@@ -1,0 +1,55 @@
+name: balades_moto
+description: Application mobile pour les balades moto
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  
+  # HTTP & API
+  http: ^1.1.0
+  dio: ^5.4.0
+  
+  # Storage sécurisé
+  flutter_secure_storage: ^9.0.0
+  
+  # Authentification biométrique
+  local_auth: ^2.1.7
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # UI & Navigation
+  cupertino_icons: ^1.0.6
+  google_maps_flutter: ^2.5.0
+  geolocator: ^10.1.0
+  geocoding: ^2.1.1
+  
+  # Utilitaires
+  intl: ^0.20.2
+  url_launcher: ^6.2.2
+  cached_network_image: ^3.3.0
+  socket_io_client: ^2.0.3+1
+  image_picker: ^1.0.7
+  file_picker: ^8.1.2
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+  share_plus: ^7.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+

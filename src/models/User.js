@@ -1,0 +1,196 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: [true, 'L\'email est requis'],
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: [/^\S+@\S+\.\S+$/, 'Veuillez entrer un email valide']
+  },
+  password: {
+    type: String,
+    required: [true, 'Le mot de passe est requis'],
+    minlength: [6, 'Le mot de passe doit contenir au moins 6 caractères']
+  },
+  // Informations de profil
+  firstName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  lastName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  pseudo: {
+    type: String,
+    required: [true, 'Le pseudo est requis'],
+    trim: true,
+    unique: true,
+    minlength: [3, 'Le pseudo doit contenir au moins 3 caractères'],
+    maxlength: [30, 'Le pseudo ne peut pas dépasser 30 caractères'],
+    match: [/^[a-zA-Z0-9_-]+$/, 'Le pseudo ne peut contenir que des lettres, chiffres, tirets et underscores']
+  },
+  vehiclePreference: {
+    type: String,
+    enum: ['moto', 'voiture', 'les deux'],
+    default: 'moto'
+  },
+  avatarUrl: {
+    type: String,
+    default: null,
+    trim: true
+  },
+  // Backgrounds personnalisés
+  customBackgrounds: {
+    balade: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    groupe: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    profil: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    global: {
+      type: String,
+      default: null,
+      trim: true
+    }
+  },
+  // Rôles et permissions
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  roles: {
+    type: [String],
+    enum: ['user', 'admin', 'moderator'],
+    default: ['user']
+  },
+  refreshToken: {
+    type: String,
+    default: null
+  },
+  // Vérification email
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    default: null
+  },
+  emailVerificationExpires: {
+    type: Date,
+    default: null
+  },
+  emailVerificationLastSent: {
+    type: Date,
+    default: null
+  },
+  // Verrouillage compte
+  loginAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockUntil: {
+    type: Date,
+    default: null
+  },
+  // Authentification à deux facteurs
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  isTwoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorMethod: {
+    type: String,
+    enum: ['totp', 'sms', 'email'],
+    default: null
+  },
+  twoFactorSecret: {
+    type: String,
+    default: null
+  }
+}, {
+  timestamps: true
+});
+
+// Index unique sur pseudo (plus besoin de sparse car le pseudo est maintenant obligatoire)
+
+// Hash du mot de passe avant sauvegarde
+userSchema.pre('save', async function(next) {
+  // Synchroniser isTwoFactorEnabled avec twoFactorEnabled
+  if (this.isModified('twoFactorEnabled')) {
+    this.isTwoFactorEnabled = this.twoFactorEnabled;
+  }
+  if (this.isModified('isTwoFactorEnabled')) {
+    this.twoFactorEnabled = this.isTwoFactorEnabled;
+  }
+  
+  if (!this.isModified('password')) {
+    return next();
+  }
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Méthode pour comparer les mots de passe
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Vérifier si le compte est verrouillé
+userSchema.methods.isLocked = function() {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+};
+
+// Incrémenter les tentatives de connexion
+userSchema.methods.incLoginAttempts = async function() {
+  // Si le compte était verrouillé et que le délai est expiré, réinitialiser
+  if (this.lockUntil && this.lockUntil < Date.now()) {
+    this.loginAttempts = 1;
+    this.lockUntil = undefined;
+    return await this.save();
+  }
+  
+  this.loginAttempts += 1;
+  
+  // Verrouiller après 5 tentatives pendant 15 minutes
+  if (this.loginAttempts >= 5 && !this.isLocked()) {
+    this.lockUntil = Date.now() + 15 * 60 * 1000; // 15 minutes
+  }
+  
+  return await this.save();
+};
+
+// Réinitialiser les tentatives de connexion
+userSchema.methods.resetLoginAttempts = async function() {
+  this.loginAttempts = 0;
+  this.lockUntil = undefined;
+  return await this.save();
+};
+
+module.exports = mongoose.model('User', userSchema);
+

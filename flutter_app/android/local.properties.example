@@ -1,0 +1,13 @@
+# Exemple de fichier local.properties
+# Copiez ce fichier vers local.properties et remplissez vos valeurs
+# local.properties est déjà dans .gitignore et ne sera pas commité
+
+sdk.dir=C:\\Users\\VOTRE_USER\\AppData\\Local\\Android\\sdk
+flutter.sdk=C:\\Users\\VOTRE_USER\\flutter
+flutter.buildMode=debug
+flutter.versionName=1.0.0
+flutter.versionCode=1
+
+# Clé API Google Maps (obligatoire)
+# Obtenez votre clé sur : https://console.cloud.google.com/google/maps-apis
+GOOGLE_MAPS_API_KEY=VOTRE_CLE_API_GOOGLE_MAPS_ICI

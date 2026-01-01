@@ -1,0 +1,155 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Build
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# Uploads
+uploads/
+src/uploads/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+.metadata
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+flutter_*.png
+*.lock
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/release/
+android/app/debug/
+android/captures/
+android/.cxx/
+android/gradle-wrapper.jar
+android/.externalNativeBuild/
+android/app/.cxx/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/App.framework
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+ios/.flutter-plugins
+ios/.flutter-plugins-dependencies
+ios/Podfile.lock
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+ios/DerivedData/
+ios/build/
+*.xcworkspace
+!default.xcworkspace
+*.xcuserdata
+*.xcuserdatad
+*.xcscmblueprint
+*.xccheckout
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Web
+web/.dart_tool/
+web/build/
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+web/index.html.bak
+flutter_app/web/index.html.bak
+
+# Test
+.jest/
+coverage/
+
+# Misc
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
