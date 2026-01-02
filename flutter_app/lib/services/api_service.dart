@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/ride.dart';
 import '../config/api_config.dart';
+import '../exceptions/auth_exception.dart';
+import '../exceptions/resend_email_exception.dart';
 
 class ApiService {
   static const String baseUrl = ApiConfig.apiUrl;
@@ -50,6 +52,11 @@ class ApiService {
 
   void setOnTokenExpired(Function()? callback) {
     _onTokenExpired = callback;
+  }
+
+  // Méthode publique pour faire des requêtes GET avec rafraîchissement automatique du token
+  Future<http.Response> get(Uri uri) async {
+    return _makeRequest(() => http.get(uri, headers: _headers));
   }
 
   // Wrapper pour les requêtes HTTP avec rafraîchissement automatique du token
@@ -128,35 +135,198 @@ class ApiService {
     );
 
     if (response.statusCode == 201) {
-      return jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
+      return responseData;
     } else {
-      throw Exception(jsonDecode(response.body)['message'] ?? 'Erreur d\'inscription');
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur d\'inscription');
     }
   }
 
   Future<Map<String, dynamic>> login(String email, String password, {String? totpCode}) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/login'),
-      headers: _headers,
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        if (totpCode != null) 'totpCode': totpCode,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: _headers,
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          if (totpCode != null) 'totpCode': totpCode,
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception(jsonDecode(response.body)['message'] ?? 'Erreur de connexion');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        // Extraire le message d'erreur du backend
+        Map<String, dynamic> responseData;
+        try {
+          responseData = jsonDecode(response.body);
+        } catch (e) {
+          // Si le parsing échoue, utiliser le body brut
+          throw AuthException(
+            code: AuthException.unknown,
+            message: 'Erreur de connexion: ${response.body}',
+            statusCode: response.statusCode,
+          );
+        }
+        
+        final message = responseData['message'] ?? 'Erreur de connexion';
+        
+        // Gérer spécifiquement les erreurs 403 (email non vérifié)
+        if (response.statusCode == 403) {
+          throw AuthException(
+            code: AuthException.emailNotVerified,
+            message: message,
+            statusCode: 403,
+          );
+        }
+        
+        // Gérer les erreurs 401 (identifiants invalides)
+        if (response.statusCode == 401) {
+          throw AuthException(
+            code: AuthException.invalidCredentials,
+            message: message,
+            statusCode: 401,
+          );
+        }
+        
+        // Pour les autres erreurs, utiliser un code générique
+        throw AuthException(
+          code: AuthException.unknown,
+          message: message,
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      // Si c'est déjà une AuthException, la relancer telle quelle
+      if (e is AuthException) {
+        rethrow;
+      }
+      // Si c'est une Exception, la convertir en AuthException
+      if (e is Exception) {
+        throw AuthException(
+          code: AuthException.unknown,
+          message: e.toString().replaceAll('Exception: ', ''),
+        );
+      }
+      // Sinon, wrapper dans une AuthException
+      throw AuthException(
+        code: AuthException.unknown,
+        message: e.toString(),
+      );
+    }
+  }
+
+  /// Connexion via OAuth (Google, Apple, Facebook)
+  Future<Map<String, dynamic>> socialLogin({
+    required String provider,
+    required String? accessToken,
+    String? idToken,
+    String? firstName,
+    String? lastName,
+    String? email,
+  }) async {
+    try {
+      // Construire le body selon le provider
+      final body = <String, dynamic>{};
+      
+      // Pour Google, préférer l'idToken (JWT) mais accepter l'accessToken en fallback
+      // ⚠️ PROBLÈME CONNU : Sur Flutter Web, google_sign_in ne retourne pas toujours l'idToken
+      if (provider == 'google') {
+        if (idToken != null && idToken.isNotEmpty) {
+          // Préférer l'idToken (JWT) si disponible
+          body['idToken'] = idToken;
+        } else if (accessToken != null && accessToken.isNotEmpty) {
+          // Fallback : utiliser l'accessToken si l'idToken n'est pas disponible (cas Flutter Web)
+          body['accessToken'] = accessToken;
+        } else {
+          throw Exception('ID Token ou Access Token Google requis pour l\'authentification');
+        }
+      } else {
+        // Pour les autres providers (Apple, Facebook), utiliser accessToken ou idToken selon le cas
+        if (accessToken != null) {
+          body['accessToken'] = accessToken;
+        }
+        if (idToken != null) {
+          body['idToken'] = idToken;
+        }
+        if (firstName != null) {
+          body['firstName'] = firstName;
+        }
+        if (lastName != null) {
+          body['lastName'] = lastName;
+        }
+        if (email != null) {
+          body['email'] = email;
+        }
+      }
+      
+      // 🔍 DEBUG : Log de la charge utile envoyée (sans afficher les tokens complets)
+      final bodyForLog = <String, dynamic>{};
+      if (body.containsKey('idToken')) {
+        final token = body['idToken'] as String;
+        bodyForLog['idToken'] = token.length > 10 ? '${token.substring(0, 10)}...' : '${token}...';
+      }
+      if (body.containsKey('accessToken')) {
+        final token = body['accessToken'] as String;
+        bodyForLog['accessToken'] = token.length > 10 ? '${token.substring(0, 10)}...' : '${token}...';
+      }
+      if (body.containsKey('firstName')) bodyForLog['firstName'] = body['firstName'];
+      if (body.containsKey('lastName')) bodyForLog['lastName'] = body['lastName'];
+      if (body.containsKey('email')) bodyForLog['email'] = body['email'];
+      
+      debugPrint('🔍 [DEBUG API] Requête POST vers: $baseUrl/auth/social/$provider');
+      debugPrint('🔍 [DEBUG API] Headers: ${_headers.toString()}');
+      debugPrint('🔍 [DEBUG API] Body (masqué): $bodyForLog');
+      debugPrint('🔍 [DEBUG API] Content-Type présent: ${_headers.containsKey('Content-Type')}');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/social/$provider'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+
+      // 🔍 DEBUG : Logs de la réponse HTTP
+      debugPrint('🔍 [DEBUG API] Réponse HTTP reçue:');
+      debugPrint('   - Status Code: ${response.statusCode}');
+      debugPrint('   - Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        // Parser le JSON pour extraire le message d'erreur
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMessage = errorData['message'] ?? response.body;
+          debugPrint('🔍 [DEBUG API] Erreur parsée: $errorMessage');
+          throw Exception(errorMessage);
+        } catch (e) {
+          // Si le parsing échoue, utiliser directement response.body
+          if (e is FormatException) {
+            debugPrint('🔍 [DEBUG API] Erreur de parsing JSON, utilisation de response.body brut');
+            throw Exception(response.body);
+          }
+          rethrow;
+        }
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la connexion OAuth: $e');
+      rethrow;
     }
   }
 
   Future<void> logout() async {
-    await http.post(
-      Uri.parse('$baseUrl/auth/logout'),
-      headers: _headers,
-    );
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: _headers,
+      );
+    } catch (e) {
+      // Ignorer les erreurs de logout (token expiré, etc.)
+      // Le logout local sera effectué de toute façon
+      debugPrint('Erreur lors du logout (ignorée): $e');
+    }
   }
 
   Future<Map<String, dynamic>> verifyEmail(String token) async {
@@ -177,9 +347,12 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
+    // Endpoint public, ne pas utiliser le token
     final response = await http.post(
       Uri.parse('$baseUrl/auth/resend-verification'),
-      headers: _headers,
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: jsonEncode({
         'email': email,
       }),
@@ -190,9 +363,15 @@ class ApiService {
     if (response.statusCode == 200) {
       return responseData;
     } else if (response.statusCode == 429) {
-      // Erreur de cooldown
+      // Erreur de cooldown - retourner retryAfter dans la réponse pour que le frontend puisse l'utiliser
       final retryAfter = responseData['retryAfter'] as int?;
-      throw Exception('${responseData['message'] ?? 'Veuillez attendre avant de renvoyer l\'email'}${retryAfter != null ? ' ($retryAfter secondes)' : ''}');
+      final message = responseData['message'] ?? 'Veuillez attendre avant de renvoyer l\'email';
+      
+      // Créer une exception personnalisée qui contient retryAfter
+      throw ResendEmailException(
+        message: message,
+        retryAfter: retryAfter,
+      );
     } else {
       throw Exception(responseData['message'] ?? 'Erreur lors du renvoi de l\'email');
     }
@@ -318,6 +497,22 @@ class ApiService {
   }
 
   // Supprimer un background personnalisé
+  Future<void> deleteAccount() async {
+    final response = await _makeRequest(() async {
+      return await http.delete(
+        Uri.parse('$baseUrl/user/delete-account'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la suppression du compte');
+    }
+  }
+
   Future<void> deleteBackground(String type) async {
     final response = await _makeRequest(() async {
       return await http.delete(
@@ -781,9 +976,13 @@ class ApiService {
   }
 
   // Groupes
-  Future<List<dynamic>> getGroups() async {
+  Future<List<dynamic>> getGroups({String? membre}) async {
+    final uri = membre != null
+        ? Uri.parse('$baseUrl/groups').replace(queryParameters: {'membre': membre})
+        : Uri.parse('$baseUrl/groups');
+    
     final response = await http.get(
-      Uri.parse('$baseUrl/groups'),
+      uri,
       headers: _headers,
     );
 

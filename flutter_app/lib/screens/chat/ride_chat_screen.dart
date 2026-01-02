@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/socket_service.dart';
@@ -89,12 +90,25 @@ class _RideChatScreenState extends State<RideChatScreen> {
       });
 
       _socketService.onError((data) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? 'Erreur'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (!mounted) return;
+        // Utiliser SchedulerBinding pour s'assurer que le callback s'exécute dans le bon contexte
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+            if (scaffoldMessenger != null) {
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text(data['message'] ?? 'Erreur'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          } catch (e) {
+            // Ignorer si le contexte n'est plus valide
+            debugPrint('Erreur lors de l\'affichage du SnackBar: $e');
+          }
+        });
       });
 
       // Rejoindre la room et charger les messages
@@ -157,12 +171,17 @@ class _RideChatScreenState extends State<RideChatScreen> {
     if (messageText.isEmpty) return;
 
     if (!_socketService.isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connexion en cours, veuillez patienter...'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (mounted) {
+        final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+        if (scaffoldMessenger != null) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('Connexion en cours, veuillez patienter...'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
       return;
     }
 
@@ -174,12 +193,17 @@ class _RideChatScreenState extends State<RideChatScreen> {
       
       // Le message sera ajouté automatiquement via le listener 'new-message'
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+        if (scaffoldMessenger != null) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

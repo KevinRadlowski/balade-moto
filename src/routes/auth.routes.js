@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
+const socialAuthController = require('../controllers/social-auth.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const {
   validateRegister,
@@ -13,6 +14,11 @@ const {
 // Routes publiques
 router.post('/register', validateRegister, authController.register);
 router.post('/login', validateLogin, authController.login);
+
+// Routes OAuth
+router.post('/social/google', socialAuthController.googleAuth);
+router.post('/social/apple', socialAuthController.appleAuth);
+router.post('/social/facebook', socialAuthController.facebookAuth);
 router.post('/resend-verification', validateResendVerification, authController.resendVerificationEmail);
 router.get('/verify-email', authController.verifyEmail);
 router.post('/verify-email', validateVerifyEmail, authController.verifyEmail);

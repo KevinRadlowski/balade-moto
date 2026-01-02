@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -10,13 +9,16 @@ import '../../models/user.dart';
 import '../../widgets/like_button.dart';
 import '../../widgets/ride_route_preview.dart';
 import '../../utils/background_helper.dart';
-import '../../widgets/navigation/navigation_app_selector.dart';
 import '../../config/api_config.dart';
+import '../../constants/home_style_constants.dart';
+import '../../widgets/home/home_hero_header.dart';
+import '../../widgets/home/next_ride_card.dart';
+import '../../widgets/home/favorite_groups_card.dart';
+import '../../widgets/home/discover_preview_card.dart';
+import '../../widgets/home/quick_actions_fab.dart';
 import '../ride/ride_detail_screen.dart';
 import '../ride/create_ride_with_map_screen.dart';
-import '../groups/group_detail_screen.dart';
 import '../groups/groups_screen.dart';
-import '../groups/create_group_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -66,6 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -88,14 +92,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadAllRides(),
       ]);
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -241,10 +249,56 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Compte le nombre de balades à venir pour le micro-signal
+  int? _getUpcomingRidesCount() {
+    // On pourrait charger toutes les balades à venir, mais pour l'instant
+    // on retourne null si on n'a pas cette info chargée
+    // TODO: Charger le count depuis l'API si nécessaire
+    return null;
+  }
+
   Future<void> _loadMyGroups() async {
     try {
-      final groupsData = await _apiService.getGroups();
-      final groups = groupsData.map((g) => Group.fromJson(g)).toList();
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userId = authService.user?.id;
+      
+      // Ne charger que les groupes dont l'utilisateur est membre
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _myGroups = [];
+          });
+        }
+        return;
+      }
+      
+      // Utiliser le paramètre 'membre' pour ne récupérer que les groupes où l'utilisateur est membre
+      final groupsData = await _apiService.getGroups(membre: userId);
+      final groups = groupsData.map((g) {
+        final group = Group.fromJson(g);
+        // Si le backend ne fournit pas unreadCount/lastMessageAt, simuler temporairement
+        // TODO: Retirer cette simulation quand le backend sera prêt
+        if (group.unreadCount == null && group.lastMessageAt == null) {
+          // Simuler des données mockées pour la démo
+          // En production, ces données viendront du backend
+          return Group(
+            id: group.id,
+            nom: group.nom,
+            description: group.description,
+            visibilite: group.visibilite,
+            createur: group.createur,
+            membres: group.membres,
+            bannedUsers: group.bannedUsers,
+            // Mock: simuler un groupe avec 2 messages non lus
+            unreadCount: group.membres.length > 1 ? 2 : 0,
+            // Mock: simuler un dernier message il y a 30 minutes
+            lastMessageAt: group.membres.length > 1 
+                ? DateTime.now().subtract(const Duration(minutes: 30))
+                : null,
+          );
+        }
+        return group;
+      }).toList();
       
       // Limiter à 3 groupes maximum
       if (mounted) {
@@ -280,10 +334,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return true;
       }).toList();
 
-      // Limiter à 2-3 éléments maximum
+      // Limiter à 2 éléments maximum pour la section Découvrir
       if (mounted) {
         setState(() {
-          _suggestedRides = filteredRides.take(3).toList();
+          _suggestedRides = filteredRides.take(2).toList();
         });
       }
     } catch (e) {
@@ -318,6 +372,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleLike(String rideId, bool newLikeState) async {
+    if (!mounted) return;
+    
     // Mise à jour optimiste
     setState(() {
       _likesState[rideId] = newLikeState;
@@ -353,47 +409,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) {
-      return 'Bonjour';
-    } else if (hour < 18) {
-      return 'Bon après-midi';
-    } else {
-      return 'Bonsoir';
-    }
-  }
-
-  String _getAvatarUrl(String avatarUrl) {
-    // Utiliser ApiConfig.getFileUrl() qui gère le remplacement de localhost
-    return ApiConfig.getFileUrl(avatarUrl);
-  }
-
-  String _getVehicleBadgeText(String? preference) {
-    switch (preference) {
-      case 'moto':
-        return '🏍️ Moto';
-      case 'voiture':
-        return '🚗 Voiture';
-      case 'les deux':
-        return '🏍️🚗 Moto & Voiture';
-      default:
-        return '🏍️ Moto';
-    }
-  }
-
-  Color _getVehicleBadgeColor(String? preference) {
-    switch (preference) {
-      case 'moto':
-        return Colors.orange.shade700;
-      case 'voiture':
-        return Colors.blue.shade700;
-      case 'les deux':
-        return Colors.purple.shade700;
-      default:
-        return Colors.orange.shade700;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -462,14 +477,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CustomScrollView(
                       controller: _scrollController,
                       slivers: [
-                        // AppBar personnalisé
+                        // Hero Header (25-30% de l'écran, réduit sur petits écrans)
                         SliverAppBar(
-                          expandedHeight: 120,
+                          expandedHeight: () {
+                            final screenHeight = MediaQuery.of(context).size.height;
+                            if (screenHeight < 650) {
+                              return screenHeight * 0.18; // 18% sur très petits écrans (Xiaomi) - encore plus réduit
+                            } else if (screenHeight < 700) {
+                              return screenHeight * 0.23; // 23% sur petits écrans
+                            } else {
+                              return screenHeight * 0.28; // 28% sur grands écrans
+                            }
+                          }(),
                           floating: false,
-                          pinned: true,
+                          pinned: false, // Ne pas épingler pour un effet plus immersif
+                          snap: false,
                           backgroundColor: Colors.transparent,
                           flexibleSpace: FlexibleSpaceBar(
-                            background: _buildHeader(user),
+                            stretchModes: const [
+                              StretchMode.zoomBackground,
+                              StretchMode.blurBackground,
+                            ],
+                            background: HomeHeroHeader(
+                              user: user,
+                              secondaryMessage: _getSecondaryMessage(),
+                              nextRide: _nextRide,
+                              groups: _myGroups,
+                              upcomingRidesCount: _getUpcomingRidesCount(),
+                            ),
                           ),
                         ),
                         // Contenu scrollable
@@ -479,6 +514,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Espacement clair après le hero header
+                                const SizedBox(height: 24),
                                 // Section: Ma prochaine balade
                                 _buildNextRideSection(),
                                 const SizedBox(height: 16),
@@ -493,6 +530,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 
                                 // Section: Toutes les balades
                                 _buildAllRidesSection(),
+                                // Padding pour éviter le chevauchement avec le FAB
+                                const SizedBox(height: 80),
                               ],
                             ),
                           ),
@@ -501,114 +540,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
       ),
-      floatingActionButton: _buildQuickActions(),
+      floatingActionButton: QuickActionsFab(
+        scrollController: _scrollController,
+      ),
     );
   }
 
-  Widget _buildHeader(User? user) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.3),
-            Colors.transparent,
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.white.withOpacity(0.3),
-                backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                    ? NetworkImage(_getAvatarUrl(user.avatarUrl!))
-                    : null,
-                onBackgroundImageError: (exception, stackTrace) {
-                  // En cas d'erreur de chargement, afficher l'initiale
-                  debugPrint('Erreur de chargement de l\'avatar: $exception');
-                },
-                child: (user?.avatarUrl == null || user!.avatarUrl!.isEmpty)
-                    ? Text(
-                        user != null && user.displayName.isNotEmpty
-                            ? user.displayName.substring(0, 1).toUpperCase()
-                            : 'U',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              // Message de bienvenue
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${_getGreeting()}, ${user?.displayName ?? "Utilisateur"}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black54,
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getSecondaryMessage(),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                        shadows: const [
-                          Shadow(
-                            color: Colors.black54,
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Badge véhicule
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getVehicleBadgeColor(user?.vehiclePreference).withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _getVehicleBadgeText(user?.vehiclePreference),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildNextRideSection() {
-    return _GlassCard(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: HomeStyleConstants.cardPadding,
+      decoration: HomeStyleConstants.glassCardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -627,7 +570,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           if (_nextRide != null)
-            _buildNextRideCard(_nextRide!)
+            NextRideCard(
+              ride: _nextRide!,
+              locationText: _getLocationText(_nextRide!),
+              onDataReload: _loadData,
+            )
           else
             _buildNoNextRideCard(),
         ],
@@ -635,173 +582,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNextRideCard(Ride ride) {
-    final dateTime = DateTime(
-      ride.date.year,
-      ride.date.month,
-      ride.date.day,
-      int.parse(ride.heure.split(':')[0]),
-      int.parse(ride.heure.split(':')[1]),
-    );
-    final dateFormat = DateFormat('EEEE d MMMM', 'fr_FR');
-    final timeFormat = DateFormat('HH:mm');
-
-    final locationText = _getLocationText(ride);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Titre
-        Text(
-          ride.titre,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Date et heure
-        Row(
-          children: [
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade700),
-            const SizedBox(width: 6),
-            Text(
-              '${dateFormat.format(dateTime)} à ${timeFormat.format(dateTime)}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Lieu de départ
-        Row(
-          children: [
-            Icon(Icons.location_on, size: 16, color: Colors.grey.shade700),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                locationText,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Participants
-        Row(
-          children: [
-            Icon(Icons.people, size: 16, color: Colors.grey.shade700),
-            const SizedBox(width: 6),
-            Text(
-              '${ride.participants.length} participant${ride.participants.length > 1 ? 's' : ''}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // Boutons d'action
-        Column(
-          children: [
-            // Bouton Naviguer (pleine largeur, mis en évidence)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  if (ride.waypoints != null && ride.waypoints!.isNotEmpty) {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (context) => NavigationAppSelector(
-                        waypoints: ride.waypoints!,
-                        rideId: ride.id,
-                        rideName: ride.titre,
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Aucun trajet configuré pour cette balade'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.navigation, size: 20),
-                label: const Text(
-                  'Naviguer',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Boutons secondaires
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => RideDetailScreen(rideId: ride.id),
-                        ),
-                      ).then((_) => _loadData());
-                    },
-                    icon: const Icon(Icons.visibility, size: 18),
-                    label: const Text('Voir la balade'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // Trouver le groupe associé à la balade ou créer une conversation
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => RideDetailScreen(rideId: ride.id),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                    label: const Text('Chat'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildNoNextRideCard() {
     return Container(
@@ -857,7 +637,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return const SizedBox.shrink();
     }
 
-    return _GlassCard(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: HomeStyleConstants.cardPadding,
+      decoration: HomeStyleConstants.glassCardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -890,164 +673,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          ..._myGroups.map((group) => _buildGroupCard(group)),
+          ..._myGroups.map((group) => FavoriteGroupsCard(
+                group: group,
+                onDataReload: _loadData,
+              )),
         ],
       ),
     );
   }
 
-  Widget _buildGroupCard(Group group) {
-    final isPublic = group.visibilite == 'publique';
-    // Indicateur d'activité : groupe actif s'il a plusieurs membres
-    // TODO: Implémenter la vérification de nouveaux messages et d'activité récente
-    final isActive = group.membres.length > 1;
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => GroupDetailScreen(groupId: group.id),
-            ),
-          ).then((_) => _loadData());
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Icône groupe avec indicateur d'activité
-              Stack(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: (isPublic ? Colors.green : Colors.orange).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      isPublic ? Icons.public : Icons.lock,
-                      color: isPublic ? Colors.green.shade700 : Colors.orange.shade700,
-                    ),
-                  ),
-                  if (isActive)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              // Infos groupe
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            group.nom,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (isActive)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Actif',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.people,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${group.membres.length} membre${group.membres.length > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (isPublic ? Colors.green : Colors.orange).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            isPublic ? 'Public' : 'Privé',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isPublic ? Colors.green.shade700 : Colors.orange.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildDiscoverSection() {
     if (_suggestedRides.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return _GlassCard(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: HomeStyleConstants.cardPadding,
+      decoration: HomeStyleConstants.glassCardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1070,142 +714,39 @@ class _HomeScreenState extends State<HomeScreen> {
               TextButton(
                 onPressed: () {
                   // Scroll vers la section "Toutes les balades"
-                  _scrollController.animateTo(
-                    _scrollController.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  }
                 },
                 child: const Text('Voir plus'),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._suggestedRides.map((ride) => _buildSuggestedRideCard(ride)),
+          ..._suggestedRides.map((ride) => DiscoverPreviewCard(
+                ride: ride,
+                locationText: _getLocationText(ride),
+                onDataReload: _loadData,
+              )),
         ],
       ),
     );
   }
 
-  Widget _buildSuggestedRideCard(Ride ride) {
-    final dateTime = DateTime(
-      ride.date.year,
-      ride.date.month,
-      ride.date.day,
-      int.parse(ride.heure.split(':')[0]),
-      int.parse(ride.heure.split(':')[1]),
-    );
-    final dateFormat = DateFormat('d MMM', 'fr_FR');
-
-    final locationText = _getLocationText(ride);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RideDetailScreen(rideId: ride.id),
-            ),
-          ).then((_) => _loadData());
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Icône type véhicule
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: (ride.typeVehicule == 'moto' ? Colors.orange : Colors.blue).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  ride.typeVehicule == 'moto' ? Icons.motorcycle : Icons.directions_car,
-                  color: ride.typeVehicule == 'moto' ? Colors.orange.shade700 : Colors.blue.shade700,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Infos balade
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ride.titre,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          dateFormat.format(dateTime),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(Icons.location_on, size: 12, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            locationText,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Bouton voir
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RideDetailScreen(rideId: ride.id),
-                    ),
-                  ).then((_) => _loadData());
-                },
-                child: const Text('Voir'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildAllRidesSection() {
     if (_allRides.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return _GlassCard(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: HomeStyleConstants.cardPadding,
+      decoration: HomeStyleConstants.glassCardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1264,165 +805,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
-    return FloatingActionButton.extended(
-      onPressed: () {
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (context) => Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Que veux-tu faire ?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildQuickActionButton(
-                  icon: Icons.add_location_alt,
-                  label: 'Créer une balade',
-                  color: Colors.blue.shade700,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CreateRideWithMapScreen(),
-                      ),
-                    ).then((_) => _loadData());
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildQuickActionButton(
-                  icon: Icons.group_add,
-                  label: 'Créer un groupe',
-                  color: Colors.purple.shade700,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CreateGroupScreen(),
-                      ),
-                    ).then((_) => _loadData());
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildQuickActionButton(
-                  icon: Icons.search,
-                  label: 'Rechercher une balade',
-                  color: Colors.green.shade700,
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Scroll vers la section "Toutes les balades"
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        );
-      },
-      icon: const Icon(Icons.add),
-      label: const Text('Actions rapides'),
-      backgroundColor: Colors.blue.shade700,
-    );
-  }
-
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const Spacer(),
-            Icon(Icons.chevron_right, color: color),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-// Widget pour les cards avec effet glassmorphism
-class _GlassCard extends StatelessWidget {
-  final Widget child;
-
-  const _GlassCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
 
 // Card pour les balades (réutilisée depuis l'ancien code)
 class _RideCard extends StatelessWidget {

@@ -21,6 +21,7 @@ import 'group_info_screen.dart';
 import 'select_ride_screen.dart';
 import '../../screens/ride/create_ride_with_map_screen.dart';
 import '../../models/ride.dart';
+import '../../widgets/chat/create_poll_dialog.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1010,14 +1011,54 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
   }
 
   Future<void> _handlePoll() async {
-    // TODO: Implémenter la création de sondage
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Création de sondage - À implémenter'),
-          backgroundColor: Colors.orange,
-        ),
+    try {
+      final pollData = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => const CreatePollDialog(),
       );
+
+      if (pollData != null && mounted) {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final token = await authService.storage.read(key: 'token');
+        _chatService.setToken(token);
+
+        // Envoyer le sondage via l'API
+        await _chatService.sendMessage(
+          conversationId: widget.groupId,
+          type: 'group',
+          content: pollData['question'] as String,
+          messageType: 'poll',
+          pollData: pollData,
+          replyToMessageId: _replyingToMessageId,
+        );
+
+        // Le message sera automatiquement ajouté via Socket.io
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sondage créé avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          // Réinitialiser la réponse si nécessaire
+          if (_replyingToMessageId != null) {
+            setState(() {
+              _replyingToMessageId = null;
+              _replyPreview = null;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la création du sondage: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

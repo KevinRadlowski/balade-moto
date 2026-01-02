@@ -1,6 +1,6 @@
-# Application Flutter - Balades Moto
+# RideTogether
 
-Application mobile Flutter pour gérer et participer aux balades moto.
+Application mobile Flutter pour organiser et participer à des balades moto.
 
 ## Prérequis
 

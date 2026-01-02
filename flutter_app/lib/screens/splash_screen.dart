@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
-import 'auth/login_screen.dart';
-import 'main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,50 +11,27 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
-  }
-
-  Future<void> _checkAuth() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    
-    // Attendre que le service vérifie l'authentification
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (!mounted) return;
-
-    if (authService.isAuthenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    }
+    // Ne plus gérer la navigation ici, c'est fait dans main.dart via Consumer
+    // Le SplashScreen s'affiche uniquement pendant isInitializing
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.primary,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.motorcycle,
-              size: 80,
-              color: Theme.of(context).primaryColor,
+            Image.asset(
+              'assets/images/logo.png',
+              height: 120,
+              fit: BoxFit.contain,
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Balades Moto',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+            const SizedBox(height: 48),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
-            const SizedBox(height: 40),
-            const CircularProgressIndicator(),
           ],
         ),
       ),

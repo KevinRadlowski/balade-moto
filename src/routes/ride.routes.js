@@ -19,10 +19,32 @@ router.get('/proches', authMiddleware, rateLimitMiddleware(10, 60000), validateG
 router.get('/past', authMiddleware, validateGetRides, rideController.getPastRides);
 router.get('/my-past', authMiddleware, validateGetRides, rideController.getMyPastRides);
 router.get('/calendar', authMiddleware, rideController.getCalendar);
-// Routes utilitaires (doivent être AVANT /:id pour éviter les conflits)
-router.get('/directions/route', rideController.calculateRoute);
-router.get('/geocode', rideController.geocodeAddress);
-router.get('/reverse-geocode', rideController.reverseGeocode);
+// Routes utilitaires Google Maps (doivent être AVANT /:id pour éviter les conflits)
+// PROTECTION: Auth + Rate Limit + Validation
+const {
+  validateCalculateRoute,
+  validateGeocodeAddress,
+  validateReverseGeocode
+} = require('../validators/google-maps.validator');
+
+router.get('/directions/route', 
+  authMiddleware, 
+  rateLimitMiddleware(20, 60000), // 20 req/min
+  validateCalculateRoute, 
+  rideController.calculateRoute
+);
+router.get('/geocode', 
+  authMiddleware, 
+  rateLimitMiddleware(20, 60000), // 20 req/min
+  validateGeocodeAddress, 
+  rideController.geocodeAddress
+);
+router.get('/reverse-geocode', 
+  authMiddleware, 
+  rateLimitMiddleware(20, 60000), // 20 req/min
+  validateReverseGeocode, 
+  rideController.reverseGeocode
+);
 // Routes avec paramètre :id (doivent être en dernier)
 router.get('/:id', authMiddleware, validateRideId, rideController.getRideById);
 router.get('/:id/ics', authMiddleware, validateRideId, rideController.exportRideICS);

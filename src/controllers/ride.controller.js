@@ -4,6 +4,7 @@ const Like = require('../models/Like');
 const icsService = require('../services/ics.service');
 const https = require('https');
 const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError } = require('../utils/errors');
+const { routeCache, geocodeCache, reverseGeocodeCache } = require('../utils/cache');
 
 exports.createRide = async (req, res, next) => {
   try {
@@ -1519,20 +1520,17 @@ exports.calculateRoute = async (req, res, next) => {
   try {
     const { origin, destination, waypoints } = req.query;
 
-    if (!origin || !destination) {
-      return res.status(400).json({
-        success: false,
-        message: 'Les paramètres origin et destination sont requis'
-      });
+    // Vérifier le cache
+    const cacheKey = { origin, destination, waypoints: waypoints || '' };
+    const cached = routeCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
     }
 
     // Construire l'URL de l'API Directions
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        message: 'Configuration serveur incomplète : clé API Google Maps manquante'
-      });
+      return next(new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante'));
     }
     let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving&key=${apiKey}`;
     
@@ -1562,43 +1560,30 @@ exports.calculateRoute = async (req, res, next) => {
             const jsonData = JSON.parse(data);
             
             if (jsonData.status === 'OK') {
-              res.status(200).json({
+              const responseData = {
                 success: true,
                 data: jsonData
-              });
+              };
+              // Mettre en cache
+              routeCache.set(cacheKey, responseData);
+              res.status(200).json(responseData);
             } else {
-              res.status(400).json({
-                success: false,
-                message: `Erreur Directions API: ${jsonData.status}`,
-                error: jsonData.error_message || 'Erreur inconnue'
-              });
+              return next(new BadRequestError(`Erreur Directions API: ${jsonData.status} - ${jsonData.error_message || 'Erreur inconnue'}`));
             }
           } catch (error) {
-            res.status(500).json({
-              success: false,
-              message: 'Erreur lors du parsing de la réponse',
-              error: error.message
-            });
+            return next(new InternalServerError(`Erreur lors du parsing de la réponse: ${error.message}`));
           }
         });
       });
 
       request.on('error', (error) => {
-        res.status(500).json({
-          success: false,
-          message: 'Erreur lors de la requête à l\'API Directions',
-          error: error.message
-        });
+        return next(new InternalServerError(`Erreur lors de la requête à l'API Directions: ${error.message}`));
       });
 
       request.end();
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du calcul de l\'itinéraire',
-      error: error.message
-    });
+    return next(new InternalServerError(`Erreur lors du calcul de l'itinéraire: ${error.message}`));
   }
 };
 
@@ -1608,17 +1593,17 @@ exports.reverseGeocode = async (req, res, next) => {
   try {
     const { lat, lng } = req.query;
 
-    if (!lat || !lng) {
-      return res.status(400).json({
-        success: false,
-        message: 'Les paramètres lat et lng sont requis'
-      });
+    // Vérifier le cache
+    const cacheKey = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    const cached = reverseGeocodeCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
     }
 
     // Construire l'URL de l'API Geocoding inverse
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      throw new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante');
+      return next(new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante'));
     }
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&language=fr`;
 
@@ -1721,7 +1706,7 @@ exports.reverseGeocode = async (req, res, next) => {
                 address = formattedAddress || 'Adresse non disponible';
               }
               
-              resolve(res.json({
+              const responseData = {
                 success: true,
                 data: {
                   address: address,
@@ -1731,39 +1716,27 @@ exports.reverseGeocode = async (req, res, next) => {
                   locality: locality,
                   country: country
                 }
-              }));
+              };
+              // Mettre en cache
+              reverseGeocodeCache.set(cacheKey, responseData);
+              resolve(res.json(responseData));
             } else {
-              resolve(res.status(404).json({
-                success: false,
-                message: 'Adresse non trouvée pour ces coordonnées'
-              }));
+              resolve(next(new NotFoundError('Adresse non trouvée pour ces coordonnées')));
             }
           } catch (error) {
-            reject(res.status(500).json({
-              success: false,
-              message: 'Erreur lors du traitement de la réponse',
-              error: error.message
-            }));
+            reject(next(new InternalServerError(`Erreur lors du traitement de la réponse: ${error.message}`)));
           }
         });
       });
 
       request.on('error', (error) => {
-        reject(res.status(500).json({
-          success: false,
-          message: 'Erreur lors de la requête à l\'API Google Maps',
-          error: error.message
-        }));
+        reject(next(new InternalServerError(`Erreur lors de la requête à l'API Google Maps: ${error.message}`)));
       });
 
       request.end();
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du géocodage inverse',
-      error: error.message
-    });
+    return next(new InternalServerError(`Erreur lors du géocodage inverse: ${error.message}`));
   }
 };
 
@@ -1771,17 +1744,17 @@ exports.geocodeAddress = async (req, res, next) => {
   try {
     const { address } = req.query;
 
-    if (!address) {
-      return res.status(400).json({
-        success: false,
-        message: 'Le paramètre address est requis'
-      });
+    // Vérifier le cache
+    const cacheKey = { address };
+    const cached = geocodeCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
     }
 
     // Construire l'URL de l'API Geocoding
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      throw new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante');
+      return next(new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante'));
     }
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
 
@@ -1810,7 +1783,7 @@ exports.geocodeAddress = async (req, res, next) => {
               const result = jsonData.results[0];
               const location = result.geometry.location;
               
-              res.status(200).json({
+              const responseData = {
                 success: true,
                 data: {
                   address: result.formatted_address,
@@ -1818,40 +1791,27 @@ exports.geocodeAddress = async (req, res, next) => {
                   longitude: location.lng,
                   placeId: result.place_id
                 }
-              });
+              };
+              // Mettre en cache
+              geocodeCache.set(cacheKey, responseData);
+              res.status(200).json(responseData);
             } else {
-              res.status(400).json({
-                success: false,
-                message: `Erreur Geocoding API: ${jsonData.status}`,
-                error: jsonData.error_message || 'Adresse non trouvée'
-              });
+              return next(new BadRequestError(`Erreur Geocoding API: ${jsonData.status} - ${jsonData.error_message || 'Adresse non trouvée'}`));
             }
           } catch (error) {
-            res.status(500).json({
-              success: false,
-              message: 'Erreur lors du parsing de la réponse',
-              error: error.message
-            });
+            return next(new InternalServerError(`Erreur lors du parsing de la réponse: ${error.message}`));
           }
         });
       });
 
       request.on('error', (error) => {
-        res.status(500).json({
-          success: false,
-          message: 'Erreur lors de la requête à l\'API Geocoding',
-          error: error.message
-        });
+        return next(new InternalServerError(`Erreur lors de la requête à l'API Geocoding: ${error.message}`));
       });
 
       request.end();
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du géocodage de l\'adresse',
-      error: error.message
-    });
+    return next(new InternalServerError(`Erreur lors du géocodage de l'adresse: ${error.message}`));
   }
 };
 

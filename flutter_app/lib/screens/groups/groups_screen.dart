@@ -69,7 +69,16 @@ class _GroupsScreenState extends State<GroupsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Groupes de discussion'),
+        centerTitle: true,
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () async {

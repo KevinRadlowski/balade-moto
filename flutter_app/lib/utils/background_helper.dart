@@ -65,6 +65,12 @@ String getProfilBackgroundImageName(String? vehiclePreference, {String? customBa
   }
 }
 
+/// Retourne le nom du fichier background pour l'écran de login
+String getLoginBackgroundImageName() {
+  // Le background de login est toujours car_moto_login_background.png
+  return 'assets/images/car_moto_login_background.png';
+}
+
 /// Retourne le background global si défini, sinon null
 String? getGlobalBackground({String? customBackground}) {
   if (customBackground != null && customBackground.isNotEmpty) {

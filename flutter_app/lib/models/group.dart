@@ -6,6 +6,9 @@ class Group {
   final GroupMember createur;
   final List<GroupMember> membres;
   final List<BannedUser>? bannedUsers;
+  // Champs pour l'indicateur d'activité
+  final int? unreadCount;
+  final DateTime? lastMessageAt;
 
   Group({
     required this.id,
@@ -15,6 +18,8 @@ class Group {
     required this.createur,
     required this.membres,
     this.bannedUsers,
+    this.unreadCount,
+    this.lastMessageAt,
   });
 
   factory Group.fromJson(Map<String, dynamic> json) {
@@ -24,6 +29,29 @@ class Group {
                        json['createur'] ?? '';
     final createurPseudo = json['createur']?['pseudo'];
     final createurAvatarUrl = json['createur']?['avatarUrl'];
+    
+    // Gérer unreadCount
+    int? unreadCount;
+    if (json['unreadCount'] != null) {
+      unreadCount = json['unreadCount'] is int 
+          ? json['unreadCount'] 
+          : int.tryParse(json['unreadCount'].toString());
+    }
+    
+    // Gérer lastMessageAt
+    DateTime? lastMessageAt;
+    if (json['lastMessageAt'] != null) {
+      try {
+        if (json['lastMessageAt'] is String) {
+          lastMessageAt = DateTime.parse(json['lastMessageAt']);
+        } else if (json['lastMessageAt'] is int) {
+          lastMessageAt = DateTime.fromMillisecondsSinceEpoch(json['lastMessageAt']);
+        }
+      } catch (e) {
+        // Ignorer les erreurs de parsing
+        lastMessageAt = null;
+      }
+    }
     
     return Group(
       id: json['id'] ?? json['_id'] ?? '',
@@ -47,6 +75,8 @@ class Group {
               .map((b) => BannedUser.fromJson(b))
               .toList()
           : [],
+      unreadCount: unreadCount,
+      lastMessageAt: lastMessageAt,
     );
   }
 }

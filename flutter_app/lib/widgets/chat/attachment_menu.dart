@@ -69,28 +69,31 @@ class AttachmentMenu extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // Ligne 2 : Audio, Sondage, Balade
+            // Ligne 2 : Audio, Sondage, Balade (si disponible)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _AttachmentOption(
-                  icon: Icons.mic,
-                  label: 'Audio',
-                  color: Colors.orange,
-                  onTap: onAudio,
-                ),
-                _AttachmentOption(
-                  icon: Icons.poll,
-                  label: 'Sondage',
-                  color: Colors.green,
-                  onTap: onPoll,
-                ),
-                _AttachmentOption(
-                  icon: rideIcon,
-                  label: 'Balade',
-                  color: Colors.red,
-                  onTap: onRide,
-                ),
+                if (onAudio != null)
+                  _AttachmentOption(
+                    icon: Icons.mic,
+                    label: 'Audio',
+                    color: Colors.orange,
+                    onTap: onAudio,
+                  ),
+                if (onPoll != null)
+                  _AttachmentOption(
+                    icon: Icons.poll,
+                    label: 'Sondage',
+                    color: Colors.green,
+                    onTap: onPoll,
+                  ),
+                if (onRide != null)
+                  _AttachmentOption(
+                    icon: rideIcon,
+                    label: 'Balade',
+                    color: Colors.red,
+                    onTap: onRide,
+                  ),
               ],
             ),
           ],

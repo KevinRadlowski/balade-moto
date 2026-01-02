@@ -3,11 +3,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'constants/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/main_navigation.dart';
 import 'screens/navigation/step_by_step_navigation_screen.dart';
 import 'services/navigation/navigation_service.dart';
 
@@ -56,26 +58,9 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _onAuthStateChanged() {
-    // Si l'utilisateur n'est plus authentifié, rediriger vers login
-    if (!authService.isAuthenticated && navigatorKey.currentContext != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (navigatorKey.currentContext != null) {
-          final context = navigatorKey.currentContext!;
-          // Vérifier qu'on n'est pas déjà sur l'écran de login ou splash
-          final currentRoute = ModalRoute.of(context);
-          final routeName = currentRoute?.settings.name;
-          
-          if (routeName != '/login' && 
-              routeName != '/verify-email' &&
-              routeName != '/') {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/login',
-              (route) => false,
-            );
-          }
-        }
-      });
-    }
+    // Ne pas rediriger pendant l'initialisation ou le chargement
+    // La redirection se fait uniquement via le Consumer dans build()
+    // Ne jamais basculer d'écran avec isLoading
   }
 
   @override
@@ -92,60 +77,82 @@ class _MyAppState extends State<MyApp> {
           value: authService,
         ),
       ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        title: 'Balades Moto',
-        debugShowCheckedModeBanner: false,
-        locale: const Locale('fr', 'FR'),
-        localizationsDelegates: [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('fr', 'FR'),
-          Locale('en', 'US'),
-        ],
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-        ),
-        home: const SplashScreen(),
-        routes: {
-          '/login': (context) => const LoginScreen(),
-        },
-        onGenerateRoute: (settings) {
-          // Gérer les liens de vérification d'email
-          if (settings.name?.startsWith('/verify-email') == true) {
-            final uri = Uri.parse(settings.name!);
-            final token = uri.queryParameters['token'];
-            if (token != null) {
-              return MaterialPageRoute(
-                builder: (_) => VerifyEmailScreen(token: token),
-              );
-            }
+      child: Consumer<AuthService>(
+        builder: (context, authService, _) {
+          // Afficher SplashScreen uniquement si isInitializing
+          if (authService.isInitializing) {
+            return MaterialApp(
+              title: 'RideTogether',
+              debugShowCheckedModeBanner: false,
+              locale: const Locale('fr', 'FR'),
+              localizationsDelegates: [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('fr', 'FR'),
+                Locale('en', 'US'),
+              ],
+              theme: AppTheme.lightTheme,
+              home: const SplashScreen(),
+            );
           }
-          // Gérer la navigation par étapes
-          if (settings.name == '/step-by-step-navigation') {
-            final args = settings.arguments as Map<String, dynamic>?;
-            if (args != null) {
-              return MaterialPageRoute(
-                builder: (_) => StepByStepNavigationScreen(
-                  rideId: args['rideId'] as String,
-                  route: args['route'] as NavigationRoute,
-                  providerId: args['providerId'] as String,
-                ),
-              );
-            }
-          }
-          return null;
+          
+          // Sinon, afficher LoginScreen ou MainNavigation selon isAuthenticated
+          // Ne jamais basculer d'écran avec isLoading
+          final homeWidget = authService.isAuthenticated 
+              ? const MainNavigation() 
+              : const LoginScreen();
+          
+          return MaterialApp(
+            navigatorKey: navigatorKey,
+            title: 'RideTogether',
+            debugShowCheckedModeBanner: false,
+            locale: const Locale('fr', 'FR'),
+            localizationsDelegates: [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('fr', 'FR'),
+              Locale('en', 'US'),
+            ],
+            theme: AppTheme.lightTheme,
+            home: homeWidget,
+            routes: {
+              '/login': (context) => const LoginScreen(),
+            },
+            onGenerateRoute: (settings) {
+              // Gérer les liens de vérification d'email
+              if (settings.name?.startsWith('/verify-email') == true) {
+                final uri = Uri.parse(settings.name!);
+                final token = uri.queryParameters['token'];
+                if (token != null) {
+                  return MaterialPageRoute(
+                    builder: (_) => VerifyEmailScreen(token: token),
+                  );
+                }
+              }
+              // Gérer la navigation par étapes
+              if (settings.name == '/step-by-step-navigation') {
+                final args = settings.arguments as Map<String, dynamic>?;
+                if (args != null) {
+                  return MaterialPageRoute(
+                    builder: (_) => StepByStepNavigationScreen(
+                      rideId: args['rideId'] as String,
+                      route: args['route'] as NavigationRoute,
+                      providerId: args['providerId'] as String,
+                    ),
+                  );
+                }
+              }
+              return null;
+            },
+          );
         },
       ),
     );
   }
 }
-

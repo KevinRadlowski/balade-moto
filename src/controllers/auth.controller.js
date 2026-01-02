@@ -62,16 +62,21 @@ exports.register = async (req, res, next) => {
     await user.save();
 
     // Envoyer l'email de vérification
+    let emailSent = false;
     try {
-      await emailService.sendVerificationEmail(email, emailVerificationToken);
+      emailSent = await emailService.sendVerificationEmail(email, emailVerificationToken);
     } catch (emailError) {
       console.error('Erreur envoi email:', emailError);
+      emailSent = false;
       // On continue même si l'email échoue, l'utilisateur peut demander un renvoi
     }
 
     res.status(201).json({
       success: true,
-      message: 'Utilisateur créé avec succès. Un email de vérification a été envoyé.',
+      message: emailSent 
+        ? 'Utilisateur créé avec succès. Un email de vérification a été envoyé.'
+        : 'Utilisateur créé avec succès. Cependant, l\'email de vérification n\'a pas pu être envoyé. Veuillez utiliser la fonction "Renvoyer l\'email de vérification" sur la page de connexion.',
+      emailSent: emailSent,
       data: {
         user: {
           id: user._id,

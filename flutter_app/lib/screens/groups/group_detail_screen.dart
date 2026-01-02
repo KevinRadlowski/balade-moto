@@ -145,7 +145,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(_group?.nom ?? 'Groupe'),
+        title: Text(
+          _group?.nom ?? 'Groupe',
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
       ),
       body: Container(
         width: double.infinity,

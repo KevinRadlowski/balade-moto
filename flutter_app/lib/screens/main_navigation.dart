@@ -4,8 +4,10 @@ import 'home/home_screen.dart';
 import 'groups/groups_screen.dart';
 import 'profile/profile_screen.dart';
 import 'rides/rides_history_screen.dart';
+import 'garage/garage_home_screen.dart';
 import '../services/auth_service.dart';
 import '../utils/vehicle_icon_helper.dart';
+import '../widgets/legal/terms_consent_banner.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -20,6 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const RidesHistoryScreen(),
+    const GarageHomeScreen(),
     const GroupsScreen(),
     const ProfileScreen(),
   ];
@@ -30,9 +33,11 @@ class _MainNavigationState extends State<MainNavigation> {
     final vehiclePreference = authService.user?.vehiclePreference;
     final rideIcon = getVehicleIcon(vehiclePreference);
     
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
+    return Stack(
+      children: [
+        Scaffold(
+          body: _screens[_currentIndex],
+          bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -50,6 +55,10 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Balades',
           ),
           const BottomNavigationBarItem(
+            icon: Icon(Icons.garage),
+            label: 'Garage',
+          ),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.group),
             label: 'Groupes',
           ),
@@ -58,7 +67,12 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Profil',
           ),
         ],
-      ),
+          ),
+        ),
+        // Bannière de consentement CGU/Confidentialité (ne devrait normalement pas s'afficher si déjà acceptées)
+        // Conservée pour compatibilité au cas où les CGU n'auraient pas été acceptées avant connexion
+        const TermsConsentBanner(),
+      ],
     );
   }
 }

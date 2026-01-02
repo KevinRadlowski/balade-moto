@@ -1,11 +1,11 @@
 {
-    "name": "Balades Moto",
-    "short_name": "Balades Moto",
+    "name": "RideTogether",
+    "short_name": "RideTogether",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Application pour les balades moto",
+    "description": "RideTogether - Application pour organiser et participer à des balades moto",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

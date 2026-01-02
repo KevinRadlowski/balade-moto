@@ -25,3 +25,4 @@ mv web/index.html.bak web/index.html
 
 echo "✅ Build terminé avec succès!"
 
+

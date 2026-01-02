@@ -28,8 +28,9 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                   onPressed: onBack,
                 )
               : null),
+      centerTitle: true,
       title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -38,14 +39,16 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
           if (subtitle != null)
             Text(
               subtitle!,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Colors.white.withOpacity(0.8),
               ),
+              overflow: TextOverflow.ellipsis,
             ),
         ],
       ),
@@ -55,6 +58,14 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.search),
             onPressed: onSearch,
           ),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Image.asset(
+            'assets/images/logo.png',
+            height: 28,
+            fit: BoxFit.contain,
+          ),
+        ),
         if (onMenu != null)
           IconButton(
             icon: const Icon(Icons.more_vert),

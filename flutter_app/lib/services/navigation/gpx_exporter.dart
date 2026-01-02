@@ -13,7 +13,7 @@ class GPXExporter {
 
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
-    buffer.writeln('<gpx version="1.1" creator="Balades Moto App" xmlns="http://www.topografix.com/GPX/1/1">');
+    buffer.writeln('<gpx version="1.1" creator="RideTogether App" xmlns="http://www.topografix.com/GPX/1/1">');
     buffer.writeln('  <metadata>');
     buffer.writeln('    <name>$routeName</name>');
     buffer.writeln('    <time>$timestamp</time>');

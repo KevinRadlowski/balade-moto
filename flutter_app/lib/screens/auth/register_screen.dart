@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/background_helper.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -53,22 +54,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
       
-      await authService.register(email, password, pseudo);
+      final result = await authService.register(email, password, pseudo);
 
       if (!mounted) return;
 
-      setState(() {
-        _successMessage = 'Inscription réussie ! Vérifiez votre email pour activer votre compte.';
-      });
+      // Déterminer le message selon si l'email a été envoyé ou non
+      final emailSent = result['emailSent'] ?? true;
+      final message = emailSent
+          ? 'Un email de validation a été envoyé à votre adresse. Veuillez vérifier votre boîte mail et cliquer sur le lien pour activer votre compte.'
+          : 'Votre compte a été créé avec succès. Cependant, l\'email de vérification n\'a pas pu être envoyé (le service email n\'est pas configuré). Veuillez utiliser le bouton "Renvoyer l\'email de vérification" ci-dessous pour recevoir votre lien de validation.';
 
-      // Retourner à la page de connexion après 2 secondes
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-          );
-        }
-      });
+      // Retourner immédiatement à la page de connexion avec un message
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            message: message,
+          ),
+        ),
+      );
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
@@ -81,31 +84,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inscription'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 40),
-                Icon(
-                  Icons.person_add,
-                  size: 80,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Créer un compte',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(getLoginBackgroundImageName()),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Overlay semi-transparent pour améliorer la lisibilité
+                  Container(
+                    padding: const EdgeInsets.all(24.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 20),
+                        // Logo RideTogether
+                        Image.asset(
+                          'assets/images/logo.png',
+                          height: 80,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Créer un compte',
+                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 40),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -256,7 +290,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                
+                const SizedBox(height: 24),
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pushReplacement(
@@ -265,12 +300,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                   child: const Text('Déjà un compte ? Se connecter'),
                 ),
-              ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
 }
 

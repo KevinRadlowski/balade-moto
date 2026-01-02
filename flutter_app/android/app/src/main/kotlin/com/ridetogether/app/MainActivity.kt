@@ -1,5 +1,6 @@
-package com.example.balades_moto
+package com.ridetogether.app
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

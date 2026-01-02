@@ -38,16 +38,27 @@ class ApiConfig {
   // ⚠️ IMPORTANT : Cette clé doit être définie via la variable d'environnement GOOGLE_MAPS_API_KEY
   // Pour lancer l'app avec la clé : flutter run --dart-define=GOOGLE_MAPS_API_KEY=votre-cle
   // Ou définissez-la dans votre IDE/CI
+  // 
+  // Pour le développement, vous pouvez aussi la mettre dans flutter_app/android/local.properties
+  // sous la forme : GOOGLE_MAPS_API_KEY=votre-cle
   // TODO: Migrer vers un proxy backend pour sécuriser la clé
   static String get googleMapsApiKey {
+    // Essayer d'abord la variable d'environnement Dart
     const key = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
-    if (key.isEmpty) {
-      throw Exception(
-        'GOOGLE_MAPS_API_KEY non définie. '
-        'Lancez avec: flutter run --dart-define=GOOGLE_MAPS_API_KEY=votre-cle'
-      );
+    if (key.isNotEmpty) {
+      return key;
     }
-    return key;
+    
+    // Pour le développement, essayer de lire depuis local.properties (Android)
+    // Note: Cette approche ne fonctionne que si vous avez déjà build Android
+    // Pour le web, utilisez le script build_web.sh/ps1/bat ou passez --dart-define
+    throw Exception(
+      'GOOGLE_MAPS_API_KEY non définie.\n'
+      'Options:\n'
+      '1. Lancez avec: flutter run --dart-define=GOOGLE_MAPS_API_KEY=votre-cle\n'
+      '2. Pour Android: Ajoutez GOOGLE_MAPS_API_KEY=votre-cle dans android/local.properties\n'
+      '3. Pour Web: Utilisez le script scripts/build_web.sh (ou .ps1/.bat)'
+    );
   }
 }
 

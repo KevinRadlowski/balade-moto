@@ -302,8 +302,22 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
     return Scaffold(
       appBar: AppBar(
         title: const Text('Balades'),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: Colors.white, // Texte blanc pour l'onglet actif
+          unselectedLabelColor: Colors.white70, // Texte blanc semi-transparent pour les onglets inactifs
+          indicatorColor: Colors.white, // Indicateur blanc sous l'onglet actif
           tabs: const [
             Tab(text: 'À venir'),
             Tab(text: 'Passées'),

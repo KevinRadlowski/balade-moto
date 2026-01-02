@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
+import '../exceptions/auth_exception.dart';
 import 'api_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -9,10 +10,12 @@ class AuthService extends ChangeNotifier {
 
   User? _user;
   bool _isLoading = false;
+  bool _isInitializing = true; // Pour _checkAuth() au boot uniquement
   bool _isAuthenticated = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
+  bool get isInitializing => _isInitializing;
   bool get isAuthenticated => _isAuthenticated;
 
   AuthService({
@@ -23,7 +26,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _checkAuth() async {
-    _isLoading = true;
+    _isInitializing = true;
     notifyListeners();
 
     try {
@@ -34,23 +37,88 @@ class AuthService extends ChangeNotifier {
         _isAuthenticated = true;
       }
     } catch (e) {
-      await logout();
+      // Ne pas appeler logout() ici car cela pourrait causer des problèmes
+      // Juste réinitialiser l'état
+      _user = null;
+      _isAuthenticated = false;
+      apiService.setToken(null);
+    } finally {
+      _isInitializing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> register(String email, String password, String pseudo) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await apiService.register(email, password, pseudo);
+      // Retourner les informations sur l'envoi d'email
+      return {
+        'emailSent': response['emailSent'] ?? true,
+        'message': response['message'] ?? 'Inscription réussie',
+      };
+    } catch (e) {
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> register(String email, String password, String pseudo) async {
+  /// Connexion via OAuth (Google, Apple, Facebook)
+  /// Appelle l'API backend une seule fois avec les tokens fournis par SocialAuthService
+  Future<void> socialLogin(String provider, Map<String, dynamic> socialData) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      await apiService.register(email, password, pseudo);
-      // Après inscription, l'utilisateur doit vérifier son email
-      // Pas de connexion automatique
+      // Appel unique à l'API backend avec les tokens récupérés par SocialAuthService
+      final response = await apiService.socialLogin(
+        provider: provider,
+        accessToken: socialData['accessToken'],
+        idToken: socialData['idToken'],
+        firstName: socialData['firstName'],
+        lastName: socialData['lastName'],
+        email: socialData['email'],
+      );
+      
+      // Vérifier que la réponse contient les données attendues
+      if (response['data'] != null) {
+        final token = response['data']['token'];
+        final refreshToken = response['data']['refreshToken'];
+        
+        // Sauvegarder les tokens
+        await storage.write(key: 'token', value: token);
+        await storage.write(key: 'refreshToken', value: refreshToken);
+        
+        // Mettre à jour l'état d'authentification
+        apiService.setToken(token);
+        _user = User.fromJson(response['data']['user']);
+        _isAuthenticated = true;
+        
+        // Ne pas lever d'exception en cas de succès (status 200)
+        // La navigation sera gérée par l'écran appelant
+      } else {
+        throw AuthException(
+          code: AuthException.unknown,
+          message: 'Erreur lors de la connexion : réponse invalide du serveur',
+        );
+      }
     } catch (e) {
-      rethrow;
+      // Réinitialiser l'état en cas d'erreur
+      _isAuthenticated = false;
+      _user = null;
+      apiService.setToken(null);
+      
+      if (e is AuthException) {
+        rethrow;
+      }
+      throw AuthException(
+        code: AuthException.unknown,
+        message: e.toString().replaceAll('Exception: ', ''),
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -83,10 +151,27 @@ class AuthService extends ChangeNotifier {
         _isAuthenticated = true;
       } else if (response['requires2FA'] == true) {
         // Nécessite un code 2FA
-        throw Exception('2FA_REQUIRED');
+        throw AuthException(
+          code: AuthException.twoFactorRequired,
+          message: 'Code 2FA requis',
+        );
+      } else {
+        // Si la réponse ne contient pas de données et pas de 2FA, c'est une erreur
+        throw AuthException(
+          code: AuthException.unknown,
+          message: 'Erreur de connexion: réponse invalide',
+        );
       }
     } catch (e) {
-      rethrow;
+      // Si c'est déjà une AuthException, la propager telle quelle
+      if (e is AuthException) {
+        rethrow;
+      }
+      // Sinon, wrapper dans une AuthException
+      throw AuthException(
+        code: AuthException.unknown,
+        message: e.toString().replaceAll('Exception: ', ''),
+      );
     } finally {
       _isLoading = false;
       notifyListeners();

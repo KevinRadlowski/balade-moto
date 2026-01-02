@@ -12,8 +12,22 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Le mot de passe est requis'],
+    required: function() {
+      // Le mot de passe est requis seulement si l'utilisateur n'utilise pas OAuth
+      return !this.authProvider;
+    },
     minlength: [6, 'Le mot de passe doit contenir au moins 6 caractères']
+  },
+  // Authentification OAuth
+  authProvider: {
+    type: String,
+    enum: ['google', 'apple', 'facebook'],
+    default: null
+  },
+  providerId: {
+    type: String,
+    default: null,
+    trim: true
   },
   // Informations de profil
   firstName: {
@@ -143,7 +157,8 @@ userSchema.pre('save', async function(next) {
     this.twoFactorEnabled = this.isTwoFactorEnabled;
   }
   
-  if (!this.isModified('password')) {
+  // Ne pas hasher le mot de passe si l'utilisateur utilise OAuth ou si le mot de passe n'est pas modifié
+  if (!this.isModified('password') || !this.password || this.authProvider) {
     return next();
   }
   

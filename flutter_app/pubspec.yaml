@@ -1,5 +1,5 @@
 name: balades_moto
-description: Application mobile pour les balades moto
+description: RideTogether - Application mobile pour organiser et participer à des balades moto
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -22,6 +22,11 @@ dependencies:
   # Authentification biométrique
   local_auth: ^2.1.7
   
+  # Authentification sociale
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.3
+  flutter_facebook_auth: ^7.1.1
+  
   # State Management
   provider: ^6.1.1
   
@@ -41,6 +46,7 @@ dependencies:
   shared_preferences: ^2.2.2
   path_provider: ^2.1.1
   share_plus: ^7.2.1
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:

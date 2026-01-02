@@ -1,6 +1,36 @@
-# Scripts de build
+# Scripts de build et développement
 
-## Scripts de build pour Flutter Web
+## Scripts pour Flutter Web
+
+### Scripts de développement (`run_web_dev.*`)
+
+Ces scripts permettent de lancer l'application Flutter Web en mode développement avec injection automatique de la clé API Google Maps.
+
+**Utilisation** :
+
+#### Linux / macOS
+```bash
+export GOOGLE_MAPS_API_KEY='votre-cle-api-google-maps'
+cd flutter_app
+chmod +x scripts/run_web_dev.sh
+./scripts/run_web_dev.sh
+```
+
+#### Windows PowerShell
+```powershell
+$env:GOOGLE_MAPS_API_KEY='votre-cle-api-google-maps'
+cd flutter_app
+.\scripts\run_web_dev.ps1
+```
+
+#### Windows CMD
+```cmd
+set GOOGLE_MAPS_API_KEY=votre-cle-api-google-maps
+cd flutter_app
+scripts\run_web_dev.bat
+```
+
+### Scripts de build (`build_web.*`)
 
 Ces scripts permettent de builder l'application Flutter Web en injectant automatiquement la clé API Google Maps depuis une variable d'environnement.
 

@@ -38,6 +38,8 @@ const messageRoutes = require('./routes/message.routes');
 const ratingRoutes = require('./routes/rating.routes');
 const likeRoutes = require('./routes/like.routes');
 const reviewRoutes = require('./routes/review.routes');
+const garageRoutes = require('./routes/garage.routes');
+const catalogRoutes = require('./routes/catalog.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -52,6 +54,10 @@ connectDB();
 // Middlewares de sécurité
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  // ⚠️ IMPORTANT : Configuration COOP pour permettre les popups OAuth (Google Sign-In)
+  // "same-origin-allow-popups" permet aux popups OAuth de fonctionner correctement
+  // tout en conservant la sécurité contre les attaques XS-Leaks
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -148,13 +154,38 @@ app.use('/uploads', (req, res, next) => {
   next();
 });
 
-app.use('/uploads', express.static(uploadsPath, {
-  setHeaders: (res, filePath) => {
-    // Définir les en-têtes CORS pour les fichiers statiques
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  },
+app.use('/uploads', (req, res, next) => {
+  // Middleware pour définir les headers avant de servir le fichier
+  const filePath = path.join(uploadsPath, req.path.replace('/uploads', ''));
+  
+  // CORS aligné avec la whitelist (pas de '*')
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  // Forcer Content-Disposition: attachment pour fichiers non-image
+  const ext = path.extname(filePath).toLowerCase();
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  if (!imageExts.includes(ext)) {
+    res.setHeader('Content-Disposition', 'attachment');
+  }
+  
+  next();
+}, express.static(uploadsPath, {
   fallthrough: false // Ne pas continuer si le fichier n'existe pas
 }));
+
+// Servir les assets statiques (images pour emails, etc.)
+const assetsPath = path.join(__dirname, '..', 'flutter_app', 'assets', 'images');
+if (fs.existsSync(assetsPath)) {
+  app.use('/assets/images', express.static(assetsPath, {
+    setHeaders: (res, filePath) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache 1 an
+    }
+  }));
+}
 
 // Documentation Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -171,6 +202,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/likes', likeRoutes);
+app.use('/api/garage', garageRoutes);
+app.use('/api/catalog', catalogRoutes);
 
 // Route de test
 app.get('/', (req, res) => {

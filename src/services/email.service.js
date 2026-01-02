@@ -5,14 +5,14 @@ require('dotenv').config();
 let transporter = null;
 
 // Créer le transporteur seulement si les credentials sont configurés
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: process.env.EMAIL_PORT || 587,
     secure: false, // true pour 465, false pour autres ports
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
   });
 
@@ -20,13 +20,13 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   transporter.verify((error, success) => {
     if (error) {
       console.warn('⚠️  Configuration email non valide. Les emails ne pourront pas être envoyés.');
-      console.warn('   Vérifiez vos variables SMTP_USER et SMTP_PASS dans le fichier .env');
+      console.warn('   Vérifiez vos variables EMAIL_USER et EMAIL_PASS dans le fichier .env');
     } else {
       console.log('✅ Serveur email prêt à envoyer des messages');
     }
   });
 } else {
-  console.warn('⚠️  Variables SMTP_USER et SMTP_PASS non configurées.');
+  console.warn('⚠️  Variables EMAIL_USER et EMAIL_PASS non configurées.');
   console.warn('   Les fonctionnalités d\'envoi d\'email seront désactivées.');
   console.warn('   Ajoutez ces variables dans votre fichier .env pour activer les emails.');
 }
@@ -43,26 +43,85 @@ const sendVerificationEmail = async (email, token) => {
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
   const verificationUrl = `${backendUrl}/api/auth/verify-email?token=${token}`;
   
+  // URLs des images (servies depuis le backend ou assets)
+  const logoUrl = `https://www.ridetogether.fr/logo.png`;
+  const backgroundUrl = `https://www.ridetogether.fr/bg-home2.png`;
+  
   const mailOptions = {
-    from: `"Balades Moto" <${process.env.SMTP_USER}>`,
+    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: 'Vérification de votre compte',
+    subject: 'Bienvenue sur Ride Together - Vérifiez votre compte',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Bienvenue sur Balades Moto !</h2>
-        <p>Merci de vous être inscrit. Veuillez cliquer sur le lien ci-dessous pour vérifier votre adresse email :</p>
-        <p style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}" 
-             style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Vérifier mon email
-          </a>
-        </p>
-        <p>Ou copiez ce lien dans votre navigateur :</p>
-        <p style="color: #666; word-break: break-all;">${verificationUrl}</p>
-        <p style="color: #999; font-size: 12px; margin-top: 30px;">
-          Ce lien expirera dans 24 heures.
-        </p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vérification de votre compte Ride Together</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f7fa;">
+          <tr>
+            <td align="center" style="padding: 40px 20px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
+                <!-- Header avec background -->
+                <tr>
+                  <td bgcolor="#3F51B5" style="background-color: #3F51B5; background-image: url('${backgroundUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat; padding: 260px 140px; text-align: center;">
+                    <h1 style="color: #ffffff; font-size: 32px; font-weight: bold; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.5);">Bienvenue !</h1>
+                  </td>
+                </tr>
+                <!-- Contenu principal -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <h2 style="color: #212121; font-size: 24px; font-weight: 600; margin: 0 0 20px 0;">Vérification de votre compte</h2>
+                    <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                      Merci de vous être inscrit sur <strong style="color: #3F51B5;">Ride Together</strong> ! 
+                      Pour finaliser votre inscription et activer votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous.
+                    </p>
+                    <!-- Bouton CTA -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td align="center" style="padding: 20px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td bgcolor="#3F51B5" align="center" style="background-color: #3F51B5; border-radius: 12px; padding: 16px 40px;">
+                                <a href="${verificationUrl}" 
+                                   style="color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">
+                                  Vérifier mon email
+                                </a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                    <!-- Lien alternatif -->
+                    <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; text-align: center;">
+                      Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :<br>
+                      <a href="${verificationUrl}" style="color: #3F51B5; word-break: break-all; text-decoration: underline;">${verificationUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="background-color: #10181F; padding: 30px 40px; text-align: center;">
+                    <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">
+                      <strong>Ride Together</strong> - Organisez et participez à des balades moto
+                    </p>
+                    <p style="color: #ffffff; font-size: 12px; margin: 0; opacity: 0.7;">
+                      Ce lien expirera dans <strong>24 heures</strong>.
+                    </p>
+                    <p style="color: #ffffff; font-size: 12px; margin: 15px 0 0 0; opacity: 0.6;">
+                      Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `
   };
 
@@ -84,9 +143,9 @@ const sendUnlockEmail = async (email, token) => {
   const unlockUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/unlock-account?token=${token}`;
   
   const mailOptions = {
-    from: `"Balades Moto" <${process.env.SMTP_USER}>`,
+    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: 'Déverrouillage de votre compte',
+    subject: 'Déverrouillage de votre compte Ride Together',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Déverrouillage de compte</h2>
@@ -138,9 +197,9 @@ const sendRideReminderEmail = async (email, ride, userName) => {
   const formattedTime = ride.heure;
   
   const mailOptions = {
-    from: `"Balades Moto" <${process.env.SMTP_USER}>`,
+    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: `Rappel: ${ride.titre} dans 1 heure`,
+    subject: `Ride Together - Rappel: ${ride.titre} dans 1 heure`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Rappel de balade</h2>
