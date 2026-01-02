@@ -6,9 +6,22 @@ const User = require('../models/User');
 
 // Initialiser Socket.io
 const initializeSocket = (server) => {
-  const allowedOrigins = process.env.FRONTEND_URL 
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-    : []; // Si pas de FRONTEND_URL, on autorise localhost en dev
+  const allowedOrigins = (() => {
+    if (process.env.FRONTEND_URL) {
+      return process.env.FRONTEND_URL.split(',').map(url => url.trim());
+    }
+    // En production, utiliser les URLs par défaut
+    if (process.env.NODE_ENV === 'production') {
+      return [
+        'http://app.ridetogether.fr',
+        'https://app.ridetogether.fr',
+        'http://www.app.ridetogether.fr',
+        'https://www.app.ridetogether.fr'
+      ];
+    }
+    // En développement, liste vide (sera géré par la logique ci-dessous)
+    return [];
+  })();
 
   const io = new Server(server, {
     cors: {

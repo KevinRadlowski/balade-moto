@@ -13,6 +13,24 @@ import 'screens/main_navigation.dart';
 import 'screens/navigation/step_by_step_navigation_screen.dart';
 import 'services/navigation/navigation_service.dart';
 
+/// Widget qui limite la largeur maximale de l'application à 400px sur desktop
+/// et centre le contenu horizontalement
+Widget _maxWidthBuilder(BuildContext context, Widget? child) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth > 400) {
+        return Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: child,
+          ),
+        );
+      }
+      return child ?? const SizedBox();
+    },
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -95,6 +113,7 @@ class _MyAppState extends State<MyApp> {
                 Locale('en', 'US'),
               ],
               theme: AppTheme.lightTheme,
+              builder: _maxWidthBuilder,
               home: const SplashScreen(),
             );
           }
@@ -120,6 +139,7 @@ class _MyAppState extends State<MyApp> {
               Locale('en', 'US'),
             ],
             theme: AppTheme.lightTheme,
+            builder: _maxWidthBuilder,
             home: homeWidget,
             routes: {
               '/login': (context) => const LoginScreen(),

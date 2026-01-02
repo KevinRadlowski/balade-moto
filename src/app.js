@@ -72,16 +72,26 @@ app.use(helmet({
 // ============================================================================
 // CONFIGURATION CORS - IMPORTANT: Placer AVANT toutes les routes
 // ============================================================================
-// Whitelist stricte des origines autorisées en développement
+// Whitelist stricte des origines autorisées
 const allowedOrigins = process.env.NODE_ENV === 'development'
   ? [
       'http://192.168.1.70:8080',  // Front Flutter Web depuis iPhone (IP LAN)
       'http://localhost:8080',      // Front Flutter Web en local
       'http://127.0.0.1:8080'       // Front Flutter Web en local (alternative)
     ]
-  : (process.env.FRONTEND_URL 
-      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-      : []);
+  : (() => {
+      // En production, utiliser FRONTEND_URL si défini, sinon utiliser les URLs par défaut
+      if (process.env.FRONTEND_URL) {
+        return process.env.FRONTEND_URL.split(',').map(url => url.trim());
+      }
+      // URLs de production par défaut
+      return [
+        'http://app.ridetogether.fr',
+        'https://app.ridetogether.fr',
+        'http://www.app.ridetogether.fr',
+        'https://www.app.ridetogether.fr'
+      ];
+    })();
 
 // Configuration CORS robuste
 app.use(cors({
@@ -110,17 +120,30 @@ app.use(cors({
   },
   credentials: true,  // IMPORTANT: Ne pas utiliser origin: '*' si credentials: true
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   // Gestion explicite des requêtes preflight OPTIONS
   preflightContinue: false,  // Ne pas passer la requête OPTIONS aux routes suivantes
-  optionsSuccessStatus: 204  // Code de succès pour les requêtes OPTIONS
+  optionsSuccessStatus: 204,  // Code de succès pour les requêtes OPTIONS
+  maxAge: 86400  // Cache les résultats preflight pendant 24 heures
 }));
 
-// Middleware pour logger les requêtes OPTIONS (preflight) pour le débogage
+// Middleware pour logger et gérer explicitement les requêtes OPTIONS (preflight)
+// Note: Le middleware cors() ci-dessus devrait déjà gérer cela, mais ce middleware
+// ajoute des logs et une gestion explicite pour le débogage
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    console.log(`✅ OPTIONS preflight request from: ${req.headers.origin || 'no origin'}`);
+    const origin = req.headers.origin;
+    console.log(`✅ OPTIONS preflight request from: ${origin || 'no origin'}`);
+    
+    // Le middleware cors() devrait déjà avoir ajouté les headers,
+    // mais on peut vérifier ici pour le débogage
+    if (origin && allowedOrigins.includes(origin)) {
+      console.log(`   ✅ Origin autorisée: ${origin}`);
+    } else if (origin) {
+      console.warn(`   ⚠️  Origin non autorisée: ${origin}`);
+      console.warn(`   Origines autorisées:`, allowedOrigins);
+    }
   }
   next();
 });
