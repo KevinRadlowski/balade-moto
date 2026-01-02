@@ -80,17 +80,27 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
       'http://127.0.0.1:8080'       // Front Flutter Web en local (alternative)
     ]
   : (() => {
-      // En production, utiliser FRONTEND_URL si défini, sinon utiliser les URLs par défaut
-      if (process.env.FRONTEND_URL) {
-        return process.env.FRONTEND_URL.split(',').map(url => url.trim());
-      }
       // URLs de production par défaut
-      return [
+      const defaultOrigins = [
         'http://app.ridetogether.fr',
         'https://app.ridetogether.fr',
         'http://www.app.ridetogether.fr',
         'https://www.app.ridetogether.fr'
       ];
+      
+      // En production, utiliser FRONTEND_URL si défini et valide
+      if (process.env.FRONTEND_URL) {
+        const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url && url !== '*');
+        // Si FRONTEND_URL contient des URLs valides (pas juste '*'), les utiliser
+        if (envOrigins.length > 0) {
+          console.log(`✅ CORS: Utilisation de FRONTEND_URL depuis les variables d'environnement:`, envOrigins);
+          return envOrigins;
+        }
+      }
+      
+      // Sinon, utiliser les URLs par défaut
+      console.log(`✅ CORS: Utilisation des URLs par défaut:`, defaultOrigins);
+      return defaultOrigins;
     })();
 
 // Configuration CORS robuste
@@ -115,6 +125,8 @@ app.use(cors({
       // Log clair pour le débogage
       console.warn(`🚫 CORS blocked for origin: ${origin}`);
       console.warn(`   Allowed origins:`, allowedOrigins);
+      console.warn(`   NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
+      console.warn(`   FRONTEND_URL: ${process.env.FRONTEND_URL || 'undefined'}`);
       callback(new Error(`CORS: Origin ${origin} is not allowed`));
     }
   },
@@ -299,6 +311,10 @@ server.listen(PORT, HOST, () => {
   console.log(`⏰ Scheduler de notifications démarré`);
   console.log(`\n✅ CORS configuré pour les origines suivantes:`);
   console.log(`   ${allowedOrigins.join('\n   ')}`);
+  console.log(`\n📋 Configuration CORS:`);
+  console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
+  console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL || 'undefined'}`);
+  console.log(`   Nombre d'origines autorisées: ${allowedOrigins.length}`);
   console.log(`\n💡 Pour tester depuis iPhone:`);
   console.log(`   - API: http://192.168.1.70:${PORT}/health`);
   console.log(`   - Front: http://192.168.1.70:8080`);
