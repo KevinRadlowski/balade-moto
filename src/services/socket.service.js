@@ -6,22 +6,8 @@ const User = require('../models/User');
 
 // Initialiser Socket.io
 const initializeSocket = (server) => {
-  const allowedOrigins = (() => {
-    if (process.env.FRONTEND_URL) {
-      return process.env.FRONTEND_URL.split(',').map(url => url.trim());
-    }
-    // En production, utiliser les URLs par défaut
-    if (process.env.NODE_ENV === 'production') {
-      return [
-        'http://app.ridetogether.fr',
-        'https://app.ridetogether.fr',
-        'http://www.app.ridetogether.fr',
-        'https://www.app.ridetogether.fr'
-      ];
-    }
-    // En développement, liste vide (sera géré par la logique ci-dessous)
-    return [];
-  })();
+  const { getAllowedOrigins } = require('../config/cors');
+  const allowedOrigins = getAllowedOrigins();
 
   const io = new Server(server, {
     cors: {
@@ -39,16 +25,18 @@ const initializeSocket = (server) => {
           }
         }
         
+        // Si allowedOrigins est null, autoriser toutes les origines (FRONTEND_URL="*")
+        if (allowedOrigins === null) {
+          return callback(null, true);
+        }
+        
         // Vérifier si l'origine est dans la liste autorisée
-        if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else if (allowedOrigins.length === 0 && process.env.NODE_ENV === 'development') {
-          // Si pas de FRONTEND_URL configuré en dev, autoriser localhost
+        if (allowedOrigins.includes(origin)) {
           callback(null, true);
         } else {
-          // En production, rejeter si pas dans la liste
+          // En développement, logger l'erreur
           if (process.env.NODE_ENV === 'development') {
-            console.warn(`⚠️  Origine Socket.io CORS rejetée: ${origin}. Origines autorisées:`, allowedOrigins.length > 0 ? allowedOrigins : 'localhost (tous ports)');
+            console.warn(`⚠️  Origine Socket.io CORS rejetée: ${origin}. Origines autorisées:`, allowedOrigins);
           }
           callback(new Error('Not allowed by CORS'));
         }

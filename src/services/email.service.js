@@ -1,18 +1,19 @@
 const nodemailer = require('nodemailer');
+const { emailConfig, isEmailConfigured, logEmailWarningIfNeeded } = require('../config/email');
 require('dotenv').config();
 
 // Configuration du transporteur email
 let transporter = null;
 
 // Créer le transporteur seulement si les credentials sont configurés
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+if (isEmailConfigured()) {
   transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: process.env.EMAIL_PORT || 587,
-    secure: false, // true pour 465, false pour autres ports
+    host: emailConfig.host,
+    port: emailConfig.port,
+    secure: emailConfig.port === 465, // true pour 465, false pour autres ports
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      user: emailConfig.user,
+      pass: emailConfig.pass
     }
   });
 
@@ -20,15 +21,13 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   transporter.verify((error, success) => {
     if (error) {
       console.warn('⚠️  Configuration email non valide. Les emails ne pourront pas être envoyés.');
-      console.warn('   Vérifiez vos variables EMAIL_USER et EMAIL_PASS dans le fichier .env');
+      console.warn('   Erreur:', error.message);
     } else {
       console.log('✅ Serveur email prêt à envoyer des messages');
     }
   });
 } else {
-  console.warn('⚠️  Variables EMAIL_USER et EMAIL_PASS non configurées.');
-  console.warn('   Les fonctionnalités d\'envoi d\'email seront désactivées.');
-  console.warn('   Ajoutez ces variables dans votre fichier .env pour activer les emails.');
+  logEmailWarningIfNeeded();
 }
 
 // Fonctions d'envoi d'email
@@ -48,7 +47,7 @@ const sendVerificationEmail = async (email, token) => {
   const backgroundUrl = `https://www.ridetogether.fr/bg-home2.png`;
   
   const mailOptions = {
-    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
     to: email,
     subject: 'Bienvenue sur Ride Together - Vérifiez votre compte',
     html: `
@@ -143,7 +142,7 @@ const sendUnlockEmail = async (email, token) => {
   const unlockUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/unlock-account?token=${token}`;
   
   const mailOptions = {
-    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
     to: email,
     subject: 'Déverrouillage de votre compte Ride Together',
     html: `
@@ -197,7 +196,7 @@ const sendRideReminderEmail = async (email, ride, userName) => {
   const formattedTime = ride.heure;
   
   const mailOptions = {
-    from: `"Ride Together" <${process.env.EMAIL_USER}>`,
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
     to: email,
     subject: `Ride Together - Rappel: ${ride.titre} dans 1 heure`,
     html: `

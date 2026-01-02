@@ -30,6 +30,7 @@ const swaggerSpec = require('./config/swagger');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const { buildCorsOptions, getCorsInfo } = require('./config/cors');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const rideRoutes = require('./routes/ride.routes');
@@ -72,93 +73,11 @@ app.use(helmet({
 // ============================================================================
 // CONFIGURATION CORS - IMPORTANT: Placer AVANT toutes les routes
 // ============================================================================
-// Whitelist stricte des origines autorisées
-const allowedOrigins = process.env.NODE_ENV === 'development'
-  ? [
-      'http://192.168.1.70:8080',  // Front Flutter Web depuis iPhone (IP LAN)
-      'http://localhost:8080',      // Front Flutter Web en local
-      'http://127.0.0.1:8080'       // Front Flutter Web en local (alternative)
-    ]
-  : (() => {
-      // URLs de production par défaut
-      const defaultOrigins = [
-        'http://app.ridetogether.fr',
-        'https://app.ridetogether.fr',
-        'http://www.app.ridetogether.fr',
-        'https://www.app.ridetogether.fr'
-      ];
-      
-      // En production, utiliser FRONTEND_URL si défini et valide
-      if (process.env.FRONTEND_URL) {
-        const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url && url !== '*');
-        // Si FRONTEND_URL contient des URLs valides (pas juste '*'), les utiliser
-        if (envOrigins.length > 0) {
-          console.log(`✅ CORS: Utilisation de FRONTEND_URL depuis les variables d'environnement:`, envOrigins);
-          return envOrigins;
-        }
-      }
-      
-      // Sinon, utiliser les URLs par défaut
-      console.log(`✅ CORS: Utilisation des URLs par défaut:`, defaultOrigins);
-      return defaultOrigins;
-    })();
+const corsOptions = buildCorsOptions();
+app.use(cors(corsOptions));
 
-// Configuration CORS robuste
-app.use(cors({
-  origin: (origin, callback) => {
-    // Autoriser les requêtes sans origin (mobile apps natifs, Postman, curl, etc.)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // En développement, autoriser tous les ports localhost (pour Flutter dev server, hot reload, etc.)
-    if (process.env.NODE_ENV === 'development') {
-      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-        return callback(null, true);
-      }
-    }
-    
-    // Vérifier si l'origine est dans la whitelist
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Log clair pour le débogage
-      console.warn(`🚫 CORS blocked for origin: ${origin}`);
-      console.warn(`   Allowed origins:`, allowedOrigins);
-      console.warn(`   NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
-      console.warn(`   FRONTEND_URL: ${process.env.FRONTEND_URL || 'undefined'}`);
-      callback(new Error(`CORS: Origin ${origin} is not allowed`));
-    }
-  },
-  credentials: true,  // IMPORTANT: Ne pas utiliser origin: '*' si credentials: true
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  // Gestion explicite des requêtes preflight OPTIONS
-  preflightContinue: false,  // Ne pas passer la requête OPTIONS aux routes suivantes
-  optionsSuccessStatus: 204,  // Code de succès pour les requêtes OPTIONS
-  maxAge: 86400  // Cache les résultats preflight pendant 24 heures
-}));
-
-// Middleware pour logger et gérer explicitement les requêtes OPTIONS (preflight)
-// Note: Le middleware cors() ci-dessus devrait déjà gérer cela, mais ce middleware
-// ajoute des logs et une gestion explicite pour le débogage
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    console.log(`✅ OPTIONS preflight request from: ${origin || 'no origin'}`);
-    
-    // Le middleware cors() devrait déjà avoir ajouté les headers,
-    // mais on peut vérifier ici pour le débogage
-    if (origin && allowedOrigins.includes(origin)) {
-      console.log(`   ✅ Origin autorisée: ${origin}`);
-    } else if (origin) {
-      console.warn(`   ⚠️  Origin non autorisée: ${origin}`);
-      console.warn(`   Origines autorisées:`, allowedOrigins);
-    }
-  }
-  next();
-});
+// Gérer explicitement les requêtes OPTIONS pour toutes les routes
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 // Configurer urlencoded pour accepter UTF-8 correctement
@@ -193,11 +112,7 @@ app.use('/uploads', (req, res, next) => {
   // Middleware pour définir les headers avant de servir le fichier
   const filePath = path.join(uploadsPath, req.path.replace('/uploads', ''));
   
-  // CORS aligné avec la whitelist (pas de '*')
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  // CORS géré par le middleware cors() global, pas besoin de le gérer ici
   
   // Forcer Content-Disposition: attachment pour fichiers non-image
   const ext = path.extname(filePath).toLowerCase();
@@ -249,16 +164,15 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================================
-// ENDPOINT DE TEST RÉSEAU
+// ENDPOINT HEALTH CHECK
 // ============================================================================
-// GET /health - Test de connectivité depuis le réseau
+// GET /health - Vérification de l'état du serveur
 app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API accessible',
+  res.status(200).json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    origin: req.headers.origin || 'N/A',
-    ip: req.ip || req.connection.remoteAddress || 'N/A'
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -303,21 +217,34 @@ const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = toutes les interfaces réseau
 
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 Serveur démarré sur http://${HOST}:${PORT}`);
-  console.log(`📡 Accessible depuis le réseau local`);
-  console.log(`   - Local: http://localhost:${PORT}`);
-  console.log(`   - LAN: http://192.168.1.70:${PORT}`);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const baseUrl = process.env.BASE_URL || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
+  
+  // Logs de base (toujours affichés)
+  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+  console.log(`📡 Base URL: ${baseUrl}`);
+  console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Logs supplémentaires en développement uniquement
+  if (isDevelopment) {
+    console.log(`📡 Accessible depuis le réseau local`);
+    console.log(`   - Local: http://localhost:${PORT}`);
+    console.log(`   - LAN: http://192.168.1.70:${PORT}`);
+    console.log(`💡 Pour tester depuis iPhone:`);
+    console.log(`   - API: http://192.168.1.70:${PORT}/health`);
+    console.log(`   - Front: http://192.168.1.70:8080`);
+  }
+  
+  // Logs des services
   console.log(`🔌 Socket.io initialisé`);
   console.log(`⏰ Scheduler de notifications démarré`);
-  console.log(`\n✅ CORS configuré pour les origines suivantes:`);
-  console.log(`   ${allowedOrigins.join('\n   ')}`);
-  console.log(`\n📋 Configuration CORS:`);
-  console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
-  console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL || 'undefined'}`);
-  console.log(`   Nombre d'origines autorisées: ${allowedOrigins.length}`);
-  console.log(`\n💡 Pour tester depuis iPhone:`);
-  console.log(`   - API: http://192.168.1.70:${PORT}/health`);
-  console.log(`   - Front: http://192.168.1.70:8080`);
+  
+  // Logs CORS
+  console.log(`\n✅ CORS configuré:`);
+  console.log(`   Origines autorisées: ${getCorsInfo()}`);
+  if (process.env.FRONTEND_URL) {
+    console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+  }
 });
 
 module.exports = { app, server, io };

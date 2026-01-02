@@ -4,8 +4,8 @@ const vehicleSchema = new mongoose.Schema({
   ownerUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Le propriétaire est requis'],
-    index: true
+    required: [true, 'Le propriétaire est requis']
+    // index: true retiré car déjà couvert par l'index composé ci-dessous
   },
   type: {
     type: String,
