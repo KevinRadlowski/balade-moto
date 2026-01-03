@@ -78,10 +78,13 @@ class CatalogService {
     }
 
     try {
-      // Utiliser les nouveaux endpoints CarAPI
-      final endpoint = type == 'voiture' ? '/catalog/voiture/makes' : '/catalog/moto/makes';
+      // Utiliser l'API interne vehicle-catalog (remplace CarAPI)
+      final endpoint = '/vehicle-catalog/makes';
       final uri = Uri.parse('${ApiConfig.apiUrl}$endpoint')
-          .replace(queryParameters: {'year': year.toString()});
+          .replace(queryParameters: {
+        'type': type,
+        'year': year.toString(),
+      });
 
       debugPrint('[Catalog] Appel API: $uri');
 
@@ -154,11 +157,12 @@ class CatalogService {
     }
 
     try {
-      // Utiliser les nouveaux endpoints CarAPI
-      final endpoint = type == 'voiture' ? '/catalog/voiture/models' : '/catalog/moto/models';
+      // Utiliser l'API interne vehicle-catalog (remplace CarAPI)
+      final endpoint = '/vehicle-catalog/models';
       final uri = Uri.parse('${ApiConfig.apiUrl}$endpoint').replace(
         queryParameters: {
-          'makeId': makeId, // Utiliser makeId au lieu de make
+          'type': type,
+          'make': makeId, // Utiliser make (ID de la marque)
           'year': year.toString(),
         },
       );

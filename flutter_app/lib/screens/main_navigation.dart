@@ -6,6 +6,7 @@ import 'profile/profile_screen.dart';
 import 'rides/rides_history_screen.dart';
 import 'garage/garage_home_screen.dart';
 import '../services/auth_service.dart';
+import '../services/navigation_state.dart';
 import '../utils/vehicle_icon_helper.dart';
 import '../widgets/legal/terms_consent_banner.dart';
 
@@ -17,7 +18,6 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -30,20 +30,19 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
+    final navigationState = Provider.of<NavigationState>(context);
     final vehiclePreference = authService.user?.vehiclePreference;
     final rideIcon = getVehicleIcon(vehiclePreference);
     
     return Stack(
       children: [
         Scaffold(
-          body: _screens[_currentIndex],
+          body: _screens[navigationState.currentIndex],
           bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
+        currentIndex: navigationState.currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          navigationState.setIndex(index);
         },
         items: [
           const BottomNavigationBarItem(

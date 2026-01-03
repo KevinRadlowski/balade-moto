@@ -41,6 +41,7 @@ const likeRoutes = require('./routes/like.routes');
 const reviewRoutes = require('./routes/review.routes');
 const garageRoutes = require('./routes/garage.routes');
 const catalogRoutes = require('./routes/catalog.routes');
+const vehicleCatalogRoutes = require('./routes/vehicle-catalog.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -154,6 +155,7 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/likes', likeRoutes);
 app.use('/api/garage', garageRoutes);
 app.use('/api/catalog', catalogRoutes);
+app.use('/api/vehicle-catalog', vehicleCatalogRoutes);
 
 // Route de test
 app.get('/', (req, res) => {

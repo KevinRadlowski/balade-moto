@@ -33,6 +33,8 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
+  bool _avoidTolls = false;
+  bool _avoidHighways = false;
   
   // Carte et waypoints
   GoogleMapController? _mapController;
@@ -372,6 +374,8 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         origin: origin,
         destination: destination,
         waypoints: waypointsParam,
+        avoidTolls: _avoidTolls,
+        avoidHighways: _avoidHighways,
       );
       
       debugPrint('🔵 Réponse du backend: ${response['success']}');
@@ -1148,6 +1152,43 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                           _visibilite = value!;
                         });
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    // Options d'itinéraire
+                    const Text(
+                      'Options d\'itinéraire',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      title: const Text('Éviter les péages'),
+                      subtitle: const Text('L\'itinéraire évitera les routes à péage'),
+                      value: _avoidTolls,
+                      onChanged: (value) {
+                        setState(() {
+                          _avoidTolls = value;
+                          // Recalculer la route si on a déjà des waypoints
+                          if (_waypoints.length >= 2) {
+                            _updateMarkersAndPolylines();
+                          }
+                        });
+                      },
+                      secondary: const Icon(Icons.toll),
+                    ),
+                    SwitchListTile(
+                      title: const Text('Éviter les autoroutes'),
+                      subtitle: const Text('L\'itinéraire évitera les autoroutes'),
+                      value: _avoidHighways,
+                      onChanged: (value) {
+                        setState(() {
+                          _avoidHighways = value;
+                          // Recalculer la route si on a déjà des waypoints
+                          if (_waypoints.length >= 2) {
+                            _updateMarkersAndPolylines();
+                          }
+                        });
+                      },
+                      secondary: const Icon(Icons.highway),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

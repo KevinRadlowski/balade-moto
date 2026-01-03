@@ -1323,6 +1323,8 @@ class ApiService {
     required String origin, // Format: "lat,lng"
     required String destination, // Format: "lat,lng"
     String? waypoints, // Format: "lat1,lng1|lat2,lng2|..."
+    bool? avoidTolls,
+    bool? avoidHighways,
   }) async {
     final queryParams = <String, String>{
       'origin': origin,
@@ -1331,6 +1333,14 @@ class ApiService {
     
     if (waypoints != null && waypoints.isNotEmpty) {
       queryParams['waypoints'] = waypoints;
+    }
+    
+    if (avoidTolls == true) {
+      queryParams['avoidTolls'] = 'true';
+    }
+    
+    if (avoidHighways == true) {
+      queryParams['avoidHighways'] = 'true';
     }
 
     final uri = Uri.parse('$baseUrl/rides/directions/route').replace(queryParameters: queryParams);

@@ -1518,10 +1518,30 @@ exports.exportRideICS = async (req, res, next) => {
 // Calculer un itinéraire via Google Directions API (pour éviter CORS)
 exports.calculateRoute = async (req, res, next) => {
   try {
-    const { origin, destination, waypoints } = req.query;
+    const { origin, destination, waypoints, avoidTolls, avoidHighways } = req.query;
 
-    // Vérifier le cache
-    const cacheKey = { origin, destination, waypoints: waypoints || '' };
+    // Validation des paramètres requis
+    if (!origin || !destination) {
+      return next(new BadRequestError('Les paramètres origin et destination sont requis'));
+    }
+
+    // Construire le paramètre avoid pour Google Directions
+    const avoidParams = [];
+    if (avoidTolls === 'true') {
+      avoidParams.push('tolls');
+    }
+    if (avoidHighways === 'true') {
+      avoidParams.push('highways');
+    }
+    const avoidParam = avoidParams.length > 0 ? avoidParams.join('|') : null;
+
+    // Vérifier le cache (inclure avoid dans la clé de cache)
+    const cacheKey = { 
+      origin, 
+      destination, 
+      waypoints: waypoints || '',
+      avoid: avoidParam || ''
+    };
     const cached = routeCache.get(cacheKey);
     if (cached) {
       return res.status(200).json(cached);
@@ -1536,6 +1556,10 @@ exports.calculateRoute = async (req, res, next) => {
     
     if (waypoints && waypoints.trim() !== '') {
       url += `&waypoints=${encodeURIComponent(waypoints)}`;
+    }
+    
+    if (avoidParam) {
+      url += `&avoid=${encodeURIComponent(avoidParam)}`;
     }
 
     // Faire la requête à l'API Directions

@@ -12,6 +12,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/navigation/step_by_step_navigation_screen.dart';
 import 'services/navigation/navigation_service.dart';
+import 'services/navigation_state.dart';
 
 /// Widget qui limite la largeur maximale de l'application à 400px sur desktop
 /// et centre le contenu horizontalement
@@ -93,6 +94,9 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider.value(
           value: authService,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => NavigationState(),
         ),
       ],
       child: Consumer<AuthService>(

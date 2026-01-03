@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/navigation_state.dart';
 import '../../models/ride.dart';
 import '../../models/group.dart';
 import '../../models/user.dart';
@@ -17,7 +18,6 @@ import '../../widgets/home/favorite_groups_card.dart';
 import '../../widgets/home/discover_preview_card.dart';
 import '../../widgets/home/quick_actions_fab.dart';
 import '../ride/ride_detail_screen.dart';
-import '../ride/create_ride_with_map_screen.dart';
 import '../groups/groups_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -614,11 +614,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const CreateRideWithMapScreen(),
-                ),
-              ).then((_) => _loadData());
+              // Ouvrir l'onglet "Balades" (index 1) au lieu de CreateRideWithMapScreen
+              final navigationState = Provider.of<NavigationState>(context, listen: false);
+              navigationState.setIndex(1);
             },
             icon: const Icon(Icons.search),
             label: const Text('Rechercher une balade'),

@@ -29,11 +29,22 @@ class SocialAuthService {
     // Initialiser GoogleSignIn avec gestion d'erreur
     // Sur web, utiliser le Web Client ID. Sur Android/iOS, ne pas passer clientId (config native)
     try {
+      // TODO: Migrer vers variable d'environnement de build si possible
+      // Pour l'instant, utiliser la valeur en dur comme fallback
+      const webClientId = String.fromEnvironment(
+        'GOOGLE_WEB_CLIENT_ID',
+        defaultValue: '481162301788-2j9lpcm9s7pkskh9uftkjikg0enavo23.apps.googleusercontent.com',
+      );
+      
+      if (kIsWeb && webClientId.isEmpty) {
+        debugPrint('⚠️ [Google Auth] GOOGLE_WEB_CLIENT_ID non défini, utilisation de la valeur par défaut');
+      }
+      
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
         // Sur web uniquement : passer le Web Client ID
         // Sur Android/iOS : clientId = null (utilise la configuration native)
-        clientId: kIsWeb ? '481162301788-2j9lpcm9s7pkskh9uftkjikg0enavo23.apps.googleusercontent.com' : null,
+        clientId: kIsWeb ? webClientId : null,
       );
       return _googleSignIn;
     } catch (e) {
@@ -86,6 +97,17 @@ class SocialAuthService {
       debugPrint('   - idToken: ${idToken != null ? "${idToken.substring(0, idToken.length > 10 ? 10 : idToken.length)}..." : "NULL"}');
       debugPrint('   - accessToken: ${accessToken != null ? "${accessToken.substring(0, accessToken.length > 10 ? 10 : accessToken.length)}..." : "NULL"}');
       debugPrint('   - Platform: ${kIsWeb ? "Web" : "Mobile"}');
+      
+      // Log de l'URL courante sur web pour diagnostiquer redirect_uri_mismatch
+      if (kIsWeb) {
+        try {
+          final currentUrl = Uri.base.toString();
+          debugPrint('   - Current URL: $currentUrl');
+          debugPrint('   - Origin: ${Uri.base.origin}');
+        } catch (e) {
+          debugPrint('   - Impossible de lire l\'URL courante: $e');
+        }
+      }
       
       // Si idToken manquant sur web, on utilise l'accessToken
       // Le backend pourra soit valider l'idToken, soit utiliser l'accessToken pour obtenir les infos
@@ -202,6 +224,9 @@ class SocialAuthService {
           debugPrint('✅ Facebook SDK chargé et prêt');
           return;
         }
+        
+        // Logs de diagnostic
+        debugPrint('⏳ [FB SDK] En attente... FB=${fb != null}, __fbReady=$fbReady');
       } catch (e) {
         // Ignorer les erreurs d'accès
         debugPrint('⚠️ Erreur lors de la vérification du SDK Facebook: $e');
@@ -212,7 +237,9 @@ class SocialAuthService {
     }
 
     // Timeout : le SDK n'est pas prêt
-    throw Exception('Facebook SDK non prêt (init non terminé)');
+    final errorMsg = 'Facebook SDK non prêt après ${maxWaitTime.inSeconds}s. Vérifiez que FB.init() a été appelé dans index.html et que l\'option "Login with the JavaScript SDK" est activée dans Facebook Developers.';
+    debugPrint('❌ [FB SDK] $errorMsg');
+    throw Exception(errorMsg);
   }
 
   /// Connexion avec Facebook
@@ -234,9 +261,27 @@ class SocialAuthService {
         // Créer un callback JavaScript compatible
         void loginCallback(js.JsObject response) {
           try {
+            // Log du status de réponse FB.login
+            final status = response['status'];
+            debugPrint('🔍 [FB Login] Status de réponse: $status');
+            
+            if (status != null) {
+              final statusStr = status.toString();
+              if (statusStr == 'connected') {
+                debugPrint('✅ [FB Login] Utilisateur connecté');
+              } else if (statusStr == 'not_authorized') {
+                debugPrint('⚠️ [FB Login] Utilisateur non autorisé');
+                completer.complete(null);
+                return;
+              } else {
+                debugPrint('⚠️ [FB Login] Status inconnu: $statusStr');
+              }
+            }
+            
             // Récupérer authResponse.accessToken (équivalent à getProperty)
             final authResponse = response['authResponse'];
             if (authResponse == null) {
+              debugPrint('⚠️ [FB Login] authResponse est null');
               completer.complete(null);
               return;
             }
@@ -244,15 +289,18 @@ class SocialAuthService {
             final authResponseObj = authResponse as js.JsObject;
             final accessToken = authResponseObj['accessToken'];
             if (accessToken == null) {
+              debugPrint('⚠️ [FB Login] accessToken est null dans authResponse');
               completer.complete(null);
               return;
             }
             
             final tokenString = accessToken.toString();
+            debugPrint('✅ [FB Login] Token récupéré avec succès');
             completer.complete({
               'accessToken': tokenString,
             });
           } catch (e) {
+            debugPrint('❌ [FB Login] Erreur lors de la récupération du token: $e');
             completer.completeError(Exception('Erreur lors de la récupération du token Facebook: $e'));
           }
         };
@@ -278,8 +326,10 @@ class SocialAuthService {
 
         if (result.status != LoginStatus.success) {
           if (result.status == LoginStatus.cancelled) {
+            debugPrint('ℹ️ [FB Login] Connexion annulée par l\'utilisateur');
             return null; // L'utilisateur a annulé
           }
+          debugPrint('❌ [FB Login] Erreur: ${result.message}');
           throw Exception('Erreur lors de la connexion Facebook: ${result.message}');
         }
 
@@ -300,7 +350,13 @@ class SocialAuthService {
         };
       }
     } catch (e) {
-      debugPrint('Erreur lors de la connexion Facebook: $e');
+      debugPrint('❌ [FB Login] Erreur lors de la connexion Facebook: $e');
+      
+      // Gérer spécifiquement le timeout du SDK
+      if (e.toString().contains('non prêt') || e.toString().contains('timeout')) {
+        throw Exception('Le SDK Facebook n\'est pas prêt. Vérifiez que l\'option "Login with the JavaScript SDK" est activée dans Facebook Developers Console.');
+      }
+      
       rethrow;
     }
   }

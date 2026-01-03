@@ -1,0 +1,105 @@
+{
+  "voiture": {
+    "makes": [
+      { "id": "1", "name": "BMW" },
+      { "id": "2", "name": "Mercedes-Benz" },
+      { "id": "3", "name": "Audi" },
+      { "id": "4", "name": "Peugeot" },
+      { "id": "5", "name": "Renault" },
+      { "id": "6", "name": "Citroën" },
+      { "id": "7", "name": "Volkswagen" },
+      { "id": "8", "name": "Ford" },
+      { "id": "9", "name": "Toyota" },
+      { "id": "10", "name": "Honda" }
+    ],
+    "models": {
+      "1": [
+        { "id": "101", "name": "Série 1" },
+        { "id": "102", "name": "Série 3" },
+        { "id": "103", "name": "Série 5" },
+        { "id": "104", "name": "X1" },
+        { "id": "105", "name": "X3" }
+      ],
+      "2": [
+        { "id": "201", "name": "Classe A" },
+        { "id": "202", "name": "Classe C" },
+        { "id": "203", "name": "Classe E" },
+        { "id": "204", "name": "GLA" },
+        { "id": "205", "name": "GLC" }
+      ],
+      "3": [
+        { "id": "301", "name": "A3" },
+        { "id": "302", "name": "A4" },
+        { "id": "303", "name": "A5" },
+        { "id": "304", "name": "Q3" },
+        { "id": "305", "name": "Q5" }
+      ],
+      "4": [
+        { "id": "401", "name": "208" },
+        { "id": "402", "name": "308" },
+        { "id": "403", "name": "508" },
+        { "id": "404", "name": "2008" },
+        { "id": "405", "name": "3008" }
+      ],
+      "5": [
+        { "id": "501", "name": "Clio" },
+        { "id": "502", "name": "Mégane" },
+        { "id": "503", "name": "Scénic" },
+        { "id": "504", "name": "Captur" },
+        { "id": "505", "name": "Kadjar" }
+      ]
+    }
+  },
+  "moto": {
+    "makes": [
+      { "id": "1", "name": "Yamaha" },
+      { "id": "2", "name": "Honda" },
+      { "id": "3", "name": "Kawasaki" },
+      { "id": "4", "name": "Suzuki" },
+      { "id": "5", "name": "Ducati" },
+      { "id": "6", "name": "BMW" },
+      { "id": "7", "name": "Triumph" },
+      { "id": "8", "name": "KTM" },
+      { "id": "9", "name": "Harley-Davidson" },
+      { "id": "10", "name": "Aprilia" }
+    ],
+    "models": {
+      "1": [
+        { "id": "101", "name": "MT-07" },
+        { "id": "102", "name": "MT-09" },
+        { "id": "103", "name": "R1" },
+        { "id": "104", "name": "R6" },
+        { "id": "105", "name": "Tracer 900" }
+      ],
+      "2": [
+        { "id": "201", "name": "CBR 600RR" },
+        { "id": "202", "name": "CBR 1000RR" },
+        { "id": "203", "name": "CB 650R" },
+        { "id": "204", "name": "Africa Twin" },
+        { "id": "205", "name": "Gold Wing" }
+      ],
+      "3": [
+        { "id": "301", "name": "Ninja 650" },
+        { "id": "302", "name": "Ninja ZX-6R" },
+        { "id": "303", "name": "Ninja ZX-10R" },
+        { "id": "304", "name": "Versys 650" },
+        { "id": "305", "name": "Z900" }
+      ],
+      "4": [
+        { "id": "401", "name": "GSX-R 600" },
+        { "id": "402", "name": "GSX-R 1000" },
+        { "id": "403", "name": "SV 650" },
+        { "id": "404", "name": "V-Strom 650" },
+        { "id": "405", "name": "Hayabusa" }
+      ],
+      "5": [
+        { "id": "501", "name": "Monster" },
+        { "id": "502", "name": "Panigale" },
+        { "id": "503", "name": "Multistrada" },
+        { "id": "504", "name": "Hypermotard" },
+        { "id": "505", "name": "Diavel" }
+      ]
+    }
+  }
+}
+
