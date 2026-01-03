@@ -37,35 +37,55 @@ const forbiddenExtensions = [
 const fileFilter = (req, file, cb) => {
   const allowedExtensions = ['.jpeg', '.jpg', '.png', '.gif', '.webp'];
   const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-  
+
   const ext = path.extname(file.originalname).toLowerCase();
   const mimetype = file.mimetype ? file.mimetype.toLowerCase() : '';
-  
+
   // Vérifier les extensions interdites en premier
   if (forbiddenExtensions.includes(ext)) {
     return cb(new Error(`Type de fichier interdit pour des raisons de sécurité: ${ext}`));
   }
-  
-  // Vérifier l'extension
-  const hasValidExtension = allowedExtensions.includes(ext);
-  
-  // Vérifier le mimetype (doit commencer par image/ et être dans la liste autorisée)
-  const hasValidMimeType = mimetype.startsWith('image/') && 
-    (allowedMimeTypes.includes(mimetype) || 
-     allowedExtensions.some(e => mimetype.includes(e.replace('.', ''))));
 
-  // Accepter si l'extension ET le mimetype sont valides (ET au lieu de OU pour plus de sécurité)
-  if (hasValidExtension && hasValidMimeType) {
-    cb(null, true);
-  } else {
-    console.log('Fichier rejeté:', {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      extname: ext
-    });
-    cb(new Error(`Seules les images sont autorisées (jpeg, jpg, png, gif, webp). Reçu: ${mimetype || 'mimetype inconnu'}, extension: ${ext || 'aucune'}`));
+  // Extension valide ?
+  const hasValidExtension = allowedExtensions.includes(ext);
+
+  // Mimetype valide ?
+  const hasValidMimeType =
+    mimetype.startsWith('image/') &&
+    (allowedMimeTypes.includes(mimetype) ||
+      allowedExtensions.some(e => mimetype.includes(e.replace('.', ''))));
+
+  /**
+   * IMPORTANT (prod/web) :
+   * Certains clients (Flutter Web / certains navigateurs) envoient un mimetype générique
+   * "application/octet-stream" même pour un .png/.jpg.
+   *
+   * On autorise donc octet-stream SI et seulement SI l'extension est une image.
+   * La validation "forte" est ensuite faite juste après via file-type (magic bytes),
+   * et supprime le fichier si ce n'est pas réellement une image.
+   */
+  const isOctetStream = mimetype === 'application/octet-stream';
+
+  // Accepter si :
+  // - extension image + mimetype image OK
+  // - OU extension image + mimetype octet-stream (cas Flutter Web)
+  if (hasValidExtension && (hasValidMimeType || isOctetStream)) {
+    return cb(null, true);
   }
+
+  console.log('Fichier rejeté:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    extname: ext
+  });
+
+  return cb(
+    new Error(
+      `Seules les images sont autorisées (jpeg, jpg, png, gif, webp). Reçu: ${mimetype || 'mimetype inconnu'}, extension: ${ext || 'aucune'}`
+    )
+  );
 };
+
 
 // Configuration de multer
 const upload = multer({

@@ -128,3 +128,4 @@ gitleaks detect --source . --verbose
 Pour signaler une vulnérabilité de sécurité, contactez l'équipe de développement.
 
 
+

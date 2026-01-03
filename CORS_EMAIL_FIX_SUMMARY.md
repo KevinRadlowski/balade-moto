@@ -161,3 +161,4 @@ curl -X OPTIONS https://api.ridetogether.fr/api/auth/login \
 - **Socket.io** : Utilise la même logique CORS que l'API HTTP pour la cohérence.
 - **Index Mongoose** : Les warnings de duplication sont corrigés en retirant les `index: true` redondants dans les schémas.
 
+

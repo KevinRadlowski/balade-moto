@@ -39,7 +39,7 @@ const sendVerificationEmail = async (email, token) => {
 
   // URL de vérification : pointer vers le backend API directement
   // Le backend retournera une page HTML de confirmation
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+  const backendUrl = process.env.BACKEND_URL;
   const verificationUrl = `${backendUrl}/api/auth/verify-email?token=${token}`;
   
   // URLs des images (servies depuis le backend ou assets)

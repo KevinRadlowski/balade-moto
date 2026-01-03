@@ -56,3 +56,4 @@ if ($gitleaksPath) {
 Write-Host "✅ Scan terminé" -ForegroundColor Green
 
 
+
