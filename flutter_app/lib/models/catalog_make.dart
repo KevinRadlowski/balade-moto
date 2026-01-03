@@ -51,3 +51,4 @@ class CatalogMake {
   int get hashCode => id.hashCode;
 }
 
+

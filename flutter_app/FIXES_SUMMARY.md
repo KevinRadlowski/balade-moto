@@ -126,3 +126,4 @@ flutter pub get
 - **Fonts** : Solution centralisée via `google_fonts`, facilement maintenable
 
 
+

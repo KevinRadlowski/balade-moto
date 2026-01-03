@@ -3,3 +3,4 @@ keyPassword=your_key_password
 keyAlias=your_key_alias
 storeFile=../path/to/your/keystore.jks
 
+

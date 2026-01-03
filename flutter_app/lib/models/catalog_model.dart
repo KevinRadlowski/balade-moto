@@ -61,3 +61,4 @@ class CatalogModel {
   int get hashCode => id.hashCode;
 }
 
+

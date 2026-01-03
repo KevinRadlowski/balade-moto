@@ -44,3 +44,4 @@ Ce warning provient de la couche JavaScript de Google Maps utilisée par le pack
 Ce warning n'affecte pas le fonctionnement de l'application. Les markers continuent de fonctionner normalement. Google a indiqué qu'au moins 12 mois de préavis seront donnés avant la suppression complète de `google.maps.Marker`.
 
 
+
