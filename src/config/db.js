@@ -9,6 +9,10 @@ const connectDB = async () => {
 
     // Corriger l'index pseudo s'il n'est pas sparse
     await fixPseudoIndex(conn.connection.db);
+    
+    // Migration automatique des rôles au démarrage
+    const migrateRolesOnStartup = require('../scripts/migrateRolesOnStartup');
+    await migrateRolesOnStartup();
   } catch (error) {
     console.error(`Erreur de connexion MongoDB : ${error.message}`);
     process.exit(1);

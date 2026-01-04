@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
-import '../../services/navigation_state.dart';
 import '../../models/ride.dart';
 import '../../models/group.dart';
 import '../../models/user.dart';
@@ -610,20 +609,6 @@ class _HomeScreenState extends State<HomeScreen> {
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Ouvrir l'onglet "Balades" (index 1) au lieu de CreateRideWithMapScreen
-              final navigationState = Provider.of<NavigationState>(context, listen: false);
-              navigationState.setIndex(1);
-            },
-            icon: const Icon(Icons.search),
-            label: const Text('Rechercher une balade'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
           ),
         ],
       ),

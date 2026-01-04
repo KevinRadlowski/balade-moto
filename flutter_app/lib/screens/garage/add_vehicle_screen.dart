@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:provider/provider.dart';
 import '../../models/vehicle.dart';
 import '../../models/catalog_make.dart';
 import '../../models/catalog_model.dart';
 import '../../services/garage_service.dart';
-import '../../services/catalog_service.dart';
+import '../../services/catalog/catalog_router_service.dart';
+import '../../services/catalog_proposal_service.dart';
 import '../../services/auth_service.dart';
-import 'package:provider/provider.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/garage/searchable_select.dart';
 
@@ -23,7 +24,8 @@ class AddVehicleScreen extends StatefulWidget {
 class _AddVehicleScreenState extends State<AddVehicleScreen> {
   final _formKey = GlobalKey<FormState>();
   final GarageService _garageService = GarageService();
-  late final CatalogService _catalogService;
+  late final CatalogRouterService _catalogRouter;
+  late final CatalogProposalService _proposalService;
 
   // Champs du formulaire
   String? _type; // 'moto' ou 'voiture'
@@ -34,13 +36,41 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   final _odometerController = TextEditingController(text: '0');
   bool _enableRecommendedMaintenancePack = false;
 
-  // Sélection catalogue CarAPI
+  // Sélection catalogue local
   int? _year;
   List<CatalogMake> _makes = [];
   CatalogMake? _selectedMake;
   List<CatalogModel> _models = [];
   CatalogModel? _selectedModel;
-  bool _useCatalog = true; // Par défaut, utiliser le catalogue CarAPI
+
+  // Normaliser un nom de marque pour comparaison (uppercase, sans accents, sans espaces/tirets)
+  static String _normalizeForCompare(String name) {
+    return name
+        .toUpperCase()
+        .replaceAll('É', 'E')
+        .replaceAll('È', 'E')
+        .replaceAll('Ê', 'E')
+        .replaceAll('Ë', 'E')
+        .replaceAll('À', 'A')
+        .replaceAll('Á', 'A')
+        .replaceAll('Â', 'A')
+        .replaceAll('Ã', 'A')
+        .replaceAll('Ä', 'A')
+        .replaceAll('Å', 'A')
+        .replaceAll('Î', 'I')
+        .replaceAll('Ï', 'I')
+        .replaceAll('Ò', 'O')
+        .replaceAll('Ó', 'O')
+        .replaceAll('Ô', 'O')
+        .replaceAll('Õ', 'O')
+        .replaceAll('Ö', 'O')
+        .replaceAll('Ù', 'U')
+        .replaceAll('Ú', 'U')
+        .replaceAll('Û', 'U')
+        .replaceAll('Ü', 'U')
+        .replaceAll('Ç', 'C')
+        .replaceAll(RegExp(r'[\s\-_]'), '');
+  }
 
   // Marques populaires voitures (affichées en premier)
   static const List<String> _popularCarMakes = [
@@ -95,29 +125,34 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   String? _makesError;
   String? _modelsError;
 
-  // Champs manuels (si useCatalog = false)
-  final _makeController = TextEditingController();
-  final _modelController = TextEditingController();
-  final _yearController = TextEditingController();
+  // Champs pour suggestion (si véhicule non trouvé)
+  final _suggestionMakeController = TextEditingController();
+  final _suggestionModelController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     
-    // Initialiser CatalogService avec le même ApiService que AuthService
+    // Récupérer l'ApiService partagé depuis AuthService
     final authService = Provider.of<AuthService>(context, listen: false);
-    _catalogService = CatalogService(apiService: authService.apiService);
+    
+    // Initialiser CatalogRouterService avec l'ApiService partagé
+    _catalogRouter = CatalogRouterService(apiService: authService.apiService);
+    
+    // Initialiser CatalogProposalService avec l'ApiService partagé
+    _proposalService = CatalogProposalService(apiService: authService.apiService);
+    
+    // Vider le cache overlay pour s'assurer d'avoir les dernières données approuvées
+    // (la vérification de version se fera automatiquement lors du premier fetch)
+    _catalogRouter.clearCache();
     
     // Si on édite un véhicule existant, pré-remplir les champs
     if (widget.vehicle != null) {
       final v = widget.vehicle!;
       _type = v.type;
       _nicknameController.text = v.nickname ?? '';
-      _makeController.text = v.make ?? '';
-      _modelController.text = v.model ?? '';
       if (v.year != null) {
         _year = v.year;
-        _yearController.text = v.year.toString();
       }
       _fuel = v.engine?.fuel;
       if (v.engine?.powerHp != null) {
@@ -125,17 +160,14 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
       }
       _odometerController.text = v.odometerCurrentKm.toString();
       _notesController.text = v.notes ?? '';
-      // Note: selectionSource n'est pas encore dans le modèle Vehicle Flutter
-      // _useCatalog = v.selectionSource == 'VPIC';
     }
   }
 
   @override
   void dispose() {
     _nicknameController.dispose();
-    _makeController.dispose();
-    _modelController.dispose();
-    _yearController.dispose();
+    _suggestionMakeController.dispose();
+    _suggestionModelController.dispose();
     _powerController.dispose();
     _odometerController.dispose();
     _notesController.dispose();
@@ -156,8 +188,8 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     });
 
     try {
-      debugPrint('[AddVehicle] Appel catalogService.fetchMakes($_type, $_year)');
-      final makes = await _catalogService.fetchMakes(_type!, _year!);
+      debugPrint('[AddVehicle] Appel catalogRouter.fetchMakes($_type, $_year)');
+      final makes = await _catalogRouter.fetchMakes(_type!, _year!);
       debugPrint('[AddVehicle] fetchMakes retourné ${makes.length} marques');
       
       if (mounted) {
@@ -202,8 +234,8 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     });
 
     try {
-      debugPrint('[AddVehicle] Appel catalogService.fetchModels($_type, ${_selectedMake!.id}, $_year)');
-      final models = await _catalogService.fetchModels(
+      debugPrint('[AddVehicle] Appel catalogRouter.fetchModels($_type, ${_selectedMake!.id}, $_year)');
+      final models = await _catalogRouter.fetchModels(
         _type!,
         _selectedMake!.id, // Utiliser l'ID au lieu du nom
         _year!,
@@ -276,49 +308,49 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         }
       }
 
-      // Si utilisation du catalogue externe (CarAPI)
-      if (_useCatalog) {
-        if (_selectedMake == null || _selectedModel == null || _year == null) {
-          SnackBarHelper.showError(
-            context,
-            'Veuillez compléter la sélection via le catalogue (marque, modèle, année)',
-          );
-          setState(() {
-            _isSubmitting = false;
-          });
-          return;
+      // Utilisation du catalogue local ou suggestion
+      if (_selectedMake != null && _selectedModel != null && _year != null) {
+        // Vérifier si c'est une suggestion (ID commence par SUGGESTION_)
+        final isSuggestion = _selectedMake!.id.startsWith('SUGGESTION_') || 
+                             _selectedModel!.id.startsWith('SUGGESTION_');
+        
+        if (isSuggestion) {
+          payload['selectionSource'] = 'SUGGESTION';
+          payload['make'] = _selectedMake!.name;
+          payload['model'] = _selectedModel!.name;
+          payload['year'] = _year!;
+          payload['externalCatalog'] = {
+            'provider': 'SUGGESTION',
+            'vehicleType': _type!,
+            'year': _year!,
+            'make': _selectedMake!.name,
+            'model': _selectedModel!.name,
+          };
+        } else {
+          payload['selectionSource'] = 'CATALOG_LOCAL';
+          payload['make'] = _selectedMake!.name;
+          payload['model'] = _selectedModel!.name;
+          payload['year'] = _year!;
+          
+          payload['externalCatalog'] = {
+            'provider': 'LOCAL_FR',
+            'vehicleType': _type!,
+            'year': _year!,
+            'makeId': _selectedMake!.id,
+            'modelId': _selectedModel!.id,
+          };
+          
+          debugPrint('[AddVehicle] Payload avec catalogue local: ${jsonEncode(payload)}');
         }
-
-        payload['selectionSource'] = 'CATALOG';
-        payload['make'] = _selectedMake!.name;
-        payload['model'] = _selectedModel!.name;
-        payload['year'] = _year!;
-        
-        // Nouveau format unifié: externalCatalog (CarAPI.app)
-        payload['externalCatalog'] = {
-          'provider': 'CARAPI',
-          'vehicleType': _type!,
-          'makeId': _selectedMake!.id, // Déjà une string
-          'modelId': _selectedModel!.id, // Déjà une string
-          'year': _year!,
-        };
-        
-        debugPrint('[AddVehicle] Payload avec catalogue: ${jsonEncode(payload)}');
       } else {
-        // Saisie manuelle
-        payload['selectionSource'] = 'MANUAL';
-        if (_makeController.text.isNotEmpty) {
-          payload['make'] = _makeController.text.trim();
-        }
-        if (_modelController.text.isNotEmpty) {
-          payload['model'] = _modelController.text.trim();
-        }
-        if (_yearController.text.isNotEmpty) {
-          final year = int.tryParse(_yearController.text);
-          if (year != null) {
-            payload['year'] = year;
-          }
-        }
+        SnackBarHelper.showError(
+          context,
+          'Veuillez compléter la sélection via le catalogue (marque, modèle, année)',
+        );
+        setState(() {
+          _isSubmitting = false;
+        });
+        return;
       }
 
       if (widget.vehicle != null) {
@@ -379,17 +411,29 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     final popularMakesList = _type == 'moto' ? _popularMotoMakes : _popularCarMakes;
 
     for (var make in _makes) {
-      if (popularMakesList.contains(make.name.toUpperCase())) {
+      // Comparer avec normalisation
+      final makeNormalized = _normalizeForCompare(make.name);
+      final isPopular = popularMakesList.any((popular) => 
+        _normalizeForCompare(popular) == makeNormalized
+      );
+      
+      if (isPopular) {
         popularMakes.add(make);
       } else {
         otherMakes.add(make);
       }
     }
 
-    // Trier les marques populaires selon l'ordre défini
+    // Trier les marques populaires selon l'ordre défini (avec normalisation)
     popularMakes.sort((a, b) {
-      int indexA = popularMakesList.indexWhere((name) => name == a.name.toUpperCase());
-      int indexB = popularMakesList.indexWhere((name) => name == b.name.toUpperCase());
+      final aNormalized = _normalizeForCompare(a.name);
+      final bNormalized = _normalizeForCompare(b.name);
+      int indexA = popularMakesList.indexWhere((name) => 
+        _normalizeForCompare(name) == aNormalized
+      );
+      int indexB = popularMakesList.indexWhere((name) => 
+        _normalizeForCompare(name) == bNormalized
+      );
       if (indexA == -1) indexA = 999;
       if (indexB == -1) indexB = 999;
       return indexA.compareTo(indexB);
@@ -406,7 +450,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         FormField<CatalogMake>(
           initialValue: _selectedMake,
           validator: (value) {
-            if (_useCatalog && value == null) {
+            if (value == null) {
               return 'La marque est requise';
             }
             return null;
@@ -498,6 +542,218 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     );
   }
 
+  /// Affiche le dialog de suggestion pour un véhicule non trouvé
+  Future<void> _showSuggestionDialog() async {
+    if (_type == null || _year == null) {
+      SnackBarHelper.showError(context, 'Veuillez d\'abord sélectionner le type et l\'année');
+      return;
+    }
+
+    // Pré-remplir la marque si elle est déjà sélectionnée
+    _suggestionMakeController.text = _selectedMake?.name ?? '';
+    _suggestionModelController.clear();
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Mon véhicule n\'est pas dans la liste',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _suggestionMakeController,
+                decoration: const InputDecoration(
+                  labelText: 'Marque *',
+                  hintText: 'Ex: YAMAHA',
+                  prefixIcon: Icon(Icons.branding_watermark),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'La marque est requise';
+                  }
+                  if (value.trim().length < 2) {
+                    return 'La marque doit contenir au moins 2 caractères';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _suggestionModelController,
+                decoration: const InputDecoration(
+                  labelText: 'Modèle *',
+                  hintText: 'Ex: MT-07',
+                  prefixIcon: Icon(Icons.precision_manufacturing),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le modèle est requis';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Année: ${_year}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Annuler'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_suggestionMakeController.text.trim().isNotEmpty &&
+                          _suggestionModelController.text.trim().isNotEmpty) {
+                        Navigator.pop(context, {
+                          'make': _suggestionMakeController.text.trim().toUpperCase(),
+                          'model': _suggestionModelController.text.trim().toUpperCase(),
+                        });
+                      }
+                    },
+                    child: const Text('Envoyer la proposition'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _sendProposalAndPreFill(
+        result['make']!,
+        result['model']!,
+      );
+    }
+  }
+
+  /// Envoie une proposition à l'admin et préremplit les champs marque/modèle
+  Future<void> _sendProposalAndPreFill(String make, String model) async {
+    if (_type == null || _year == null) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // Envoyer la proposition à l'admin
+      final proposalResult = await _proposalService.createProposal(
+        type: _type!,
+        year: _year!,
+        make: make,
+        model: model,
+      );
+      
+      debugPrint('[AddVehicle] Proposition créée: ${proposalResult?['status']}');
+      
+      // Afficher un message selon le statut
+      if (mounted && proposalResult != null) {
+        if (proposalResult['status'] == 'ALREADY_APPROVED') {
+          SnackBarHelper.showInfo(context, 'Cette combinaison est déjà approuvée dans le catalogue.');
+        } else if (proposalResult['status'] == 'ALREADY_PENDING') {
+          SnackBarHelper.showInfo(context, 'Une proposition similaire est déjà en attente de validation.');
+        } else {
+          SnackBarHelper.showSuccess(context, 'Votre suggestion a été envoyée pour validation par un administrateur.');
+        }
+      }
+
+      // Préremplir les champs marque et modèle dans le formulaire
+      // Créer des objets CatalogMake et CatalogModel temporaires pour la sélection
+      final makeId = 'SUGGESTION_MAKE_${make.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}';
+      final suggestionMake = CatalogMake(
+        id: makeId,
+        name: make,
+      );
+
+      // Vérifier si la marque n'est pas déjà dans la liste
+      CatalogMake finalMake;
+      if (!_makes.any((m) => m.name.toUpperCase() == make.toUpperCase())) {
+        setState(() {
+          _makes.add(suggestionMake);
+          _makes.sort((a, b) => a.name.compareTo(b.name));
+        });
+        finalMake = suggestionMake;
+      } else {
+        // Utiliser la marque existante
+        finalMake = _makes.firstWhere((m) => m.name.toUpperCase() == make.toUpperCase());
+      }
+
+      setState(() {
+        _selectedMake = finalMake;
+      });
+
+      // Charger les modèles pour cette marque (ou créer un modèle temporaire)
+      await _loadModels();
+      
+      // Si le modèle n'est pas dans la liste, créer un modèle temporaire
+      if (!_models.any((m) => m.name.toUpperCase() == model.toUpperCase())) {
+        final modelId = 'SUGGESTION_MODEL_${make.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}_${model.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}_$_year';
+        final suggestionModel = CatalogModel(
+          id: modelId,
+          name: model,
+          makeName: make,
+        );
+        
+        setState(() {
+          _models.add(suggestionModel);
+          _models.sort((a, b) => a.name.compareTo(b.name));
+          _selectedModel = suggestionModel;
+        });
+      } else {
+        // Sélectionner le modèle existant
+        setState(() {
+          _selectedModel = _models.firstWhere((m) => m.name.toUpperCase() == model.toUpperCase());
+        });
+      }
+
+      if (mounted) {
+        SnackBarHelper.showInfo(
+          context,
+          'Vous pouvez maintenant compléter le formulaire et créer votre véhicule.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Erreur lors de l\'envoi de la proposition: ${e.toString()}',
+        );
+      }
+      debugPrint('Erreur _sendProposalAndPreFill: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -536,9 +792,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                     _selectedMake = null;
                     _selectedModel = null;
                     _models = [];
-                    if (_useCatalog) {
-                      _makes = [];
-                    }
+                    _makes = [];
                     _makesError = null;
                     _modelsError = null;
                     _isLoadingMakes = false;
@@ -548,7 +802,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 });
                 
                 // Charger les marques si type + année sont déjà sélectionnés
-                if (_useCatalog && newType != null && _year != null && _makes.isEmpty && !_isLoadingMakes) {
+                if (newType != null && _year != null && _makes.isEmpty && !_isLoadingMakes) {
                   debugPrint('[AddVehicle] Type ($newType) et année ($_year) sélectionnés, déclenchement _loadMakes()');
                   _loadMakes();
                 }
@@ -569,38 +823,8 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Choix entre catalogue et saisie manuelle
-            _buildSectionTitle('Mode de saisie'),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Utiliser le catalogue CarAPI'),
-              subtitle: const Text('Sélectionner depuis le catalogue officiel'),
-              value: _useCatalog,
-              onChanged: (value) {
-                debugPrint('[AddVehicle] Switch catalogue: $_useCatalog -> $value');
-                setState(() {
-                  _useCatalog = value;
-                  // Réinitialiser les sélections
-                  _selectedMake = null;
-                  _selectedModel = null;
-                  _models = [];
-                  _makes = [];
-                  _makesError = null;
-                  _modelsError = null;
-                  _isLoadingMakes = false;
-                  _isLoadingModels = false;
-                });
-                // Charger les marques si catalogue activé, type et année sélectionnés
-                if (value && _type != null && _year != null && _makes.isEmpty) {
-                  debugPrint('[AddVehicle] Catalogue activé, déclenchement _loadMakes()');
-                  _loadMakes();
-                }
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Sélection via catalogue ou saisie manuelle
-            if (_useCatalog) ...[
+            // Sélection via catalogue local
+            ...[
               // Année
               DropdownButtonFormField<int>(
                 value: _year,
@@ -634,7 +858,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                   });
                   
                   // Charger automatiquement les marques si type + année sont sélectionnés
-                  if (_useCatalog && _type != null && value != null && _makes.isEmpty && !_isLoadingMakes) {
+                  if (_type != null && value != null && _makes.isEmpty && !_isLoadingMakes) {
                     debugPrint('[AddVehicle] Type ($_type) et année ($value) sélectionnés, déclenchement automatique _loadMakes()');
                     _loadMakes();
                   }
@@ -646,7 +870,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                   }
                 },
                 validator: (value) {
-                  if (_useCatalog && value == null) {
+                  if (value == null) {
                     return 'L\'année est requise';
                   }
                   return null;
@@ -662,73 +886,44 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
               FormField<CatalogModel>(
                 initialValue: _selectedModel,
                 validator: (value) {
-                  if (_useCatalog && value == null) {
+                  if (value == null) {
                     return 'Le modèle est requis';
                   }
                   return null;
                 },
                 builder: (FormFieldState<CatalogModel> field) {
-                  return SearchableSelect<CatalogModel>(
-                    label: 'Modèle *',
-                    hint: _selectedMake == null || _year == null || _type == null
-                        ? 'Sélectionnez d\'abord le type, la marque et l\'année'
-                        : 'Rechercher un modèle...',
-                    items: _models,
-                    selectedItem: _selectedModel,
-                    displayText: (model) => model.name,
-                    onSelected: (CatalogModel? model) {
-                      field.didChange(model);
-                      setState(() {
-                        _selectedModel = model;
-                      });
-                    },
-                    isLoading: _isLoadingModels,
-                    errorMessage: _modelsError ?? field.errorText,
-                    prefixIcon: Icons.precision_manufacturing,
-                    enabled: !_isLoadingModels && _type != null && _selectedMake != null && _year != null,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SearchableSelect<CatalogModel>(
+                        label: 'Modèle *',
+                        hint: _selectedMake == null || _year == null || _type == null
+                            ? 'Sélectionnez d\'abord le type, la marque et l\'année'
+                            : 'Rechercher un modèle...',
+                        items: _models,
+                        selectedItem: _selectedModel,
+                        displayText: (model) => model.name,
+                        onSelected: (CatalogModel? model) {
+                          field.didChange(model);
+                          setState(() {
+                            _selectedModel = model;
+                          });
+                        },
+                        isLoading: _isLoadingModels,
+                        errorMessage: _modelsError ?? field.errorText,
+                        prefixIcon: Icons.precision_manufacturing,
+                        enabled: !_isLoadingModels && _type != null && _selectedMake != null && _year != null,
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _year == null || _type == null
+                            ? null
+                            : _showSuggestionDialog,
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Mon véhicule n\'est pas dans la liste'),
+                      ),
+                    ],
                   );
-                },
-              ),
-            ] else ...[
-              // Saisie manuelle
-              TextFormField(
-                controller: _makeController,
-                decoration: const InputDecoration(
-                  labelText: 'Marque',
-                  hintText: 'Ex: Yamaha',
-                  prefixIcon: Icon(Icons.branding_watermark),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _modelController,
-                decoration: const InputDecoration(
-                  labelText: 'Modèle',
-                  hintText: 'Ex: MT-07',
-                  prefixIcon: Icon(Icons.precision_manufacturing),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _yearController,
-                decoration: const InputDecoration(
-                  labelText: 'Année (optionnel)',
-                  hintText: 'Ex: 2020',
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    final year = int.tryParse(value);
-                    if (year == null) {
-                      return 'Année invalide';
-                    }
-                    final currentYear = DateTime.now().year;
-                    if (year < 1900 || year > currentYear + 1) {
-                      return 'Année invalide';
-                    }
-                  }
-                  return null;
                 },
               ),
             ],

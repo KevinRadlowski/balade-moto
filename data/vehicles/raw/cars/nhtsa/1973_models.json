@@ -1,0 +1,566 @@
+{
+  "year": 1973,
+  "makeBlocks": [
+    {
+      "make": "ALFA ROMEO",
+      "models": []
+    },
+    {
+      "make": "ALOUETTE",
+      "models": []
+    },
+    {
+      "make": "ALTEC",
+      "models": []
+    },
+    {
+      "make": "AM GENERAL",
+      "models": []
+    },
+    {
+      "make": "AMERICAN MOTORS",
+      "models": []
+    },
+    {
+      "make": "AMERICAN TRAILERS",
+      "models": []
+    },
+    {
+      "make": "APPLEBY",
+      "models": []
+    },
+    {
+      "make": "ARROW",
+      "models": []
+    },
+    {
+      "make": "AUDI",
+      "models": []
+    },
+    {
+      "make": "AUSTIN HEALEY",
+      "models": []
+    },
+    {
+      "make": "AUTOCAR",
+      "models": []
+    },
+    {
+      "make": "AVCO",
+      "models": []
+    },
+    {
+      "make": "BANNER",
+      "models": []
+    },
+    {
+      "make": "BARTH",
+      "models": []
+    },
+    {
+      "make": "BATAVUS",
+      "models": []
+    },
+    {
+      "make": "BETHLEHEM",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": []
+    },
+    {
+      "make": "BOLES AERO",
+      "models": []
+    },
+    {
+      "make": "BROUGHAM",
+      "models": []
+    },
+    {
+      "make": "BROWN",
+      "models": []
+    },
+    {
+      "make": "BROWNLOW",
+      "models": []
+    },
+    {
+      "make": "BUICK",
+      "models": [
+        "RIVIERA"
+      ]
+    },
+    {
+      "make": "BUS AND TRUCK",
+      "models": []
+    },
+    {
+      "make": "CABANA COACH",
+      "models": []
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "DEVILLE",
+        "ELDORADO"
+      ]
+    },
+    {
+      "make": "CARRIER",
+      "models": []
+    },
+    {
+      "make": "CHECKER",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "BLAZER",
+        "C SERIES(LIGHT)",
+        "CHEVROLET TRUCK",
+        "PICKUP"
+      ]
+    },
+    {
+      "make": "CHINOOK",
+      "models": []
+    },
+    {
+      "make": "CHRYSLER",
+      "models": []
+    },
+    {
+      "make": "COMET",
+      "models": []
+    },
+    {
+      "make": "CONCO",
+      "models": []
+    },
+    {
+      "make": "CONTEMPO",
+      "models": []
+    },
+    {
+      "make": "CRANE",
+      "models": []
+    },
+    {
+      "make": "CROWN",
+      "models": []
+    },
+    {
+      "make": "CUSHMAN",
+      "models": []
+    },
+    {
+      "make": "DALEWOOD",
+      "models": []
+    },
+    {
+      "make": "DATSUN",
+      "models": []
+    },
+    {
+      "make": "DIAMOND REO",
+      "models": []
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "D100",
+        "DODGE TRUCK",
+        "MOTOR HOME"
+      ]
+    },
+    {
+      "make": "DORSEY",
+      "models": []
+    },
+    {
+      "make": "ERNEST HOLMES",
+      "models": []
+    },
+    {
+      "make": "EXECUTIVE",
+      "models": []
+    },
+    {
+      "make": "FABCO",
+      "models": []
+    },
+    {
+      "make": "FIAT",
+      "models": []
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": []
+    },
+    {
+      "make": "FLXIBLE",
+      "models": []
+    },
+    {
+      "make": "FMC",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "E SERIES",
+        "F SERIES (LIGHT)",
+        "FAIRLANE",
+        "FORD TRUCK",
+        "RANCHERO"
+      ]
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": []
+    },
+    {
+      "make": "FRUEHAUF",
+      "models": []
+    },
+    {
+      "make": "FWD",
+      "models": []
+    },
+    {
+      "make": "GEORGIE BOY",
+      "models": [
+        "SWINGER"
+      ]
+    },
+    {
+      "make": "GIL MAR",
+      "models": []
+    },
+    {
+      "make": "GILLIG",
+      "models": []
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "GMC"
+      ]
+    },
+    {
+      "make": "GREAT DANE",
+      "models": []
+    },
+    {
+      "make": "GROVE",
+      "models": []
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": []
+    },
+    {
+      "make": "HEIL",
+      "models": []
+    },
+    {
+      "make": "HENDRICKSON",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    },
+    {
+      "make": "HYSTER",
+      "models": []
+    },
+    {
+      "make": "INTERNATIONAL HARVESTER",
+      "models": [
+        "LOADSTAR SERIES",
+        "SCOUT SERIES"
+      ]
+    },
+    {
+      "make": "JAGUAR",
+      "models": []
+    },
+    {
+      "make": "JEEP",
+      "models": [
+        "CHEROKEE",
+        "WAGONEER"
+      ]
+    },
+    {
+      "make": "JENSEN",
+      "models": []
+    },
+    {
+      "make": "KATTLE KING",
+      "models": []
+    },
+    {
+      "make": "KENWORTH",
+      "models": []
+    },
+    {
+      "make": "LAFRANCE",
+      "models": []
+    },
+    {
+      "make": "LINCOLN",
+      "models": [
+        "MARK IV"
+      ]
+    },
+    {
+      "make": "MACK",
+      "models": []
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": []
+    },
+    {
+      "make": "MERCURY",
+      "models": [
+        "COUGAR",
+        "MERCURY"
+      ]
+    },
+    {
+      "make": "MG",
+      "models": []
+    },
+    {
+      "make": "MOBIL TRAVELER",
+      "models": []
+    },
+    {
+      "make": "MODULAR",
+      "models": []
+    },
+    {
+      "make": "MOODY",
+      "models": []
+    },
+    {
+      "make": "MOTOR COACH",
+      "models": []
+    },
+    {
+      "make": "NEWELL",
+      "models": []
+    },
+    {
+      "make": "NIMROD",
+      "models": []
+    },
+    {
+      "make": "NISSAN",
+      "models": []
+    },
+    {
+      "make": "NORTON",
+      "models": []
+    },
+    {
+      "make": "OLDSMOBILE",
+      "models": []
+    },
+    {
+      "make": "OPEL",
+      "models": []
+    },
+    {
+      "make": "OPEN ROAD",
+      "models": []
+    },
+    {
+      "make": "OSHKOSH",
+      "models": []
+    },
+    {
+      "make": "OUTBOARD MARINE",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT",
+      "models": []
+    },
+    {
+      "make": "PLYMOUTH",
+      "models": []
+    },
+    {
+      "make": "PONTIAC",
+      "models": [
+        "GRAND AM"
+      ]
+    },
+    {
+      "make": "PORSCHE",
+      "models": []
+    },
+    {
+      "make": "PORT",
+      "models": []
+    },
+    {
+      "make": "PREVOST",
+      "models": []
+    },
+    {
+      "make": "RADEMACHER",
+      "models": []
+    },
+    {
+      "make": "RAYMOND",
+      "models": []
+    },
+    {
+      "make": "RECTRANS",
+      "models": []
+    },
+    {
+      "make": "RENAULT",
+      "models": []
+    },
+    {
+      "make": "REVCON",
+      "models": []
+    },
+    {
+      "make": "REXNORD",
+      "models": []
+    },
+    {
+      "make": "ROAD RUNNER",
+      "models": []
+    },
+    {
+      "make": "ROBINHOOD",
+      "models": []
+    },
+    {
+      "make": "ROCKWELL",
+      "models": []
+    },
+    {
+      "make": "ROLLS-ROYCE",
+      "models": []
+    },
+    {
+      "make": "SAAB",
+      "models": []
+    },
+    {
+      "make": "SEAGRAVE",
+      "models": []
+    },
+    {
+      "make": "SHASTA",
+      "models": []
+    },
+    {
+      "make": "SIGHTSEER",
+      "models": []
+    },
+    {
+      "make": "SINFAC",
+      "models": []
+    },
+    {
+      "make": "SKYLINE",
+      "models": []
+    },
+    {
+      "make": "SOUTHERN AMBULANCE",
+      "models": []
+    },
+    {
+      "make": "SPORTSCOACH",
+      "models": []
+    },
+    {
+      "make": "STARCRAFT",
+      "models": []
+    },
+    {
+      "make": "STARDUST",
+      "models": []
+    },
+    {
+      "make": "SUBARU",
+      "models": [
+        "22"
+      ]
+    },
+    {
+      "make": "SUPERIOR",
+      "models": []
+    },
+    {
+      "make": "THOMAS",
+      "models": []
+    },
+    {
+      "make": "TIMPTE",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "COROLLA"
+      ]
+    },
+    {
+      "make": "TRAVCO",
+      "models": []
+    },
+    {
+      "make": "TRAVEL EQUIPMENT",
+      "models": []
+    },
+    {
+      "make": "TRAVOY",
+      "models": []
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "TR6"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "BEETLE"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": []
+    },
+    {
+      "make": "WHITE TRUCK",
+      "models": []
+    },
+    {
+      "make": "YELLOWSTONE",
+      "models": []
+    }
+  ]
+}

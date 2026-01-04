@@ -1,0 +1,136 @@
+{
+  "year": 2024,
+  "makeBlocks": [
+    {
+      "make": "RENAULT",
+      "models": [
+        "CAPTUR II",
+        "CLIO V",
+        "MEGANE E-TECH"
+      ]
+    },
+    {
+      "make": "PEUGEOT",
+      "models": [
+        "2008 II",
+        "208 II",
+        "3008 III",
+        "308 III",
+        "5008 II"
+      ]
+    },
+    {
+      "make": "CITROEN",
+      "models": [
+        "BERLINGO III",
+        "C3 IV",
+        "C4 III"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "GOLF VIII",
+        "POLO VI",
+        "TIGUAN III"
+      ]
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "KUGA III"
+      ]
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "COROLLA E210",
+        "RAV4 V",
+        "YARIS IV"
+      ]
+    },
+    {
+      "make": "OPEL",
+      "models": [
+        "CORSA F"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "SERIE 1 F40",
+        "SERIE 3 G20",
+        "X1 U11"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A3 8Y"
+      ]
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "CLASSE A W177",
+        "CLASSE C W206",
+        "GLA H247",
+        "GLC X254"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "QASHQAI J12"
+      ]
+    },
+    {
+      "make": "FIAT",
+      "models": [
+        "500 II"
+      ]
+    },
+    {
+      "make": "SEAT",
+      "models": [
+        "LEON IV"
+      ]
+    },
+    {
+      "make": "SKODA",
+      "models": [
+        "FABIA IV",
+        "OCTAVIA IV"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "I20 III",
+        "TUCSON IV"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "SPORTAGE IV"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": []
+    },
+    {
+      "make": "ALFA ROMEO",
+      "models": []
+    },
+    {
+      "make": "SMART",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    }
+  ]
+}

@@ -162,3 +162,4 @@ curl -X OPTIONS https://api.ridetogether.fr/api/auth/login \
 - **Index Mongoose** : Les warnings de duplication sont corrigés en retirant les `index: true` redondants dans les schémas.
 
 
+

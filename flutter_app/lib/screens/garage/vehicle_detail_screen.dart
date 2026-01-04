@@ -65,7 +65,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _photoController.dispose();
+    // Ne pas disposer le controller ici car il est géré par Provider.value
+    // Le controller sera disposé automatiquement quand il n'y aura plus de listeners
     super.dispose();
   }
 
@@ -352,7 +353,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
+    return ChangeNotifierProvider<PhotoGalleryController>.value(
       value: _photoController,
       child: Scaffold(
         appBar: AppBar(
@@ -1170,7 +1171,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     return Consumer<PhotoGalleryController>(
       builder: (context, controller, _) {
         if (controller.photos.isEmpty) {
-          return const SizedBox.shrink();
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
         }
         
         // Calculer la taille de cache basée sur la largeur de l'écran

@@ -8,8 +8,8 @@ const { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } = req
 const { buildUserAvatarUrl } = require('../utils/urlHelper');
 
 // Générer un token JWT
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+const generateToken = (userId, role) => {
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET, {
     expiresIn: '15m' // 15 minutes
   });
 };
@@ -52,7 +52,7 @@ exports.register = async (req, res, next) => {
       email: normalizedEmail, // Utiliser l'email normalisé
       password,
       pseudo: pseudo.trim(),
-      role: 'user',
+      role: 'MEMBER', // Par défaut MEMBER
       emailVerified: false,
       emailVerificationToken,
       emailVerificationExpires,
@@ -462,8 +462,17 @@ exports.login = async (req, res) => {
     // Réinitialiser les tentatives de connexion
     await user.resetLoginAttempts();
 
+    // Normaliser le rôle avant sauvegarde (compatibilité legacy)
+    if (user.role === 'user') {
+      user.role = 'MEMBER';
+    } else if (user.role === 'admin') {
+      user.role = 'ADMIN';
+    } else if (!user.role || user.role === '') {
+      user.role = 'MEMBER';
+    }
+
     // Générer les tokens
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.role);
     const refreshToken = generateRefreshToken();
 
     // Rotation du refresh token : invalider l'ancien et sauvegarder le nouveau
@@ -488,6 +497,16 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    // Gestion spécifique des ValidationError (Mongoose)
+    if (error.name === 'ValidationError') {
+      return res.status(422).json({
+        success: false,
+        message: 'Données utilisateur invalides',
+        error: error.message
+      });
+    }
+    
+    // Erreur générique
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la connexion',
@@ -720,7 +739,7 @@ exports.refreshToken = async (req, res) => {
     }
 
     // Générer un nouveau access token
-    const newToken = generateToken(user._id);
+    const newToken = generateToken(user._id, user.role);
     
     // Rotation : générer un nouveau refresh token et invalider l'ancien
     const newRefreshToken = generateRefreshToken();

@@ -1,0 +1,113 @@
+{
+  "year": 2005,
+  "makeBlocks": [
+    {
+      "make": "HONDA",
+      "models": [
+        "CBF 600",
+        "CBR 1000RR",
+        "CBR 600RR"
+      ]
+    },
+    {
+      "make": "YAMAHA",
+      "models": [
+        "TMAX 500",
+        "YZF-R1",
+        "YZF-R6"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "Ninja ZX-10R",
+        "Ninja ZX-6R",
+        "Z750"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "GSX-R1000",
+        "GSX-R600",
+        "GSX-R750",
+        "SV650",
+        "V-Strom 1000",
+        "V-Strom 650"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "R 1200 GS"
+      ]
+    },
+    {
+      "make": "KTM",
+      "models": []
+    },
+    {
+      "make": "DUCATI",
+      "models": []
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "Speed Triple"
+      ]
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "Softail",
+        "Sportster"
+      ]
+    },
+    {
+      "make": "PIAGGIO",
+      "models": [
+        "Vespa GTS"
+      ]
+    },
+    {
+      "make": "APRILIA",
+      "models": []
+    },
+    {
+      "make": "MOTO GUZZI",
+      "models": []
+    },
+    {
+      "make": "HUSQVARNA",
+      "models": []
+    },
+    {
+      "make": "INDIAN",
+      "models": []
+    },
+    {
+      "make": "BENELLI",
+      "models": []
+    },
+    {
+      "make": "CFMOTO",
+      "models": []
+    },
+    {
+      "make": "KYMCO",
+      "models": []
+    },
+    {
+      "make": "SYM",
+      "models": []
+    },
+    {
+      "make": "ZERO",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT MOTOCYCLES",
+      "models": []
+    }
+  ]
+}

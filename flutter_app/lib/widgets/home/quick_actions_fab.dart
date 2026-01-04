@@ -75,24 +75,6 @@ class QuickActionsFab extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 12),
-            _buildQuickActionButton(
-              context: context,
-              icon: Icons.search,
-              label: 'Rechercher une balade',
-              color: Colors.green.shade700,
-              onTap: () {
-                Navigator.pop(context);
-                // Scroll vers la section "Toutes les balades"
-                if (scrollController != null && scrollController!.hasClients) {
-                  scrollController!.animateTo(
-                    scrollController!.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
-                }
-              },
-            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -150,6 +132,7 @@ class QuickActionsFab extends StatelessWidget {
     );
   }
 }
+
 
 
 

@@ -1,0 +1,2114 @@
+{
+  "year": 1998,
+  "makeBlocks": [
+    {
+      "make": "ACURA",
+      "models": [
+        "CL",
+        "INTEGRA",
+        "RL",
+        "SLX",
+        "TL"
+      ]
+    },
+    {
+      "make": "AERO",
+      "models": [
+        "AEROLITE"
+      ]
+    },
+    {
+      "make": "AIRSTREAM",
+      "models": [
+        "AIRSTREAM"
+      ]
+    },
+    {
+      "make": "ALFA",
+      "models": [
+        "TRAVEL TRAILER"
+      ]
+    },
+    {
+      "make": "ALLEN CAMPER",
+      "models": []
+    },
+    {
+      "make": "ALLURE",
+      "models": [
+        "ROGUE"
+      ]
+    },
+    {
+      "make": "ALTEC",
+      "models": []
+    },
+    {
+      "make": "AM GENERAL",
+      "models": [
+        "HUMMER"
+      ]
+    },
+    {
+      "make": "AMERICAN LAFRANCE",
+      "models": []
+    },
+    {
+      "make": "AMERICAN TRAVEL",
+      "models": []
+    },
+    {
+      "make": "AMTRAN",
+      "models": [
+        "COMMERCIAL",
+        "GENESIS"
+      ]
+    },
+    {
+      "make": "ASPEN",
+      "models": []
+    },
+    {
+      "make": "ASTON MARTIN",
+      "models": []
+    },
+    {
+      "make": "ATHEY",
+      "models": [
+        "SWEEPER"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "100",
+        "A4",
+        "A6",
+        "A8",
+        "ALLROAD",
+        "CABRIOLET",
+        "QUATTRO",
+        "S6"
+      ]
+    },
+    {
+      "make": "BEALL",
+      "models": []
+    },
+    {
+      "make": "BEAVER",
+      "models": []
+    },
+    {
+      "make": "BEAVER COACH",
+      "models": []
+    },
+    {
+      "make": "BENSON",
+      "models": []
+    },
+    {
+      "make": "BENTLEY",
+      "models": []
+    },
+    {
+      "make": "BEST",
+      "models": [
+        "TTL60K3"
+      ]
+    },
+    {
+      "make": "BIGDOG",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": [
+        "ALL AMERICAN",
+        "SCHOOL BUS"
+      ]
+    },
+    {
+      "make": "BLUEBIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "3 SERIES",
+        "318",
+        "318I",
+        "318TI",
+        "320",
+        "323I",
+        "325",
+        "328I",
+        "525",
+        "525I",
+        "528",
+        "528I",
+        "528IA",
+        "540I",
+        "540IA",
+        "735",
+        "740",
+        "740I",
+        "740IA",
+        "740IL",
+        "740ILA",
+        "750IL",
+        "750ILA",
+        "BMW",
+        "BMW MOTORCYCLE",
+        "E36 SERIES",
+        "K1100",
+        "K1200RS",
+        "M ROADSTER",
+        "M3",
+        "MC R SERIES",
+        "R1100",
+        "R1100 RS",
+        "R1200C",
+        "Z3",
+        "Z3 ROADSTER"
+      ]
+    },
+    {
+      "make": "BOYDSTUN",
+      "models": []
+    },
+    {
+      "make": "BUELL",
+      "models": [
+        "M2",
+        "S1 LIGHTNING",
+        "S1 WHITE LIGHTNING",
+        "S1W",
+        "S1W WHITE LIGHTNING",
+        "S3",
+        "S3 THUNDERBOLT",
+        "S3T",
+        "THUNDERBOLT"
+      ]
+    },
+    {
+      "make": "BUICK",
+      "models": [
+        "CENTURY",
+        "LESABRE",
+        "PARK AVENUE",
+        "REGAL",
+        "RIVIERA",
+        "SKYLARK"
+      ]
+    },
+    {
+      "make": "CACHE",
+      "models": []
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "CATERA",
+        "DEVILLE",
+        "ELDORADO",
+        "FLEETWOOD",
+        "SEVILLE",
+        "STS"
+      ]
+    },
+    {
+      "make": "CALIFORNIA",
+      "models": []
+    },
+    {
+      "make": "CARRIAGE",
+      "models": []
+    },
+    {
+      "make": "CHAMPION",
+      "models": []
+    },
+    {
+      "make": "CHANCE",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "ASTRO",
+        "B7 MEDIUM DUTY",
+        "BERETTA",
+        "BLAZER",
+        "C/K",
+        "C10",
+        "C30",
+        "C6500",
+        "CAMARO",
+        "CAVALIER",
+        "CHEVROLET TRUCK",
+        "CHEVY VAN",
+        "CONVENTIONAL",
+        "CORVETTE",
+        "ENVOY",
+        "EXPLORER",
+        "EXPRESS",
+        "EXPRESS 2500",
+        "EXPRESS 3500",
+        "F SERIES",
+        "G SERIES",
+        "G VAN",
+        "G10",
+        "G20",
+        "G2500",
+        "G30",
+        "G35",
+        "GMT-400",
+        "H SERIES",
+        "IMPALA",
+        "JIMMY",
+        "K1",
+        "K10",
+        "K2",
+        "K20",
+        "LUMINA",
+        "LUMINA APV",
+        "M SERIES",
+        "M/L",
+        "MALIBU",
+        "METRO",
+        "MONTE CARLO",
+        "MOTOR HOME",
+        "P",
+        "P SERIES",
+        "P3",
+        "P30",
+        "PRIZM",
+        "S-10",
+        "S/T BLAZER",
+        "SILVERADO 2500 HD",
+        "SILVERADO 3500 HD",
+        "SONOMA",
+        "SUBURBAN",
+        "T7500",
+        "TAHOE",
+        "TRACKER",
+        "TRANS SPORT",
+        "VAN",
+        "VENTURE",
+        "W3500",
+        "YUKON"
+      ]
+    },
+    {
+      "make": "CHRYSLER",
+      "models": [
+        "CIRRUS",
+        "CONCORDE",
+        "LHS",
+        "NEW YORKER",
+        "SEBRING",
+        "SEBRING CONVERTIBLE",
+        "TOWN & COUNTRY"
+      ]
+    },
+    {
+      "make": "CLASSIC",
+      "models": []
+    },
+    {
+      "make": "COACH HOUSE",
+      "models": []
+    },
+    {
+      "make": "COACHMEN",
+      "models": [
+        "241FK-LITE",
+        "COACHMEN",
+        "MINI MOTORHOME",
+        "SANTARA",
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "COAST MACHINERY",
+      "models": []
+    },
+    {
+      "make": "COLLINS",
+      "models": [
+        "BANTAM",
+        "GRAND BANTAM"
+      ]
+    },
+    {
+      "make": "CORBEIL",
+      "models": []
+    },
+    {
+      "make": "COUNTRY COACH",
+      "models": [
+        "AFFINITY GRANDE CHALET",
+        "INTRIGUE",
+        "MAGNA",
+        "MAX"
+      ]
+    },
+    {
+      "make": "COZAD",
+      "models": []
+    },
+    {
+      "make": "CRAFTSMEN",
+      "models": [
+        "LINCOLN TOWN CAR"
+      ]
+    },
+    {
+      "make": "CRANE",
+      "models": []
+    },
+    {
+      "make": "CROSSROADS",
+      "models": []
+    },
+    {
+      "make": "CRUISER RV",
+      "models": []
+    },
+    {
+      "make": "CUSHMAN",
+      "models": []
+    },
+    {
+      "make": "CUSTOM CAMPERS",
+      "models": []
+    },
+    {
+      "make": "DABRYAN",
+      "models": []
+    },
+    {
+      "make": "DAEWOO",
+      "models": [
+        "LANOS",
+        "LEGANZA",
+        "NUBIRA"
+      ]
+    },
+    {
+      "make": "DAEWOO PUERTO RICO",
+      "models": [
+        "LANOS",
+        "LEGANZA"
+      ]
+    },
+    {
+      "make": "DAMON",
+      "models": [
+        "CHALLENGER",
+        "DAYBREAK",
+        "INTRUDER",
+        "ULTRASPORT"
+      ]
+    },
+    {
+      "make": "DEMPSTER",
+      "models": []
+    },
+    {
+      "make": "DESTINY",
+      "models": []
+    },
+    {
+      "make": "DIAMOND COACH",
+      "models": []
+    },
+    {
+      "make": "DITCH WITCH",
+      "models": []
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "AVENGER",
+        "B SERIES",
+        "B250",
+        "B350",
+        "CARAVAN",
+        "COLT VISTA",
+        "DAKOTA",
+        "DODGE TRUCK",
+        "DURANGO",
+        "GRAND CARAVAN",
+        "INTREPID",
+        "NEON",
+        "PICKUP",
+        "QUAD",
+        "RAM",
+        "RAM 2500",
+        "RAM 3500",
+        "RAM B250",
+        "RAM CLUB CAB",
+        "RAM PICKUP",
+        "RAM VAN",
+        "RAM WAGON",
+        "SHADOW",
+        "SPIRIT",
+        "STRATUS",
+        "VAN",
+        "VIPER",
+        "WAGON"
+      ]
+    },
+    {
+      "make": "DOLPHIN",
+      "models": [
+        "MOTOR HOME"
+      ]
+    },
+    {
+      "make": "DORSEY",
+      "models": []
+    },
+    {
+      "make": "DOUBLE DUTY",
+      "models": []
+    },
+    {
+      "make": "DRAKE",
+      "models": []
+    },
+    {
+      "make": "DUCATI",
+      "models": [
+        "748",
+        "916",
+        "DUCATI",
+        "ST2"
+      ]
+    },
+    {
+      "make": "DUTCHMEN",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "DYNAMAX",
+      "models": []
+    },
+    {
+      "make": "EAGLE",
+      "models": [
+        "TALON"
+      ]
+    },
+    {
+      "make": "EAST",
+      "models": []
+    },
+    {
+      "make": "EAST MANUFACTURING",
+      "models": []
+    },
+    {
+      "make": "EBY",
+      "models": []
+    },
+    {
+      "make": "ELDORADO",
+      "models": [
+        "ELDORADO"
+      ]
+    },
+    {
+      "make": "ELGIN",
+      "models": []
+    },
+    {
+      "make": "EMERGENCY ONE",
+      "models": []
+    },
+    {
+      "make": "ENC",
+      "models": []
+    },
+    {
+      "make": "ENTREPRISES",
+      "models": []
+    },
+    {
+      "make": "ETI",
+      "models": []
+    },
+    {
+      "make": "EUROPA",
+      "models": []
+    },
+    {
+      "make": "EXECUTIVE COACH",
+      "models": []
+    },
+    {
+      "make": "EXPLORER VAN",
+      "models": [
+        "FORD E150",
+        "FORD EXPLORER",
+        "GMC SAVANA"
+      ]
+    },
+    {
+      "make": "FEATHERLITE",
+      "models": []
+    },
+    {
+      "make": "FEDERAL COACH",
+      "models": []
+    },
+    {
+      "make": "FERRARI",
+      "models": [
+        "550",
+        "F355"
+      ]
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": [
+        "AMERICAN DREAM",
+        "AMERICAN EAGLE",
+        "AMERICAN TRADITION",
+        "AVION",
+        "BOUNDER",
+        "DISCOVERY",
+        "FLAIR",
+        "FLEETWOOD",
+        "FOLDING TRAILER",
+        "JAMBOREE",
+        "MALLARD",
+        "PACE ARROW",
+        "PROWLER",
+        "SAVANNA",
+        "SOUTHWIND",
+        "SOUTHWIND STORM",
+        "STORM",
+        "TERRY",
+        "TIOGA",
+        "TRAVEL TRAILER",
+        "WILDERNESS"
+      ]
+    },
+    {
+      "make": "FONTAINE",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "AEROMAX",
+        "AEROSTAR",
+        "AT9513",
+        "AT9522",
+        "B SERIES",
+        "B800",
+        "BRONCO",
+        "CAB CHASSIS",
+        "CLUB WAGON",
+        "CONTOUR",
+        "CROWN VICTORIA",
+        "CVPI",
+        "E SERIES",
+        "E-150",
+        "E-250",
+        "E-350",
+        "E-450",
+        "E-SERIES",
+        "ECONOLINE",
+        "ESCORT",
+        "ESCORT ZX2",
+        "EXPEDITION",
+        "EXPLORER",
+        "F SUPER DUTY",
+        "F-150",
+        "F-250",
+        "F-250 SD",
+        "F-350",
+        "F-350 SD",
+        "F-450 SD",
+        "F47",
+        "F53",
+        "F800",
+        "FORD TRUCK",
+        "GRAND MARQUIS",
+        "L SERIES",
+        "L8501",
+        "LARIAT",
+        "LOUISVILLE",
+        "MOTOR HOME",
+        "MOUNTAINEER",
+        "MUSTANG",
+        "NAVIGATOR",
+        "PICKUP",
+        "RANGER",
+        "SCHOOL BUS",
+        "SHO (TAURUS)",
+        "STRIPPED CHASSIS",
+        "SUPER DUTY F SERIES",
+        "TAURUS",
+        "TEMPO",
+        "THUNDERBIRD",
+        "UTILITY VAN XH",
+        "WINDSTAR",
+        "XL"
+      ]
+    },
+    {
+      "make": "FOREST RIVER",
+      "models": [
+        "CARDINAL",
+        "FLAGSTAFF",
+        "GEORGETOWN",
+        "WINDSONG"
+      ]
+    },
+    {
+      "make": "FORETRAVEL",
+      "models": []
+    },
+    {
+      "make": "FRANKLIN",
+      "models": []
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": [
+        "CENTURY",
+        "CENTURY CLASS",
+        "CLASSIC",
+        "CONVENTIONAL",
+        "FL-60",
+        "FL-70",
+        "FLC112",
+        "FLD",
+        "FLD120",
+        "FREIGHTLINER",
+        "FS-65",
+        "MT"
+      ]
+    },
+    {
+      "make": "FRUEHAUF",
+      "models": []
+    },
+    {
+      "make": "FWF",
+      "models": []
+    },
+    {
+      "make": "GENERAL COACH",
+      "models": []
+    },
+    {
+      "make": "GENERAL TRAILER",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "GENIE",
+      "models": [
+        "TMZ-34/19"
+      ]
+    },
+    {
+      "make": "GEORGIE BOY",
+      "models": [
+        "CRUISE MASTER",
+        "GEORGIE BOY",
+        "MAVERICK",
+        "SWINGER"
+      ]
+    },
+    {
+      "make": "GILLIG",
+      "models": []
+    },
+    {
+      "make": "GIRARDIN",
+      "models": [
+        "MBIV"
+      ]
+    },
+    {
+      "make": "GLENDALE",
+      "models": []
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "BLAZER",
+        "C SERIES",
+        "C/K 3500",
+        "C/K PICKUP",
+        "C/K SERIES",
+        "C/K SUBURBAN (GMC)",
+        "C10753",
+        "C1500 SUBURBAN",
+        "ENVOY",
+        "GMC TRUCK",
+        "JIMMY",
+        "P30 MOTORHOME CHASSIS",
+        "PASSENGER VEHICLE",
+        "PICKUP",
+        "S/T JIMMY",
+        "S15",
+        "SAFARI",
+        "SAVANA",
+        "SIERRA",
+        "SONOMA",
+        "SUBURBAN",
+        "T10",
+        "TAHOE",
+        "V SERIES",
+        "VANDURA",
+        "YUKON",
+        "Z-71"
+      ]
+    },
+    {
+      "make": "GORE",
+      "models": []
+    },
+    {
+      "make": "GREAT DANE",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "GREAT LAKES",
+      "models": []
+    },
+    {
+      "make": "GRUMMAN",
+      "models": []
+    },
+    {
+      "make": "GULF STREAM",
+      "models": [
+        "FRIENDSHIP",
+        "GULF STREAM",
+        "MOTORHOME",
+        "SUNSPORT LT",
+        "ULTRA"
+      ]
+    },
+    {
+      "make": "GULF TOYOTA",
+      "models": []
+    },
+    {
+      "make": "HALE",
+      "models": []
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "883 HUGGER",
+        "ASVE",
+        "DYNA",
+        "ELECTRA GLIDE",
+        "FL SERIES",
+        "FLHS",
+        "FLHT",
+        "FLHTC",
+        "FLHTCI",
+        "FLHTCUI",
+        "FLSTC",
+        "FLSTF",
+        "FLSTS",
+        "FLTCUI",
+        "FLTR",
+        "FLTRI",
+        "FX",
+        "FXDS CONV",
+        "FXDWG",
+        "FXST SERIES",
+        "FXSTS",
+        "HARLEY DAVIDSON",
+        "ROAD KING",
+        "SOFTAIL",
+        "SPORTSTER",
+        "ULTRA CLASSIC",
+        "XL"
+      ]
+    },
+    {
+      "make": "HARMAR",
+      "models": []
+    },
+    {
+      "make": "HARMON",
+      "models": []
+    },
+    {
+      "make": "HARNEY",
+      "models": [
+        "RIATA"
+      ]
+    },
+    {
+      "make": "HART",
+      "models": []
+    },
+    {
+      "make": "HAULMARK",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "HINO",
+      "models": []
+    },
+    {
+      "make": "HME",
+      "models": []
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": [
+        "ALUMA LITE CUSTOM",
+        "ALUMASCAPE",
+        "ENDEAVOR",
+        "ENDEAVOR DIESEL",
+        "HOLIDAY RAMBLER",
+        "IMPERIAL",
+        "RAMBLER",
+        "VACATIONER"
+      ]
+    },
+    {
+      "make": "HOME AND PARK",
+      "models": [
+        "ROADTREK"
+      ]
+    },
+    {
+      "make": "HONDA",
+      "models": [
+        "ACCORD",
+        "ATV SERIES",
+        "CBR600",
+        "CBR900",
+        "CH80",
+        "CIVIC",
+        "CR-V",
+        "DEL SOL",
+        "GL1500",
+        "HONDA MOTORCYCLE",
+        "ODYSSEY",
+        "PASSPORT",
+        "PC800",
+        "PRELUDE",
+        "ST1100",
+        "V SERIES",
+        "VALKYRIE",
+        "VF750",
+        "VT1100",
+        "VT1100C3",
+        "VTR1000F"
+      ]
+    },
+    {
+      "make": "HORTON",
+      "models": []
+    },
+    {
+      "make": "HUMDINGER",
+      "models": []
+    },
+    {
+      "make": "HY-LINE",
+      "models": []
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "ACCENT",
+        "ELANTRA",
+        "EXCEL",
+        "SONATA",
+        "TIBURON"
+      ]
+    },
+    {
+      "make": "HYUNDAI CARIBBEAN",
+      "models": []
+    },
+    {
+      "make": "HYUNDAI TRANSLEAD",
+      "models": []
+    },
+    {
+      "make": "IC",
+      "models": [
+        "3800"
+      ]
+    },
+    {
+      "make": "INFINITI",
+      "models": [
+        "I30",
+        "Q45",
+        "QX4"
+      ]
+    },
+    {
+      "make": "INTERNATIONAL",
+      "models": [
+        "3600",
+        "9400",
+        "INTERNATIONAL"
+      ]
+    },
+    {
+      "make": "INTERNATIONAL HARVESTER",
+      "models": [
+        "3800",
+        "4700",
+        "9100",
+        "9200",
+        "9300",
+        "9400",
+        "9800",
+        "AMTRAN BUSES",
+        "CONVENTIONAL",
+        "INTERNATIONAL"
+      ]
+    },
+    {
+      "make": "INTRIGUE",
+      "models": []
+    },
+    {
+      "make": "ISUZU",
+      "models": [
+        "AMIGO",
+        "FTR",
+        "HOMBRE",
+        "ISUZU TRUCK",
+        "N SERIES",
+        "NPR",
+        "OASIS",
+        "RODEO",
+        "TROOPER",
+        "VEHICROSS"
+      ]
+    },
+    {
+      "make": "ITASCA",
+      "models": [
+        "HORIZON",
+        "ITASCA",
+        "SUNDANCER"
+      ]
+    },
+    {
+      "make": "J&L",
+      "models": []
+    },
+    {
+      "make": "JAGUAR",
+      "models": [
+        "JAGUAR",
+        "VANDEN PLAS",
+        "XJ",
+        "XJ6",
+        "XJ8",
+        "XJ8L",
+        "XJR",
+        "XJS",
+        "XJV8",
+        "XK8",
+        "XK8 SPORTS"
+      ]
+    },
+    {
+      "make": "JAYCO",
+      "models": [
+        "DESIGNER",
+        "EAGLE",
+        "HERITAGE",
+        "JAYCO"
+      ]
+    },
+    {
+      "make": "JEEP",
+      "models": [
+        "GRAND CHEROKEE",
+        "GRAND WAGONEER",
+        "LAREDO",
+        "WAGONEER",
+        "WRANGLER"
+      ]
+    },
+    {
+      "make": "JMH",
+      "models": []
+    },
+    {
+      "make": "K-Z",
+      "models": []
+    },
+    {
+      "make": "KENWORTH",
+      "models": [
+        "KENWORTH",
+        "T2000",
+        "T800",
+        "W900"
+      ]
+    },
+    {
+      "make": "KEYSTONE",
+      "models": [
+        "SPRINGDALE",
+        "SPRINTER"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "KIA",
+        "SEPHIA",
+        "SPORTAGE"
+      ]
+    },
+    {
+      "make": "KING OF THE ROAD",
+      "models": [
+        "MINI MOTOR HOME"
+      ]
+    },
+    {
+      "make": "KIT RV",
+      "models": []
+    },
+    {
+      "make": "KME",
+      "models": []
+    },
+    {
+      "make": "KOMPACT KAMP",
+      "models": []
+    },
+    {
+      "make": "KRYSTAL",
+      "models": []
+    },
+    {
+      "make": "LAMBORGHINI",
+      "models": []
+    },
+    {
+      "make": "LANCE",
+      "models": []
+    },
+    {
+      "make": "LAND ROVER",
+      "models": [
+        "DISCOVERY",
+        "RANGE ROVER"
+      ]
+    },
+    {
+      "make": "LAZY DAZE",
+      "models": []
+    },
+    {
+      "make": "LCW",
+      "models": []
+    },
+    {
+      "make": "LEXUS",
+      "models": [
+        "ES300",
+        "GS",
+        "GS300",
+        "GS400",
+        "LS",
+        "LS400",
+        "LX450",
+        "LX470",
+        "RX300",
+        "SC400"
+      ]
+    },
+    {
+      "make": "LINCOLN",
+      "models": [
+        "CONTINENTAL",
+        "MARK",
+        "MARK VII",
+        "MARK VIII",
+        "NAVIGATOR",
+        "TOWN CAR"
+      ]
+    },
+    {
+      "make": "LOTUS",
+      "models": [
+        "ESPRIT"
+      ]
+    },
+    {
+      "make": "LUXOR",
+      "models": []
+    },
+    {
+      "make": "MAC",
+      "models": []
+    },
+    {
+      "make": "MACK",
+      "models": [
+        "CH613",
+        "CL",
+        "MACK"
+      ]
+    },
+    {
+      "make": "MADRID",
+      "models": []
+    },
+    {
+      "make": "MAGNUM",
+      "models": []
+    },
+    {
+      "make": "MARATHON",
+      "models": []
+    },
+    {
+      "make": "MARK III",
+      "models": [
+        "CHEVROLET TAHOE",
+        "FORD WINDSTAR",
+        "PLYMOUTH VOYAGER"
+      ]
+    },
+    {
+      "make": "MARQUE",
+      "models": []
+    },
+    {
+      "make": "MARQUEZ",
+      "models": []
+    },
+    {
+      "make": "MATE",
+      "models": []
+    },
+    {
+      "make": "MAXIM",
+      "models": []
+    },
+    {
+      "make": "MAZDA",
+      "models": [
+        "626",
+        "B-SERIES",
+        "MILLENIA",
+        "MPV",
+        "MX-5 MIATA",
+        "PROTEGE"
+      ]
+    },
+    {
+      "make": "MCCOY MILLER",
+      "models": []
+    },
+    {
+      "make": "MCI",
+      "models": [
+        "102D3"
+      ]
+    },
+    {
+      "make": "MCKENZIE",
+      "models": []
+    },
+    {
+      "make": "MEDTEC",
+      "models": []
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": [
+        "280",
+        "300",
+        "320",
+        "400",
+        "500",
+        "C220",
+        "C280",
+        "CLK",
+        "E CLASS",
+        "E300",
+        "E320",
+        "E430",
+        "S CLASS",
+        "S420",
+        "SL CLASS",
+        "SL320",
+        "SL500",
+        "SLK",
+        "SLK230"
+      ]
+    },
+    {
+      "make": "MERCURY",
+      "models": [
+        "COUGAR",
+        "GRAND MARQUIS",
+        "MOUNTAINEER",
+        "MYSTIQUE",
+        "SABLE",
+        "TOPAZ",
+        "TRACER",
+        "VILLAGER"
+      ]
+    },
+    {
+      "make": "MID BUS",
+      "models": []
+    },
+    {
+      "make": "MID CONTINENT",
+      "models": []
+    },
+    {
+      "make": "MITSUBISHI",
+      "models": [
+        "3000GT",
+        "DIAMANTE",
+        "ECLIPSE",
+        "GALANT",
+        "MIRAGE",
+        "MONTERO",
+        "MONTERO SPORT",
+        "SPYDER"
+      ]
+    },
+    {
+      "make": "MITSUBISHI CARIBBEAN",
+      "models": [
+        "MONTERO",
+        "SPYDER"
+      ]
+    },
+    {
+      "make": "MITSUBISHI FUSO",
+      "models": [
+        "FE",
+        "FM617"
+      ]
+    },
+    {
+      "make": "MOBILE SUITES",
+      "models": []
+    },
+    {
+      "make": "MONACO COACH",
+      "models": [
+        "DIPLOMAT",
+        "MONACO"
+      ]
+    },
+    {
+      "make": "MONON",
+      "models": []
+    },
+    {
+      "make": "MORGAN TRAILER",
+      "models": []
+    },
+    {
+      "make": "MOTO GUZZI",
+      "models": [
+        "SPECIAL",
+        "V10 CENTAURO"
+      ]
+    },
+    {
+      "make": "NABI",
+      "models": []
+    },
+    {
+      "make": "NATIONAL RV",
+      "models": [
+        "DOLPHIN",
+        "NATIONAL RV",
+        "SEA BREEZE",
+        "TROPI-CAL"
+      ]
+    },
+    {
+      "make": "NAVISTAR",
+      "models": [
+        "3800"
+      ]
+    },
+    {
+      "make": "NELSON",
+      "models": []
+    },
+    {
+      "make": "NEOPLAN",
+      "models": [
+        "AN440"
+      ]
+    },
+    {
+      "make": "NEW FLYER",
+      "models": [
+        "D40LF"
+      ]
+    },
+    {
+      "make": "NEW HORIZONS",
+      "models": []
+    },
+    {
+      "make": "NEWELL",
+      "models": []
+    },
+    {
+      "make": "NEWMAR",
+      "models": [
+        "DUTCH STAR",
+        "KOUNTRY AIRE",
+        "MOUNTAIN AIRE"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "200SX",
+        "240SX",
+        "ALTIMA",
+        "FRONTIER",
+        "MAXIMA",
+        "PATHFINDER",
+        "QUEST",
+        "SENTRA"
+      ]
+    },
+    {
+      "make": "NISSAN DIESEL",
+      "models": []
+    },
+    {
+      "make": "NOVA BUS",
+      "models": []
+    },
+    {
+      "make": "NOVABUS",
+      "models": []
+    },
+    {
+      "make": "NU VAN",
+      "models": []
+    },
+    {
+      "make": "NU WA",
+      "models": [
+        "CHAMPAGNE EDITION",
+        "HITCHHIKER"
+      ]
+    },
+    {
+      "make": "OLDSMOBILE",
+      "models": [
+        "88",
+        "98",
+        "ACHIEVA",
+        "ALERO",
+        "AURORA",
+        "BRAVADA",
+        "CUTLASS",
+        "INTRIGUE",
+        "OLDSMOBILE TRUCK",
+        "SILHOUETTE"
+      ]
+    },
+    {
+      "make": "OPTIMA",
+      "models": []
+    },
+    {
+      "make": "ORION",
+      "models": [
+        "ORION"
+      ]
+    },
+    {
+      "make": "OSHKOSH",
+      "models": []
+    },
+    {
+      "make": "OTTAWA",
+      "models": []
+    },
+    {
+      "make": "OVERLAND",
+      "models": [
+        "LORADO"
+      ]
+    },
+    {
+      "make": "PACE ARROW",
+      "models": [
+        "VISION"
+      ]
+    },
+    {
+      "make": "PEERLESS",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": [
+        "379",
+        "PETERBILT"
+      ]
+    },
+    {
+      "make": "PETERSEN",
+      "models": []
+    },
+    {
+      "make": "PICASSO",
+      "models": []
+    },
+    {
+      "make": "PIERCE",
+      "models": []
+    },
+    {
+      "make": "PLEASURE WAY",
+      "models": []
+    },
+    {
+      "make": "PLYMOUTH",
+      "models": [
+        "BREEZE",
+        "GRAND VOYAGER",
+        "LASER",
+        "NEON",
+        "SUNDANCE",
+        "VOYAGER"
+      ]
+    },
+    {
+      "make": "POLAR",
+      "models": []
+    },
+    {
+      "make": "PONTIAC",
+      "models": [
+        "BONNEVILLE",
+        "FIREBIRD",
+        "GRAND AM",
+        "GRAND PRIX",
+        "MONTANA",
+        "PONTIAC TRUCK",
+        "SUNBIRD",
+        "SUNFIRE",
+        "TRANS AM",
+        "TRANS SPORT"
+      ]
+    },
+    {
+      "make": "PORSCHE",
+      "models": [
+        "911",
+        "BOXSTER",
+        "PORSCHE"
+      ]
+    },
+    {
+      "make": "PREVOST",
+      "models": [
+        "H3-45",
+        "H3-45VIP"
+      ]
+    },
+    {
+      "make": "PROGRESSIVE",
+      "models": []
+    },
+    {
+      "make": "QUALITY COACH",
+      "models": []
+    },
+    {
+      "make": "RED RIVER",
+      "models": []
+    },
+    {
+      "make": "REGENCY",
+      "models": [
+        "FORD F150",
+        "FORD F350"
+      ]
+    },
+    {
+      "make": "REITNOUER",
+      "models": []
+    },
+    {
+      "make": "RELIANCE",
+      "models": []
+    },
+    {
+      "make": "RELIANCE TRAILER",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "RENEGADE",
+      "models": []
+    },
+    {
+      "make": "REXHALL",
+      "models": [
+        "AERBUS",
+        "REXAIR"
+      ]
+    },
+    {
+      "make": "RHODES",
+      "models": []
+    },
+    {
+      "make": "RIALTA",
+      "models": [
+        "RIALTA"
+      ]
+    },
+    {
+      "make": "RIDE AWAY",
+      "models": []
+    },
+    {
+      "make": "RIDE THE DUCKS",
+      "models": []
+    },
+    {
+      "make": "ROAD RESCUE",
+      "models": []
+    },
+    {
+      "make": "ROLLS-ROYCE",
+      "models": [
+        "SILVER SPUR"
+      ]
+    },
+    {
+      "make": "ROYALE",
+      "models": []
+    },
+    {
+      "make": "S&S",
+      "models": []
+    },
+    {
+      "make": "SAAB",
+      "models": [
+        "9-5",
+        "900",
+        "9000"
+      ]
+    },
+    {
+      "make": "SAFARI COACH",
+      "models": [
+        "SAFARI CLASS C",
+        "TREK"
+      ]
+    },
+    {
+      "make": "SALEEN",
+      "models": []
+    },
+    {
+      "make": "SATURN",
+      "models": [
+        "S-SERIES WAGON",
+        "SC",
+        "SC1",
+        "SL",
+        "SW"
+      ]
+    },
+    {
+      "make": "SCHIEN",
+      "models": []
+    },
+    {
+      "make": "SCOTTY",
+      "models": []
+    },
+    {
+      "make": "SETRA",
+      "models": []
+    },
+    {
+      "make": "SHASTA",
+      "models": [
+        "SHASTA"
+      ]
+    },
+    {
+      "make": "SILVER EAGLE",
+      "models": []
+    },
+    {
+      "make": "SKYLINE",
+      "models": [
+        "ALJO",
+        "LAYTON",
+        "NOMAD"
+      ]
+    },
+    {
+      "make": "SMEAL",
+      "models": []
+    },
+    {
+      "make": "SPACE CRAFT",
+      "models": []
+    },
+    {
+      "make": "SPARTAN",
+      "models": []
+    },
+    {
+      "make": "SPEC TEC",
+      "models": []
+    },
+    {
+      "make": "STAIRS",
+      "models": []
+    },
+    {
+      "make": "STARCRAFT",
+      "models": []
+    },
+    {
+      "make": "STERLING",
+      "models": []
+    },
+    {
+      "make": "STRICK",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "SUBARU",
+      "models": [
+        "FORESTER",
+        "IMPREZA",
+        "LEGACY",
+        "OUTBACK"
+      ]
+    },
+    {
+      "make": "SUN HAWK",
+      "models": []
+    },
+    {
+      "make": "SUN VALLEY",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "SUNDOWNER",
+      "models": [
+        "710",
+        "SHOWMAN",
+        "VALUESPORT"
+      ]
+    },
+    {
+      "make": "SUNLINE",
+      "models": []
+    },
+    {
+      "make": "SUNNYBROOK",
+      "models": [
+        "27RKFS"
+      ]
+    },
+    {
+      "make": "SUPERIOR",
+      "models": []
+    },
+    {
+      "make": "SUTPHEN",
+      "models": []
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "ESTEEM",
+        "GSX600FW",
+        "GSXR600",
+        "INTRUDER",
+        "SAMURAI",
+        "SIDEKICK",
+        "SIDEKICK SPORT",
+        "SUZUKI",
+        "SUZUKI MOTORCYCLE",
+        "SWIFT",
+        "TL1000RW",
+        "VL1500",
+        "VS 1400",
+        "X90"
+      ]
+    },
+    {
+      "make": "TALBERT",
+      "models": []
+    },
+    {
+      "make": "TARASPORT",
+      "models": []
+    },
+    {
+      "make": "TEREX",
+      "models": []
+    },
+    {
+      "make": "TETON HOMES",
+      "models": []
+    },
+    {
+      "make": "THOMAS",
+      "models": [
+        "BUS",
+        "MVP EF",
+        "SAF-T-LINER",
+        "SCHOOL BUS",
+        "THOMAS"
+      ]
+    },
+    {
+      "make": "THOMAS BUILT BUSES",
+      "models": []
+    },
+    {
+      "make": "THOR",
+      "models": [
+        "DUTCHMEN"
+      ]
+    },
+    {
+      "make": "THOR CALIFORNIA",
+      "models": []
+    },
+    {
+      "make": "TIARA",
+      "models": [
+        "CONVERSION VAN"
+      ]
+    },
+    {
+      "make": "TIFFIN",
+      "models": [
+        "ALLEGRO"
+      ]
+    },
+    {
+      "make": "TIMPTE",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "4RUNNER",
+        "AVALON",
+        "CAMRY",
+        "CELICA",
+        "COROLLA",
+        "HIGHLANDER",
+        "LAND CRUISER",
+        "LX470",
+        "PICKUP",
+        "PRERUNNER",
+        "PREVIA",
+        "RAV4",
+        "SIENNA",
+        "SOLARA",
+        "SUPRA",
+        "T100",
+        "TACOMA",
+        "TERCEL",
+        "TOYOTA TRUCK"
+      ]
+    },
+    {
+      "make": "TPI",
+      "models": []
+    },
+    {
+      "make": "TRAIL KING",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "TRAILER",
+      "models": [
+        "TRAILER STAR"
+      ]
+    },
+    {
+      "make": "TRAILMOBILE",
+      "models": []
+    },
+    {
+      "make": "TRANSCRAFT",
+      "models": []
+    },
+    {
+      "make": "TRANSPORT DESIGNS",
+      "models": []
+    },
+    {
+      "make": "TRAVIS",
+      "models": []
+    },
+    {
+      "make": "TRIAD MACK",
+      "models": []
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "TRIUMPH",
+        "TROPHY"
+      ]
+    },
+    {
+      "make": "TROPI CAL",
+      "models": [
+        "6370"
+      ]
+    },
+    {
+      "make": "TRUCK EQUIPMENT",
+      "models": []
+    },
+    {
+      "make": "TURTLE TOP",
+      "models": []
+    },
+    {
+      "make": "UD",
+      "models": [
+        "UD1400"
+      ]
+    },
+    {
+      "make": "ULTIMATE",
+      "models": [
+        "ADVANTAGE"
+      ]
+    },
+    {
+      "make": "UNITED",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "UNITED STATES COACHWORKS",
+      "models": []
+    },
+    {
+      "make": "UNIVERSAL SPECIALTY",
+      "models": []
+    },
+    {
+      "make": "US BUS",
+      "models": []
+    },
+    {
+      "make": "UTILIMASTER",
+      "models": []
+    },
+    {
+      "make": "UTILITY",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "VACTOR",
+      "models": []
+    },
+    {
+      "make": "VAN CON",
+      "models": [
+        "GMC SAVANA"
+      ]
+    },
+    {
+      "make": "VAN HOOL",
+      "models": [
+        "T2145"
+      ]
+    },
+    {
+      "make": "VECTRA",
+      "models": []
+    },
+    {
+      "make": "VIKING",
+      "models": [
+        "LEGEND",
+        "VIKING"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "BEETLE",
+        "CABRIO",
+        "EUROVAN",
+        "GOLF",
+        "GTI",
+        "JETTA",
+        "NEW BEETLE",
+        "PASSAT"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": [
+        "660",
+        "700",
+        "740",
+        "770",
+        "940",
+        "ACL",
+        "C70",
+        "C70 CONVERTIBLE",
+        "HEAVY TRUCK",
+        "S70",
+        "S90",
+        "V70",
+        "V70AWD",
+        "V70XC",
+        "V90",
+        "VN",
+        "VN610",
+        "VN660",
+        "VN770",
+        "VNL",
+        "VNL64T",
+        "VOLVO TRUCK",
+        "WG",
+        "WHTGM",
+        "WIA"
+      ]
+    },
+    {
+      "make": "WABASH",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "WARREN",
+      "models": []
+    },
+    {
+      "make": "WEEKEND WARRIOR",
+      "models": []
+    },
+    {
+      "make": "WELD-IT",
+      "models": []
+    },
+    {
+      "make": "WESCO",
+      "models": []
+    },
+    {
+      "make": "WESTERN",
+      "models": [
+        "ALPENLITE",
+        "ALPINE COACH"
+      ]
+    },
+    {
+      "make": "WESTERN STAR",
+      "models": [
+        "4900"
+      ]
+    },
+    {
+      "make": "WHITE GMC",
+      "models": []
+    },
+    {
+      "make": "WILKENS",
+      "models": []
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": [
+        "ADVENTURER",
+        "BRAVE",
+        "BRAVE SE",
+        "CHIEFTAIN",
+        "ITASCA",
+        "L33WB",
+        "MINNIE",
+        "MINNIE WINNIE",
+        "RIALTA",
+        "SUN CRUISER",
+        "VECTRA",
+        "WINNEBAGO",
+        "WINNEBAGO MINNIE"
+      ]
+    },
+    {
+      "make": "WINSTON",
+      "models": []
+    },
+    {
+      "make": "XL",
+      "models": []
+    },
+    {
+      "make": "YAMAHA",
+      "models": [
+        "FZR600",
+        "XVS650",
+        "YAMAHA",
+        "YZF600RH",
+        "YZFR1",
+        "YZFR1K"
+      ]
+    }
+  ]
+}

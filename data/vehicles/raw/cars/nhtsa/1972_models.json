@@ -1,0 +1,598 @@
+{
+  "year": 1972,
+  "makeBlocks": [
+    {
+      "make": "ALFA ROMEO",
+      "models": []
+    },
+    {
+      "make": "AM GENERAL",
+      "models": []
+    },
+    {
+      "make": "AMERICAN MOTORS",
+      "models": []
+    },
+    {
+      "make": "AMERICAN TRAILERS",
+      "models": []
+    },
+    {
+      "make": "APPLEBY",
+      "models": []
+    },
+    {
+      "make": "ARGOSY",
+      "models": []
+    },
+    {
+      "make": "AROS",
+      "models": []
+    },
+    {
+      "make": "ARROW",
+      "models": []
+    },
+    {
+      "make": "AUTOCAR",
+      "models": []
+    },
+    {
+      "make": "AVCO",
+      "models": []
+    },
+    {
+      "make": "BANNER",
+      "models": []
+    },
+    {
+      "make": "BARTH",
+      "models": []
+    },
+    {
+      "make": "BENDIX",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "2002"
+      ]
+    },
+    {
+      "make": "BOLES AERO",
+      "models": []
+    },
+    {
+      "make": "BROCKWAY",
+      "models": []
+    },
+    {
+      "make": "BROUGHAM",
+      "models": []
+    },
+    {
+      "make": "BROWNLOW",
+      "models": []
+    },
+    {
+      "make": "BUICK",
+      "models": []
+    },
+    {
+      "make": "CABANA COACH",
+      "models": []
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "DEVILLE",
+        "FLEETWOOD"
+      ]
+    },
+    {
+      "make": "CALIFORNIA CAMPER",
+      "models": []
+    },
+    {
+      "make": "CARDINAL",
+      "models": []
+    },
+    {
+      "make": "CARRIER",
+      "models": []
+    },
+    {
+      "make": "CHECKER",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "C20",
+        "CHEVROLET TRUCK",
+        "PICKUP"
+      ]
+    },
+    {
+      "make": "CHINOOK",
+      "models": []
+    },
+    {
+      "make": "CHOREBOY",
+      "models": []
+    },
+    {
+      "make": "CHRYSLER",
+      "models": []
+    },
+    {
+      "make": "CITROEN",
+      "models": []
+    },
+    {
+      "make": "CONCO",
+      "models": []
+    },
+    {
+      "make": "COX",
+      "models": []
+    },
+    {
+      "make": "CRANE",
+      "models": []
+    },
+    {
+      "make": "CROWN",
+      "models": []
+    },
+    {
+      "make": "DALEWOOD",
+      "models": []
+    },
+    {
+      "make": "DATSUN",
+      "models": []
+    },
+    {
+      "make": "DAYBROOK OTTAWA",
+      "models": []
+    },
+    {
+      "make": "DIAMOND REO",
+      "models": []
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "D200"
+      ]
+    },
+    {
+      "make": "DORSEY",
+      "models": []
+    },
+    {
+      "make": "DURHAM",
+      "models": []
+    },
+    {
+      "make": "ENGLISH FORD",
+      "models": []
+    },
+    {
+      "make": "ERNEST HOLMES",
+      "models": []
+    },
+    {
+      "make": "EXECUTIVE",
+      "models": []
+    },
+    {
+      "make": "FABCO",
+      "models": []
+    },
+    {
+      "make": "FIAT",
+      "models": []
+    },
+    {
+      "make": "FLXIBLE",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "FORD",
+        "PINTO"
+      ]
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": []
+    },
+    {
+      "make": "FRUEHAUF",
+      "models": []
+    },
+    {
+      "make": "FWD",
+      "models": []
+    },
+    {
+      "make": "GIL MAR",
+      "models": []
+    },
+    {
+      "make": "GILLIG",
+      "models": []
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "K25"
+      ]
+    },
+    {
+      "make": "GREAT DANE",
+      "models": []
+    },
+    {
+      "make": "GRUMMAN",
+      "models": []
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": []
+    },
+    {
+      "make": "HEIL",
+      "models": []
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    },
+    {
+      "make": "IDEAL CONNECTION",
+      "models": []
+    },
+    {
+      "make": "INTERNATIONAL HARVESTER",
+      "models": []
+    },
+    {
+      "make": "JAGUAR",
+      "models": []
+    },
+    {
+      "make": "JEEP",
+      "models": []
+    },
+    {
+      "make": "KATTLE KING",
+      "models": []
+    },
+    {
+      "make": "KENWORTH",
+      "models": []
+    },
+    {
+      "make": "LINCOLN",
+      "models": []
+    },
+    {
+      "make": "LUFKIN",
+      "models": []
+    },
+    {
+      "make": "LUVERNE",
+      "models": []
+    },
+    {
+      "make": "MACK",
+      "models": []
+    },
+    {
+      "make": "MAXIM MOTOR",
+      "models": []
+    },
+    {
+      "make": "MAZDA",
+      "models": []
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": [
+        "350SL",
+        "450"
+      ]
+    },
+    {
+      "make": "MERCURY",
+      "models": [
+        "COMET"
+      ]
+    },
+    {
+      "make": "MG",
+      "models": []
+    },
+    {
+      "make": "MGB",
+      "models": []
+    },
+    {
+      "make": "MOBIL TRAVELER",
+      "models": []
+    },
+    {
+      "make": "MOBILE SCOUT",
+      "models": []
+    },
+    {
+      "make": "MODULAR",
+      "models": []
+    },
+    {
+      "make": "MOODY",
+      "models": []
+    },
+    {
+      "make": "MOTOR COACH",
+      "models": []
+    },
+    {
+      "make": "NEWBERG",
+      "models": []
+    },
+    {
+      "make": "NIMROD",
+      "models": []
+    },
+    {
+      "make": "NISSAN",
+      "models": []
+    },
+    {
+      "make": "NORTON",
+      "models": []
+    },
+    {
+      "make": "OLDSMOBILE",
+      "models": [
+        "88"
+      ]
+    },
+    {
+      "make": "OPEL",
+      "models": []
+    },
+    {
+      "make": "OPEN ROAD",
+      "models": []
+    },
+    {
+      "make": "OSHKOSH",
+      "models": []
+    },
+    {
+      "make": "OUTBOARD MARINE",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT",
+      "models": []
+    },
+    {
+      "make": "PLYMOUTH",
+      "models": [
+        "PLYMOUTH"
+      ]
+    },
+    {
+      "make": "PONTIAC",
+      "models": []
+    },
+    {
+      "make": "PORSCHE",
+      "models": []
+    },
+    {
+      "make": "PORT",
+      "models": []
+    },
+    {
+      "make": "PREVOST",
+      "models": []
+    },
+    {
+      "make": "RADEMACHER",
+      "models": []
+    },
+    {
+      "make": "RAYMOND",
+      "models": []
+    },
+    {
+      "make": "RECTRANS",
+      "models": []
+    },
+    {
+      "make": "RENAULT",
+      "models": []
+    },
+    {
+      "make": "REVCON",
+      "models": []
+    },
+    {
+      "make": "RITEWAY",
+      "models": []
+    },
+    {
+      "make": "ROAD RUNNER",
+      "models": []
+    },
+    {
+      "make": "ROBINHOOD",
+      "models": []
+    },
+    {
+      "make": "ROCKWELL",
+      "models": []
+    },
+    {
+      "make": "ROLLS-ROYCE",
+      "models": []
+    },
+    {
+      "make": "SAAB",
+      "models": []
+    },
+    {
+      "make": "SANTA FE",
+      "models": []
+    },
+    {
+      "make": "SCOTT GAFFNEY",
+      "models": []
+    },
+    {
+      "make": "SEAGRAVE",
+      "models": []
+    },
+    {
+      "make": "SEMINOLE",
+      "models": []
+    },
+    {
+      "make": "SINFAC",
+      "models": []
+    },
+    {
+      "make": "SKYLINE",
+      "models": []
+    },
+    {
+      "make": "SKYTOP",
+      "models": []
+    },
+    {
+      "make": "SOUTHERN AMBULANCE",
+      "models": []
+    },
+    {
+      "make": "SPORTSCOACH",
+      "models": []
+    },
+    {
+      "make": "STARCRAFT",
+      "models": []
+    },
+    {
+      "make": "STARDUST",
+      "models": []
+    },
+    {
+      "make": "STERLING SALEM",
+      "models": []
+    },
+    {
+      "make": "STREAMLINE",
+      "models": []
+    },
+    {
+      "make": "SUBARU",
+      "models": []
+    },
+    {
+      "make": "SUPERIOR",
+      "models": []
+    },
+    {
+      "make": "SUZUKI",
+      "models": []
+    },
+    {
+      "make": "TIMBERLINE",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": []
+    },
+    {
+      "make": "TRAILMOBILE",
+      "models": []
+    },
+    {
+      "make": "TRAVCO",
+      "models": []
+    },
+    {
+      "make": "TRAVEL EQUIPMENT",
+      "models": []
+    },
+    {
+      "make": "TRAVELEZE",
+      "models": []
+    },
+    {
+      "make": "TRAVOY",
+      "models": []
+    },
+    {
+      "make": "TRIUMPH",
+      "models": []
+    },
+    {
+      "make": "VANGUARD",
+      "models": []
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "TYPE III"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": []
+    },
+    {
+      "make": "VULCAN",
+      "models": []
+    },
+    {
+      "make": "WHITE TRUCK",
+      "models": []
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": [
+        "CHIEFTAN"
+      ]
+    },
+    {
+      "make": "YELLOWSTONE",
+      "models": []
+    },
+    {
+      "make": "YOUNG FIRE",
+      "models": []
+    }
+  ]
+}

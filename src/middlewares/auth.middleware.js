@@ -28,6 +28,12 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    // Vérifier que le rôle dans le token correspond au rôle en base (sécurité)
+    if (decoded.role && decoded.role !== user.role) {
+      // Le rôle a changé, mettre à jour le token serait mieux mais pour l'instant on accepte
+      console.warn(`Rôle mismatch pour user ${user._id}: token=${decoded.role}, db=${user.role}`);
+    }
+
     // Ajouter l'utilisateur à la requête
     req.user = user;
     next();

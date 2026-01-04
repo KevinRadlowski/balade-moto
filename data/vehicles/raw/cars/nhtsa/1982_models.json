@@ -1,0 +1,607 @@
+{
+  "year": 1982,
+  "makeBlocks": [
+    {
+      "make": "ACCURATE",
+      "models": []
+    },
+    {
+      "make": "AIRSTREAM",
+      "models": []
+    },
+    {
+      "make": "ALFA",
+      "models": []
+    },
+    {
+      "make": "ALFA ROMEO",
+      "models": []
+    },
+    {
+      "make": "AMERICAN MOTORS",
+      "models": [
+        "EAGLE"
+      ]
+    },
+    {
+      "make": "AMTRAN",
+      "models": []
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "5000"
+      ]
+    },
+    {
+      "make": "AUTOCAR",
+      "models": []
+    },
+    {
+      "make": "BEALL",
+      "models": []
+    },
+    {
+      "make": "BENTLEY",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "320I",
+        "BMW"
+      ]
+    },
+    {
+      "make": "BROUGHAM",
+      "models": []
+    },
+    {
+      "make": "BUICK",
+      "models": [
+        "CENTURY",
+        "LESABRE",
+        "REGAL",
+        "RIVIERA",
+        "SKYLARK"
+      ]
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "DEVILLE",
+        "ELDORADO"
+      ]
+    },
+    {
+      "make": "CARPENTER",
+      "models": []
+    },
+    {
+      "make": "CHAMPION",
+      "models": []
+    },
+    {
+      "make": "CHANCE",
+      "models": []
+    },
+    {
+      "make": "CHARLES MACHINE",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "BLAZER",
+        "C SERIES",
+        "C10",
+        "C20",
+        "CAMARO",
+        "CAVALIER",
+        "CELEBRITY",
+        "CHEVETTE",
+        "CHEVROLET TRUCK",
+        "G20",
+        "G30",
+        "IMPALA",
+        "K15",
+        "K20",
+        "MALIBU",
+        "MONTE CARLO",
+        "PICK UP",
+        "S10",
+        "SILVERADO",
+        "SUBURBAN"
+      ]
+    },
+    {
+      "make": "CHRYSLER",
+      "models": [
+        "CORDOBA",
+        "LEBARON"
+      ]
+    },
+    {
+      "make": "COACH AND EQUIPMENT",
+      "models": []
+    },
+    {
+      "make": "COACHMEN",
+      "models": []
+    },
+    {
+      "make": "COAST MACHINERY",
+      "models": []
+    },
+    {
+      "make": "COLEMAN",
+      "models": [
+        "COLEMAN"
+      ]
+    },
+    {
+      "make": "CRANE",
+      "models": []
+    },
+    {
+      "make": "CROWN",
+      "models": []
+    },
+    {
+      "make": "CUSHMAN",
+      "models": []
+    },
+    {
+      "make": "DABRYAN",
+      "models": []
+    },
+    {
+      "make": "DAKOTA MFG",
+      "models": []
+    },
+    {
+      "make": "DATSUN",
+      "models": [
+        "280Z",
+        "MAXIMA"
+      ]
+    },
+    {
+      "make": "DELOREAN",
+      "models": []
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "ARIES",
+        "B150",
+        "COLT",
+        "DODGE"
+      ]
+    },
+    {
+      "make": "DUPLEX CHASSIS",
+      "models": []
+    },
+    {
+      "make": "EAGLE INTERNATIONAL",
+      "models": []
+    },
+    {
+      "make": "FERRARI",
+      "models": []
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": [
+        "JAMBOREE"
+      ]
+    },
+    {
+      "make": "FLXIBLE",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "BRONCO",
+        "BRONCO II",
+        "CROWN VICTORIA",
+        "E150",
+        "ECONOLINE",
+        "ESCORT",
+        "F150",
+        "FAIRMONT",
+        "FORD",
+        "GRANADA",
+        "MUSTANG"
+      ]
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": []
+    },
+    {
+      "make": "GARDNER",
+      "models": []
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "GMC",
+        "JIMMY",
+        "SIERRA"
+      ]
+    },
+    {
+      "make": "GREAT DANE",
+      "models": []
+    },
+    {
+      "make": "GRUMMAN",
+      "models": []
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "ELECTRA GLIDE",
+        "HARLEY DAVIDSON"
+      ]
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": [
+        "ACCORD",
+        "CIVIC",
+        "HONDA",
+        "TOURING"
+      ]
+    },
+    {
+      "make": "HUNTSMAN",
+      "models": []
+    },
+    {
+      "make": "INTERNATIONAL",
+      "models": []
+    },
+    {
+      "make": "INTERNATIONAL HARVESTER",
+      "models": []
+    },
+    {
+      "make": "ISUZU",
+      "models": []
+    },
+    {
+      "make": "IVECO",
+      "models": []
+    },
+    {
+      "make": "JAGUAR",
+      "models": [
+        "XJS"
+      ]
+    },
+    {
+      "make": "JEEP",
+      "models": [
+        "WAGONEER"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "CSR750"
+      ]
+    },
+    {
+      "make": "KENWORTH",
+      "models": []
+    },
+    {
+      "make": "LAFRANCE",
+      "models": []
+    },
+    {
+      "make": "LINCOLN",
+      "models": [
+        "CONTINENTAL",
+        "MARK VI",
+        "TOWN CAR"
+      ]
+    },
+    {
+      "make": "LODAL",
+      "models": []
+    },
+    {
+      "make": "MACK",
+      "models": [
+        "MACK"
+      ]
+    },
+    {
+      "make": "MARMON",
+      "models": []
+    },
+    {
+      "make": "MARSHALL",
+      "models": []
+    },
+    {
+      "make": "MAZDA",
+      "models": [
+        "GLC",
+        "RX7"
+      ]
+    },
+    {
+      "make": "MCI",
+      "models": []
+    },
+    {
+      "make": "MCNEILUS",
+      "models": []
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": [
+        "300",
+        "380"
+      ]
+    },
+    {
+      "make": "MERCURY",
+      "models": [
+        "COLONY PARK",
+        "COUGAR",
+        "GRAND MARQUIS",
+        "LYNX",
+        "MARQUIS",
+        "ZEPHYR"
+      ]
+    },
+    {
+      "make": "MONITOR",
+      "models": []
+    },
+    {
+      "make": "MOTOR COACH",
+      "models": []
+    },
+    {
+      "make": "NATIONAL RV",
+      "models": []
+    },
+    {
+      "make": "NAVISTAR",
+      "models": []
+    },
+    {
+      "make": "NEGRINI",
+      "models": []
+    },
+    {
+      "make": "NEOPLAN",
+      "models": []
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "210",
+        "280Z",
+        "DATSUN",
+        "MAXIMA",
+        "SENTRA"
+      ]
+    },
+    {
+      "make": "OLDSMOBILE",
+      "models": [
+        "88",
+        "98",
+        "CUTLASS",
+        "OLDSMOBILE",
+        "TORONADO"
+      ]
+    },
+    {
+      "make": "ORION",
+      "models": []
+    },
+    {
+      "make": "OSHKOSH",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": []
+    },
+    {
+      "make": "PIERCE",
+      "models": []
+    },
+    {
+      "make": "PLYMOUTH",
+      "models": [
+        "CHAMP",
+        "RELIANT"
+      ]
+    },
+    {
+      "make": "PONTIAC",
+      "models": [
+        "BONNEVILLE",
+        "FIREBIRD",
+        "TRANS AM"
+      ]
+    },
+    {
+      "make": "PORSCHE",
+      "models": []
+    },
+    {
+      "make": "PREVOST",
+      "models": []
+    },
+    {
+      "make": "RANGER",
+      "models": []
+    },
+    {
+      "make": "RBR",
+      "models": []
+    },
+    {
+      "make": "RENAULT",
+      "models": []
+    },
+    {
+      "make": "ROAD RESCUE",
+      "models": []
+    },
+    {
+      "make": "ROLLS-ROYCE",
+      "models": []
+    },
+    {
+      "make": "SAAB",
+      "models": [
+        "900"
+      ]
+    },
+    {
+      "make": "SHASTA",
+      "models": []
+    },
+    {
+      "make": "SIMON DUPLEX",
+      "models": []
+    },
+    {
+      "make": "SPARTAN",
+      "models": []
+    },
+    {
+      "make": "SPORTSCOACH",
+      "models": [
+        "CROSS COUNTRY"
+      ]
+    },
+    {
+      "make": "STRICK",
+      "models": []
+    },
+    {
+      "make": "STURDICORP",
+      "models": []
+    },
+    {
+      "make": "SUBARU",
+      "models": [
+        "BRAT",
+        "GL",
+        "SUBARU"
+      ]
+    },
+    {
+      "make": "SUNRADER",
+      "models": [
+        "SUNRADER"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": []
+    },
+    {
+      "make": "TERRA",
+      "models": []
+    },
+    {
+      "make": "THOMAS",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "CELICA",
+        "COROLLA",
+        "CRESSIDA",
+        "LAND CRUISER",
+        "PICKUP",
+        "SUPRA",
+        "TERCEL",
+        "TOYOTA",
+        "TOYOTA MOTORHOME",
+        "TOYOTA TRUCK"
+      ]
+    },
+    {
+      "make": "TRANSPORTATION",
+      "models": []
+    },
+    {
+      "make": "UNION",
+      "models": []
+    },
+    {
+      "make": "UTILIMASTER",
+      "models": []
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "RABBIT"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": [
+        "240",
+        "245",
+        "DL",
+        "GL"
+      ]
+    },
+    {
+      "make": "WARD",
+      "models": []
+    },
+    {
+      "make": "WESTERN",
+      "models": []
+    },
+    {
+      "make": "WESTERN STAR",
+      "models": []
+    },
+    {
+      "make": "WHEELED COACH",
+      "models": []
+    },
+    {
+      "make": "WHITE TRUCK",
+      "models": []
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": [
+        "WARRIOR"
+      ]
+    },
+    {
+      "make": "ZIMMER",
+      "models": []
+    }
+  ]
+}

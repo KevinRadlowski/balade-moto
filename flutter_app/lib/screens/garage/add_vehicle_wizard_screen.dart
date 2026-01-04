@@ -1,13 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/vehicle.dart';
 import '../../models/catalog_make.dart';
 import '../../models/catalog_model.dart';
 import '../../services/garage_service.dart';
-import '../../services/catalog_service.dart';
+import '../../services/catalog/catalog_router_service.dart';
+import '../../services/catalog_proposal_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:provider/provider.dart';
 
 class AddVehicleWizardScreen extends StatefulWidget {
   final Vehicle? vehicle;
@@ -20,8 +22,13 @@ class AddVehicleWizardScreen extends StatefulWidget {
 
 class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
   final GarageService _garageService = GarageService();
-  late final CatalogService _catalogService;
+  late final CatalogRouterService _catalogRouter;
+  late final CatalogProposalService _proposalService;
   final PageController _pageController = PageController();
+  
+  // Champs pour suggestion (si véhicule non trouvé)
+  final _suggestionMakeController = TextEditingController();
+  final _suggestionModelController = TextEditingController();
 
   // Étape 1: Type
   String? _type;
@@ -99,9 +106,14 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
   void initState() {
     super.initState();
     
-    // Initialiser CatalogService avec le même ApiService que AuthService
+    // Récupérer l'ApiService partagé depuis AuthService
     final authService = Provider.of<AuthService>(context, listen: false);
-    _catalogService = CatalogService(apiService: authService.apiService);
+    
+    // Initialiser CatalogRouterService avec l'ApiService partagé
+    _catalogRouter = CatalogRouterService(apiService: authService.apiService);
+    
+    // Initialiser CatalogProposalService avec l'ApiService partagé
+    _proposalService = CatalogProposalService(apiService: authService.apiService);
     
     if (widget.vehicle != null) {
       _type = widget.vehicle!.type;
@@ -118,6 +130,8 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
     _pageController.dispose();
     _nicknameController.dispose();
     _notesController.dispose();
+    _suggestionMakeController.dispose();
+    _suggestionModelController.dispose();
     super.dispose();
   }
 
@@ -183,8 +197,8 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
     }
 
     try {
-      debugPrint('[Wizard] Appel catalogService.fetchMakes($_type, $_year)');
-      final makes = await _catalogService.fetchMakes(_type!, _year!);
+      debugPrint('[Wizard] Appel catalogRouter.fetchMakes($_type, $_year)');
+      final makes = await _catalogRouter.fetchMakes(_type!, _year!);
       debugPrint('[Wizard] fetchMakes retourné ${makes.length} marques');
       
       if (mounted) {
@@ -214,9 +228,33 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
     _featuredMakes = [];
     _remainingMakes = [];
     
-    // Fonction pour normaliser un nom de marque (casse, espaces, tirets)
+    // Fonction pour normaliser un nom de marque (casse, accents, espaces, tirets)
     String normalizeMakeName(String name) {
-      return name.toUpperCase().replaceAll(RegExp(r'[\s\-_]'), '');
+      return name
+          .toUpperCase()
+          .replaceAll('É', 'E')
+          .replaceAll('È', 'E')
+          .replaceAll('Ê', 'E')
+          .replaceAll('Ë', 'E')
+          .replaceAll('À', 'A')
+          .replaceAll('Á', 'A')
+          .replaceAll('Â', 'A')
+          .replaceAll('Ã', 'A')
+          .replaceAll('Ä', 'A')
+          .replaceAll('Å', 'A')
+          .replaceAll('Î', 'I')
+          .replaceAll('Ï', 'I')
+          .replaceAll('Ò', 'O')
+          .replaceAll('Ó', 'O')
+          .replaceAll('Ô', 'O')
+          .replaceAll('Õ', 'O')
+          .replaceAll('Ö', 'O')
+          .replaceAll('Ù', 'U')
+          .replaceAll('Ú', 'U')
+          .replaceAll('Û', 'U')
+          .replaceAll('Ü', 'U')
+          .replaceAll('Ç', 'C')
+          .replaceAll(RegExp(r'[\s\-_]'), '');
     }
     
     // Créer un Map pour retrouver rapidement les marques populaires
@@ -367,8 +405,8 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
     });
 
     try {
-      debugPrint('[Wizard] Appel catalogService.fetchModels($_type, ${_selectedMake!.id}, $_year)');
-      final models = await _catalogService.fetchModels(
+      debugPrint('[Wizard] Appel catalogRouter.fetchModels($_type, ${_selectedMake!.id}, $_year)');
+      final models = await _catalogRouter.fetchModels(
         _type!,
         _selectedMake!.id,
         _year!,
@@ -408,32 +446,41 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
     });
 
     try {
-      // Convertir les IDs en entiers (le backend attend des numbers)
-      final makeIdInt = int.tryParse(_selectedMake!.id) ?? 0;
-      final modelIdInt = int.tryParse(_selectedModel!.id) ?? 0;
+      // Vérifier si c'est une suggestion (ID commence par SUGGESTION_)
+      final isSuggestion = _selectedMake!.id.startsWith('SUGGESTION_') || 
+                           _selectedModel!.id.startsWith('SUGGESTION_');
       
-      if (makeIdInt == 0 || modelIdInt == 0) {
-        throw Exception('IDs de marque ou modèle invalides');
-      }
-
       final payload = <String, dynamic>{
         'type': _type!,
-        'selectionSource': 'CATALOG',
         'make': _selectedMake!.name,
         'model': _selectedModel!.name,
         'year': _year!,
         'odometerCurrentKm': 0,
-        // Nouveau format unifié: externalCatalog avec provider CARAPI
-        'externalCatalog': {
-          'provider': 'CARAPI',
-          'vehicleType': _type!,
-          'makeId': makeIdInt, // Entier (number)
-          'modelId': modelIdInt, // Entier (number)
-          'year': _year!,
-        },
         if (_enableRecommendedMaintenancePack)
           'enableRecommendedMaintenancePack': true,
       };
+
+      if (isSuggestion) {
+        payload['selectionSource'] = 'SUGGESTION';
+        payload['externalCatalog'] = {
+          'provider': 'SUGGESTION',
+          'vehicleType': _type!,
+          'year': _year!,
+          'make': _selectedMake!.name,
+          'model': _selectedModel!.name,
+        };
+        debugPrint('[Wizard] Payload avec suggestion: ${jsonEncode(payload)}');
+      } else {
+        payload['selectionSource'] = 'CATALOG_LOCAL';
+        payload['externalCatalog'] = {
+          'provider': 'LOCAL_FR',
+          'vehicleType': _type!,
+          'year': _year!,
+          'makeId': _selectedMake!.id,
+          'modelId': _selectedModel!.id,
+        };
+        debugPrint('[Wizard] Payload avec catalogue local: ${jsonEncode(payload)}');
+      }
 
       if (_nicknameController.text.isNotEmpty) {
         payload['nickname'] = _nicknameController.text.trim();
@@ -744,6 +791,14 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
                   },
             isExpanded: true,
           ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _year == null || _type == null
+                ? null
+                : _showSuggestionDialog,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Mon véhicule n\'est pas dans la liste'),
+          ),
           if (_isLoadingModels)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -863,6 +918,218 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
         ],
       ),
     );
+  }
+
+  /// Affiche le dialog de suggestion pour un véhicule non trouvé
+  Future<void> _showSuggestionDialog() async {
+    if (_type == null || _year == null) {
+      SnackBarHelper.showError(context, 'Veuillez d\'abord sélectionner le type et l\'année');
+      return;
+    }
+
+    // Pré-remplir la marque si elle est déjà sélectionnée
+    _suggestionMakeController.text = _selectedMake?.name ?? '';
+    _suggestionModelController.clear();
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Mon véhicule n\'est pas dans la liste',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _suggestionMakeController,
+                decoration: const InputDecoration(
+                  labelText: 'Marque *',
+                  hintText: 'Ex: YAMAHA',
+                  prefixIcon: Icon(Icons.branding_watermark),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'La marque est requise';
+                  }
+                  if (value.trim().length < 2) {
+                    return 'La marque doit contenir au moins 2 caractères';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _suggestionModelController,
+                decoration: const InputDecoration(
+                  labelText: 'Modèle *',
+                  hintText: 'Ex: MT-07',
+                  prefixIcon: Icon(Icons.precision_manufacturing),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le modèle est requis';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Année: ${_year}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Annuler'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_suggestionMakeController.text.trim().isNotEmpty &&
+                          _suggestionModelController.text.trim().isNotEmpty) {
+                        Navigator.pop(context, {
+                          'make': _suggestionMakeController.text.trim().toUpperCase(),
+                          'model': _suggestionModelController.text.trim().toUpperCase(),
+                        });
+                      }
+                    },
+                    child: const Text('Envoyer la proposition'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _sendProposalAndPreFill(
+        result['make']!,
+        result['model']!,
+      );
+    }
+  }
+
+  /// Envoie une proposition à l'admin et préremplit les champs marque/modèle
+  Future<void> _sendProposalAndPreFill(String make, String model) async {
+    if (_type == null || _year == null) {
+      return;
+    }
+
+    setState(() {
+      _isCreating = true;
+    });
+
+    try {
+      // Envoyer la proposition à l'admin
+      final proposalResult = await _proposalService.createProposal(
+        type: _type!,
+        year: _year!,
+        make: make,
+        model: model,
+      );
+      
+      debugPrint('[Wizard] Proposition créée: ${proposalResult?['status']}');
+      
+      // Afficher un message selon le statut
+      if (mounted && proposalResult != null) {
+        if (proposalResult['status'] == 'ALREADY_APPROVED') {
+          SnackBarHelper.showInfo(context, 'Cette combinaison est déjà approuvée dans le catalogue.');
+        } else if (proposalResult['status'] == 'ALREADY_PENDING') {
+          SnackBarHelper.showInfo(context, 'Une proposition similaire est déjà en attente de validation.');
+        } else {
+          SnackBarHelper.showSuccess(context, 'Votre suggestion a été envoyée pour validation par un administrateur.');
+        }
+      }
+
+      // Préremplir les champs marque et modèle dans le formulaire
+      // Créer des objets CatalogMake et CatalogModel temporaires pour la sélection
+      final makeId = 'SUGGESTION_MAKE_${make.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}';
+      final suggestionMake = CatalogMake(
+        id: makeId,
+        name: make,
+      );
+
+      // Vérifier si la marque n'est pas déjà dans la liste
+      CatalogMake finalMake;
+      if (!_makes.any((m) => m.name.toUpperCase() == make.toUpperCase())) {
+        setState(() {
+          _makes.add(suggestionMake);
+          _makes.sort((a, b) => a.name.compareTo(b.name));
+        });
+        finalMake = suggestionMake;
+      } else {
+        // Utiliser la marque existante
+        finalMake = _makes.firstWhere((m) => m.name.toUpperCase() == make.toUpperCase());
+      }
+
+      setState(() {
+        _selectedMake = finalMake;
+      });
+
+      // Charger les modèles pour cette marque (ou créer un modèle temporaire)
+      await _loadModels();
+      
+      // Si le modèle n'est pas dans la liste, créer un modèle temporaire
+      if (!_models.any((m) => m.name.toUpperCase() == model.toUpperCase())) {
+        final modelId = 'SUGGESTION_MODEL_${make.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}_${model.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '_')}_$_year';
+        final suggestionModel = CatalogModel(
+          id: modelId,
+          name: model,
+          makeName: make,
+        );
+        
+        setState(() {
+          _models.add(suggestionModel);
+          _models.sort((a, b) => a.name.compareTo(b.name));
+          _selectedModel = suggestionModel;
+        });
+      } else {
+        // Sélectionner le modèle existant
+        setState(() {
+          _selectedModel = _models.firstWhere((m) => m.name.toUpperCase() == model.toUpperCase());
+        });
+      }
+
+      if (mounted) {
+        SnackBarHelper.showInfo(
+          context,
+          'Vous pouvez maintenant continuer le formulaire et créer votre véhicule.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Erreur lors de l\'envoi de la proposition: ${e.toString()}',
+        );
+      }
+      debugPrint('Erreur _sendProposalAndPreFill: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
+      }
+    }
   }
 }
 

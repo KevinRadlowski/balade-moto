@@ -1,0 +1,151 @@
+{
+  "year": 2005,
+  "makeBlocks": [
+    {
+      "make": "RENAULT",
+      "models": [
+        "CLIO II",
+        "CLIO III",
+        "MEGANE II",
+        "SCENIC II"
+      ]
+    },
+    {
+      "make": "PEUGEOT",
+      "models": [
+        "206",
+        "307"
+      ]
+    },
+    {
+      "make": "CITROEN",
+      "models": [
+        "C3 I",
+        "C4 I",
+        "C5 I"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "GOLF V",
+        "PASSAT B6",
+        "POLO IV",
+        "TOURAN I"
+      ]
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "FIESTA VI",
+        "FOCUS II",
+        "MONDEO III"
+      ]
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "PRIUS II",
+        "RAV4 III",
+        "YARIS I",
+        "YARIS II"
+      ]
+    },
+    {
+      "make": "OPEL",
+      "models": [
+        "ASTRA H",
+        "CORSA C"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "SERIE 1 E87",
+        "SERIE 3 E46",
+        "SERIE 3 E90",
+        "SERIE 5 E60",
+        "X3 E83"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A3 8P",
+        "A4 B7",
+        "A6 C6"
+      ]
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "CLASSE A W169",
+        "CLASSE C W203",
+        "CLASSE E W211"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "MICRA K12"
+      ]
+    },
+    {
+      "make": "FIAT",
+      "models": [
+        "PANDA II",
+        "PUNTO II",
+        "PUNTO III"
+      ]
+    },
+    {
+      "make": "SEAT",
+      "models": [
+        "LEON I",
+        "LEON II"
+      ]
+    },
+    {
+      "make": "SKODA",
+      "models": [
+        "OCTAVIA II"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "TUCSON I"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "RIO II"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "SWIFT II",
+        "VITARA III"
+      ]
+    },
+    {
+      "make": "ALFA ROMEO",
+      "models": [
+        "147"
+      ]
+    },
+    {
+      "make": "SMART",
+      "models": [
+        "FORFOUR I",
+        "FORTWO 450"
+      ]
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    }
+  ]
+}

@@ -348,6 +348,23 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const CreateRideWithMapScreen(),
+            ),
+          ).then((result) {
+            if (result == true) {
+              _loadRides();
+            }
+          });
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Créer une balade'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+      ),
     );
   }
 

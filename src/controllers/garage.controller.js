@@ -142,44 +142,69 @@ exports.createVehicle = async (req, res, next) => {
     const makeValue = make || req.body.brand;
     const purchaseDate = purchase?.date || req.body.purchaseDate;
 
-    // Validation: si selectionSource='CATALOG', make, model, year et externalCatalog sont obligatoires
-    if (selectionSource === 'CATALOG') {
+    // Validation: si selectionSource='CATALOG' ou 'CATALOG_LOCAL', make, model, year et externalCatalog sont obligatoires
+    if (selectionSource === 'CATALOG' || selectionSource === 'CATALOG_LOCAL') {
       if (!makeValue || makeValue.trim().length === 0) {
-        throw new BadRequestError('La marque est requise lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`La marque est requise lorsque selectionSource="${selectionSource}"`);
       }
       if (!model || model.trim().length === 0) {
-        throw new BadRequestError('Le modèle est requis lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`Le modèle est requis lorsque selectionSource="${selectionSource}"`);
       }
       if (!year) {
-        throw new BadRequestError('L\'année est requise lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`L'année est requise lorsque selectionSource="${selectionSource}"`);
       }
       if (!externalCatalog || !externalCatalog.provider) {
-        throw new BadRequestError('externalCatalog.provider est requis lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`externalCatalog.provider est requis lorsque selectionSource="${selectionSource}"`);
       }
       if (!externalCatalog.makeId || typeof externalCatalog.makeId !== 'string' || externalCatalog.makeId.trim().length === 0) {
-        throw new BadRequestError('externalCatalog.makeId (string) est requis lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`externalCatalog.makeId (string) est requis lorsque selectionSource="${selectionSource}"`);
       }
       if (!externalCatalog.modelId || typeof externalCatalog.modelId !== 'string' || externalCatalog.modelId.trim().length === 0) {
-        throw new BadRequestError('externalCatalog.modelId (string) est requis lorsque selectionSource="CATALOG"');
+        throw new BadRequestError(`externalCatalog.modelId (string) est requis lorsque selectionSource="${selectionSource}"`);
       }
-      if (externalCatalog.provider !== 'CARAPI') {
-        throw new BadRequestError('externalCatalog.provider doit être "CARAPI"');
+      if (!['CARAPI', 'LOCAL_FR', 'SUGGESTION'].includes(externalCatalog.provider)) {
+        throw new BadRequestError('externalCatalog.provider doit être "CARAPI", "LOCAL_FR" ou "SUGGESTION"');
       }
       if (!externalCatalog.vehicleType || !['voiture', 'moto'].includes(externalCatalog.vehicleType)) {
         throw new BadRequestError('externalCatalog.vehicleType doit être "voiture" ou "moto"');
       }
     }
 
+    // Validation: si selectionSource='SUGGESTION', make, model, year sont obligatoires
+    if (selectionSource === 'SUGGESTION') {
+      if (!makeValue || makeValue.trim().length === 0) {
+        throw new BadRequestError('La marque est requise lorsque selectionSource="SUGGESTION"');
+      }
+      if (!model || model.trim().length === 0) {
+        throw new BadRequestError('Le modèle est requis lorsque selectionSource="SUGGESTION"');
+      }
+      if (!year) {
+        throw new BadRequestError('L\'année est requise lorsque selectionSource="SUGGESTION"');
+      }
+      if (externalCatalog && externalCatalog.provider !== 'SUGGESTION') {
+        throw new BadRequestError('externalCatalog.provider doit être "SUGGESTION" lorsque selectionSource="SUGGESTION"');
+      }
+    }
+
     // Construire l'objet externalCatalog (nouveau format unifié)
     let externalCatalogData = undefined;
     
-    if (selectionSource === 'CATALOG' && externalCatalog) {
+    if ((selectionSource === 'CATALOG' || selectionSource === 'CATALOG_LOCAL') && externalCatalog) {
       externalCatalogData = {
-        provider: 'CARAPI',
+        provider: externalCatalog.provider || 'LOCAL_FR', // Utiliser le provider fourni ou LOCAL_FR par défaut
         vehicleType: externalCatalog.vehicleType || type, // Utiliser type du véhicule si non fourni
         makeId: String(externalCatalog.makeId).trim(), // Forcer string
         modelId: String(externalCatalog.modelId).trim(), // Forcer string
         year: year,
+        raw: externalCatalog.raw
+      };
+    } else if (selectionSource === 'SUGGESTION' && externalCatalog) {
+      externalCatalogData = {
+        provider: 'SUGGESTION',
+        vehicleType: externalCatalog.vehicleType || type,
+        year: year,
+        make: makeValue ? makeValue.toUpperCase().trim() : undefined,
+        model: model ? model.toUpperCase().trim() : undefined,
         raw: externalCatalog.raw
       };
     }

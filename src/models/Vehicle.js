@@ -132,18 +132,19 @@ const vehicleSchema = new mongoose.Schema({
   selectionSource: {
     type: String,
     enum: {
-      values: ['MANUAL', 'CATALOG'],
-      message: 'selectionSource doit être "MANUAL" ou "CATALOG"'
+      values: ['MANUAL', 'CATALOG', 'CATALOG_LOCAL', 'SUGGESTION', 'VPIC'],
+      message: 'selectionSource doit être "MANUAL", "CATALOG", "CATALOG_LOCAL", "SUGGESTION" ou "VPIC"'
     },
-    default: 'MANUAL'
+    default: 'MANUAL',
+    index: true
   },
   // Champ unifié pour les catalogues externes (CarAPI.app)
   externalCatalog: {
     provider: {
       type: String,
       enum: {
-        values: ['CARAPI'],
-        message: 'provider doit être "CARAPI"'
+        values: ['CARAPI', 'LOCAL_FR', 'SUGGESTION'],
+        message: 'provider doit être "CARAPI", "LOCAL_FR" ou "SUGGESTION"'
       }
     },
     vehicleType: {
@@ -161,7 +162,19 @@ const vehicleSchema = new mongoose.Schema({
     modelId: {
       type: String,
       trim: true,
-      description: 'ID du modèle dans le catalogue externe (string, jamais d\'entier)'
+      description: 'ID du modèle dans le catalogue externe (string, jamais d\'entier). Optionnel pour SUGGESTION.'
+    },
+    make: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      description: 'Nom de la marque (pour SUGGESTION uniquement)'
+    },
+    model: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      description: 'Nom du modèle (pour SUGGESTION uniquement)'
     },
     year: {
       type: Number,

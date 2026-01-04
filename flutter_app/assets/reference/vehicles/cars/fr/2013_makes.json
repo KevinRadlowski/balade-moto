@@ -1,0 +1,176 @@
+{
+  "year": 2013,
+  "makeBlocks": [
+    {
+      "make": "RENAULT",
+      "models": [
+        "CAPTUR I",
+        "CLIO IV",
+        "MEGANE III",
+        "SCENIC III"
+      ]
+    },
+    {
+      "make": "PEUGEOT",
+      "models": [
+        "2008 I",
+        "207",
+        "208 I",
+        "3008 I",
+        "308 I",
+        "308 II",
+        "5008 I"
+      ]
+    },
+    {
+      "make": "CITROEN",
+      "models": [
+        "BERLINGO II",
+        "C3 II",
+        "C4 II",
+        "C4 PICASSO",
+        "C5 II"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "GOLF VII",
+        "PASSAT B7",
+        "POLO V",
+        "TIGUAN I",
+        "TOURAN I"
+      ]
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "FIESTA VII",
+        "FOCUS III",
+        "KUGA II",
+        "MONDEO IV"
+      ]
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "AURIS II",
+        "COROLLA E12",
+        "PRIUS III",
+        "RAV4 IV",
+        "YARIS III"
+      ]
+    },
+    {
+      "make": "OPEL",
+      "models": [
+        "ASTRA J",
+        "CORSA D",
+        "INSIGNIA A"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "SERIE 1 F20",
+        "SERIE 3 F30",
+        "SERIE 5 F10",
+        "X1 E84",
+        "X3 F25"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A3 8V",
+        "A4 B8",
+        "A6 C7",
+        "Q3 8U",
+        "Q5 8R"
+      ]
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "CLASSE A W176",
+        "CLASSE C W204",
+        "CLASSE E W212",
+        "GLA X156"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "LEAF ZE0",
+        "MICRA K13",
+        "QASHQAI J10",
+        "QASHQAI J11",
+        "X-TRAIL T31"
+      ]
+    },
+    {
+      "make": "FIAT",
+      "models": [
+        "500",
+        "PANDA III",
+        "PUNTO III"
+      ]
+    },
+    {
+      "make": "SEAT",
+      "models": [
+        "IBIZA IV",
+        "LEON III"
+      ]
+    },
+    {
+      "make": "SKODA",
+      "models": [
+        "FABIA II",
+        "OCTAVIA III",
+        "SUPERB II"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "I20 I",
+        "I30 II",
+        "TUCSON II"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "CEED II",
+        "RIO III",
+        "SPORTAGE II"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "SWIFT III",
+        "SX4",
+        "SX4 S-CROSS",
+        "VITARA III"
+      ]
+    },
+    {
+      "make": "ALFA ROMEO",
+      "models": [
+        "GIULIETTA"
+      ]
+    },
+    {
+      "make": "SMART",
+      "models": [
+        "FORTWO 451"
+      ]
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    }
+  ]
+}

@@ -210,3 +210,4 @@ Liste paginée des logs de maintenance pour un véhicule.
 La documentation Swagger est disponible à `/api-docs` (si configuré) et inclut tous les endpoints Garage avec leurs schémas de validation.
 
 
+

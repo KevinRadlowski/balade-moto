@@ -17,6 +17,7 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isInitializing => _isInitializing;
   bool get isAuthenticated => _isAuthenticated;
+  bool get isAdmin => _user?.role == 'ADMIN';
 
   AuthService({
     required this.storage,

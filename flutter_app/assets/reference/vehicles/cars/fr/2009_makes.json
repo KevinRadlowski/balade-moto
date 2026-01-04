@@ -1,0 +1,174 @@
+{
+  "year": 2009,
+  "makeBlocks": [
+    {
+      "make": "RENAULT",
+      "models": [
+        "CLIO III",
+        "MEGANE III",
+        "SCENIC II",
+        "SCENIC III"
+      ]
+    },
+    {
+      "make": "PEUGEOT",
+      "models": [
+        "206",
+        "207",
+        "3008 I",
+        "308 I",
+        "5008 I"
+      ]
+    },
+    {
+      "make": "CITROEN",
+      "models": [
+        "BERLINGO II",
+        "C3 I",
+        "C3 II",
+        "C4 I",
+        "C4 PICASSO",
+        "C5 II"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "GOLF VI",
+        "PASSAT B6",
+        "POLO IV",
+        "POLO V",
+        "TIGUAN I",
+        "TOURAN I"
+      ]
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "FIESTA VII",
+        "FOCUS II",
+        "KUGA I",
+        "MONDEO IV"
+      ]
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "AURIS I",
+        "COROLLA E12",
+        "PRIUS II",
+        "PRIUS III",
+        "RAV4 III",
+        "YARIS II"
+      ]
+    },
+    {
+      "make": "OPEL",
+      "models": [
+        "ASTRA H",
+        "ASTRA J",
+        "CORSA D",
+        "INSIGNIA A"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "SERIE 1 E87",
+        "SERIE 3 E90",
+        "SERIE 5 E60",
+        "X1 E84",
+        "X3 E83"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A3 8P",
+        "A4 B8",
+        "A6 C6",
+        "Q5 8R"
+      ]
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "CLASSE A W169",
+        "CLASSE C W204",
+        "CLASSE E W211",
+        "CLASSE E W212"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "MICRA K12",
+        "QASHQAI J10",
+        "X-TRAIL T31"
+      ]
+    },
+    {
+      "make": "FIAT",
+      "models": [
+        "500",
+        "PANDA II",
+        "PUNTO III"
+      ]
+    },
+    {
+      "make": "SEAT",
+      "models": [
+        "IBIZA IV",
+        "LEON II"
+      ]
+    },
+    {
+      "make": "SKODA",
+      "models": [
+        "FABIA II",
+        "OCTAVIA II",
+        "SUPERB II"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "I20 I",
+        "I30 I",
+        "TUCSON I",
+        "TUCSON II"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "CEED I",
+        "RIO II"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "SWIFT II",
+        "SX4",
+        "VITARA III"
+      ]
+    },
+    {
+      "make": "ALFA ROMEO",
+      "models": [
+        "147"
+      ]
+    },
+    {
+      "make": "SMART",
+      "models": [
+        "FORTWO 451"
+      ]
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    }
+  ]
+}

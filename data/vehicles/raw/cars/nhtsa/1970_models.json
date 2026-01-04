@@ -1,0 +1,465 @@
+{
+  "year": 1970,
+  "makeBlocks": [
+    {
+      "make": "ALFA ROMEO",
+      "models": []
+    },
+    {
+      "make": "AM GENERAL",
+      "models": []
+    },
+    {
+      "make": "AMERICAN MOTORS",
+      "models": []
+    },
+    {
+      "make": "AUDI",
+      "models": []
+    },
+    {
+      "make": "AUSTIN HEALEY",
+      "models": []
+    },
+    {
+      "make": "AUTOCAR",
+      "models": []
+    },
+    {
+      "make": "AVANTI",
+      "models": [
+        "AVANTI"
+      ]
+    },
+    {
+      "make": "AVCO",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": []
+    },
+    {
+      "make": "BROCKWAY",
+      "models": []
+    },
+    {
+      "make": "BROUGHAM",
+      "models": []
+    },
+    {
+      "make": "BROWN",
+      "models": []
+    },
+    {
+      "make": "BROWNLOW",
+      "models": []
+    },
+    {
+      "make": "BSA",
+      "models": []
+    },
+    {
+      "make": "BUICK",
+      "models": []
+    },
+    {
+      "make": "BUS AND TRUCK",
+      "models": []
+    },
+    {
+      "make": "BUTLER",
+      "models": []
+    },
+    {
+      "make": "CABANA COACH",
+      "models": []
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "CADILLAC"
+      ]
+    },
+    {
+      "make": "CALIFORNIA CAMPER",
+      "models": []
+    },
+    {
+      "make": "CHECKER",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "C20"
+      ]
+    },
+    {
+      "make": "CHRYSLER",
+      "models": [
+        "300"
+      ]
+    },
+    {
+      "make": "CONCO",
+      "models": []
+    },
+    {
+      "make": "CRANE",
+      "models": []
+    },
+    {
+      "make": "CROWN",
+      "models": []
+    },
+    {
+      "make": "DETOMASO",
+      "models": []
+    },
+    {
+      "make": "DIAMOND REO",
+      "models": []
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "CHALLENGER",
+        "CHARGER"
+      ]
+    },
+    {
+      "make": "DORSEY",
+      "models": []
+    },
+    {
+      "make": "ENGLISH FORD",
+      "models": []
+    },
+    {
+      "make": "ERNEST HOLMES",
+      "models": []
+    },
+    {
+      "make": "EXECUTIVE",
+      "models": []
+    },
+    {
+      "make": "EXPLORER",
+      "models": []
+    },
+    {
+      "make": "FABCO",
+      "models": []
+    },
+    {
+      "make": "FIAT",
+      "models": []
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": []
+    },
+    {
+      "make": "FLXIBLE",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "F250",
+        "FORD TRUCK AND VAN",
+        "LTD",
+        "THUNDERBIRD"
+      ]
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": []
+    },
+    {
+      "make": "FRUEHAUF",
+      "models": []
+    },
+    {
+      "make": "FWD",
+      "models": []
+    },
+    {
+      "make": "GILLIG",
+      "models": []
+    },
+    {
+      "make": "GMC",
+      "models": []
+    },
+    {
+      "make": "GRUMMAN",
+      "models": []
+    },
+    {
+      "make": "HALE",
+      "models": []
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": []
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": []
+    },
+    {
+      "make": "HORIZON",
+      "models": []
+    },
+    {
+      "make": "INTERNATIONAL HARVESTER",
+      "models": []
+    },
+    {
+      "make": "JAGUAR",
+      "models": []
+    },
+    {
+      "make": "JEEP",
+      "models": []
+    },
+    {
+      "make": "JENSEN",
+      "models": []
+    },
+    {
+      "make": "KAYOT",
+      "models": []
+    },
+    {
+      "make": "KENWORTH",
+      "models": []
+    },
+    {
+      "make": "LAND ROVER",
+      "models": []
+    },
+    {
+      "make": "LINCOLN",
+      "models": []
+    },
+    {
+      "make": "LUFKIN",
+      "models": []
+    },
+    {
+      "make": "MACK",
+      "models": []
+    },
+    {
+      "make": "MALLARD",
+      "models": []
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": []
+    },
+    {
+      "make": "MERCURY",
+      "models": []
+    },
+    {
+      "make": "MG",
+      "models": []
+    },
+    {
+      "make": "MOTOR COACH",
+      "models": []
+    },
+    {
+      "make": "NATIONAL",
+      "models": []
+    },
+    {
+      "make": "NISSAN",
+      "models": []
+    },
+    {
+      "make": "OASIS",
+      "models": []
+    },
+    {
+      "make": "OPEL",
+      "models": []
+    },
+    {
+      "make": "OPEN ROAD",
+      "models": []
+    },
+    {
+      "make": "OSHKOSH",
+      "models": []
+    },
+    {
+      "make": "OUTBOARD MARINE",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT",
+      "models": []
+    },
+    {
+      "make": "PLYMOUTH",
+      "models": [
+        "BARRACUDA"
+      ]
+    },
+    {
+      "make": "PONTIAC",
+      "models": []
+    },
+    {
+      "make": "PORSCHE",
+      "models": []
+    },
+    {
+      "make": "PREVOST",
+      "models": []
+    },
+    {
+      "make": "RECTRANS",
+      "models": []
+    },
+    {
+      "make": "REVCON",
+      "models": []
+    },
+    {
+      "make": "ROLLS-ROYCE",
+      "models": []
+    },
+    {
+      "make": "SAAB",
+      "models": []
+    },
+    {
+      "make": "SEAGRAVE",
+      "models": []
+    },
+    {
+      "make": "SEMINOLE",
+      "models": []
+    },
+    {
+      "make": "SIGHTSEER",
+      "models": []
+    },
+    {
+      "make": "SIMCA",
+      "models": []
+    },
+    {
+      "make": "SINFAC",
+      "models": []
+    },
+    {
+      "make": "SKYTOP",
+      "models": []
+    },
+    {
+      "make": "SPARTAN",
+      "models": []
+    },
+    {
+      "make": "STARCRAFT",
+      "models": []
+    },
+    {
+      "make": "STARDUST",
+      "models": []
+    },
+    {
+      "make": "STERLING SALEM",
+      "models": []
+    },
+    {
+      "make": "SUBARU",
+      "models": []
+    },
+    {
+      "make": "SUPERIOR",
+      "models": []
+    },
+    {
+      "make": "SYMONS",
+      "models": []
+    },
+    {
+      "make": "TIMBERLINE",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": []
+    },
+    {
+      "make": "TRAILMOBILE",
+      "models": []
+    },
+    {
+      "make": "TRAVCO",
+      "models": []
+    },
+    {
+      "make": "TRAVEL EQUIPMENT",
+      "models": []
+    },
+    {
+      "make": "TRIUMPH",
+      "models": []
+    },
+    {
+      "make": "TVR",
+      "models": []
+    },
+    {
+      "make": "VM",
+      "models": []
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "BEETLE"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": []
+    },
+    {
+      "make": "WESTERN STAR",
+      "models": []
+    },
+    {
+      "make": "WHITE TRUCK",
+      "models": []
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": []
+    },
+    {
+      "make": "YOUNG FIRE",
+      "models": []
+    }
+  ]
+}

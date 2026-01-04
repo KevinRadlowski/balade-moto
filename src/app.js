@@ -42,6 +42,10 @@ const reviewRoutes = require('./routes/review.routes');
 const garageRoutes = require('./routes/garage.routes');
 const catalogRoutes = require('./routes/catalog.routes');
 const vehicleCatalogRoutes = require('./routes/vehicle-catalog.routes');
+const adminCatalogRoutes = require('./routes/admin.catalog.routes');
+const adminUsersRoutes = require('./routes/admin.users.routes');
+const adminRidesRoutes = require('./routes/admin.rides.routes');
+const adminGroupsRoutes = require('./routes/admin.groups.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -156,6 +160,10 @@ app.use('/api/likes', likeRoutes);
 app.use('/api/garage', garageRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/vehicle-catalog', vehicleCatalogRoutes);
+app.use('/api/admin/catalog', adminCatalogRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
+app.use('/api/admin/rides', adminRidesRoutes);
+app.use('/api/admin/groups', adminGroupsRoutes);
 
 // Route de test
 app.get('/', (req, res) => {

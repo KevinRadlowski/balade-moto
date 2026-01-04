@@ -59,6 +59,38 @@ class ApiService {
     return _makeRequest(() => http.get(uri, headers: _headers));
   }
 
+  // Méthode publique pour faire des requêtes POST avec rafraîchissement automatique du token
+  Future<http.Response> post(Uri uri, {String? body}) async {
+    return _makeRequest(() => http.post(
+      uri,
+      headers: _headers,
+      body: body,
+    ));
+  }
+
+  // Méthode publique pour faire des requêtes PUT avec rafraîchissement automatique du token
+  Future<http.Response> put(Uri uri, {String? body}) async {
+    return _makeRequest(() => http.put(
+      uri,
+      headers: _headers,
+      body: body,
+    ));
+  }
+
+  // Méthode publique pour faire des requêtes PATCH avec rafraîchissement automatique du token
+  Future<http.Response> patch(Uri uri, {String? body}) async {
+    return _makeRequest(() => http.patch(
+      uri,
+      headers: _headers,
+      body: body,
+    ));
+  }
+
+  // Méthode publique pour faire des requêtes DELETE avec rafraîchissement automatique du token
+  Future<http.Response> delete(Uri uri) async {
+    return _makeRequest(() => http.delete(uri, headers: _headers));
+  }
+
   // Wrapper pour les requêtes HTTP avec rafraîchissement automatique du token
   Future<http.Response> _makeRequest(
     Future<http.Response> Function() requestFn, {

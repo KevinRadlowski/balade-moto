@@ -6,12 +6,13 @@ class NavigationState extends ChangeNotifier {
 
   int get currentIndex => _currentIndex;
 
-  /// Change l'onglet actif (0=Accueil, 1=Balades, 2=Garage, 3=Groupes, 4=Profil)
+  /// Change l'onglet actif (0=Accueil, 1=Balades, 2=Garage, 3=Groupes, 4=Profil, 5=Admin si admin)
   void setIndex(int index) {
-    if (index != _currentIndex && index >= 0 && index < 5) {
+    if (index != _currentIndex && index >= 0) {
       _currentIndex = index;
       notifyListeners();
     }
   }
 }
+
 

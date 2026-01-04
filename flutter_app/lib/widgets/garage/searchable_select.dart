@@ -91,9 +91,13 @@ class _SearchableSelectState<T> extends State<SearchableSelect<T>> {
         widget.featuredItems != oldWidget.featuredItems ||
         widget.showSections != oldWidget.showSections) {
       _updateFilteredLists(_searchController.text);
-      // Si overlay est visible, le reconstruire
+      // Si overlay est visible, le reconstruire après le build
       if (_overlayEntry != null) {
-        _rebuildOverlay();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _overlayEntry != null) {
+            _rebuildOverlay();
+          }
+        });
       }
     }
   }
@@ -112,8 +116,8 @@ class _SearchableSelectState<T> extends State<SearchableSelect<T>> {
       _filterItems(_searchController.text);
       _showOverlay();
     } else {
-      // Délai pour permettre au onTapDown des ListTile de s'exécuter avant la fermeture
-      Future.delayed(const Duration(milliseconds: 50), () {
+      // Délai pour permettre au onTap des InkWell de s'exécuter avant la fermeture
+      Future.delayed(const Duration(milliseconds: 100), () {
         if (!_focusNode.hasFocus && mounted) {
           _removeOverlay();
         }
@@ -124,7 +128,12 @@ class _SearchableSelectState<T> extends State<SearchableSelect<T>> {
   void _onSearchChanged() {
     _filterItems(_searchController.text);
     if (_focusNode.hasFocus && _overlayEntry != null) {
-      _rebuildOverlay();
+      // Différer la reconstruction pour éviter setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlayEntry != null) {
+          _rebuildOverlay();
+        }
+      });
     }
   }
 
@@ -183,18 +192,16 @@ class _SearchableSelectState<T> extends State<SearchableSelect<T>> {
       TextPosition(offset: displayText.length),
     );
     
-    // Fermer l'overlay immédiatement
-    _removeOverlay();
+    // Appeler le callback immédiatement
+    widget.onSelected(item);
+    debugPrint('[SearchableSelect] Item sélectionné et callback appelé: $displayText');
     
-    // Perdre le focus immédiatement
-    _focusNode.unfocus();
-    
-    // Appeler le callback APRÈS avoir mis à jour le texte et fermé l'overlay
-    // Utiliser un microtask pour s'assurer que l'UI est mise à jour
-    Future.microtask(() {
+    // Fermer l'overlay et perdre le focus après un court délai
+    // pour permettre au callback de s'exécuter
+    Future.delayed(const Duration(milliseconds: 50), () {
       if (mounted) {
-        widget.onSelected(item);
-        debugPrint('[SearchableSelect] Item sélectionné et callback appelé: $displayText');
+        _removeOverlay();
+        _focusNode.unfocus();
       }
     });
   }
@@ -216,37 +223,18 @@ class _SearchableSelectState<T> extends State<SearchableSelect<T>> {
     if (renderBox == null) return;
 
     final fieldHeight = renderBox.size.height;
-    final fieldPosition = renderBox.localToGlobal(Offset.zero);
-    final fieldWidth = renderBox.size.width;
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        // Calculer la position du dropdown pour exclure de la barrière
-        final dropdownTop = fieldPosition.dy + fieldHeight + 8;
-        final dropdownLeft = fieldPosition.dx;
-        final dropdownRight = fieldPosition.dx + fieldWidth;
-        final dropdownBottom = dropdownTop + 400; // maxHeight
-        
         return Stack(
           children: [
             // Barrière pour fermer au tap outside (en dessous)
             Positioned.fill(
-              child: Listener(
+              child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onPointerDown: (event) {
-                  final tapX = event.position.dx;
-                  final tapY = event.position.dy;
-                  
-                  // Vérifier si le tap est dans la zone du dropdown
-                  if (tapX >= dropdownLeft &&
-                      tapX <= dropdownRight &&
-                      tapY >= dropdownTop &&
-                      tapY <= dropdownBottom) {
-                    // Tap dans le dropdown, ne pas fermer - laisser les ListTile gérer
-                    return;
-                  }
-                  
-                  // Tap en dehors, fermer
+                onTap: () {
+                  // Si on arrive ici, c'est qu'on a tapé en dehors du dropdown
+                  // car les InkWell du dropdown absorbent les taps
                   _focusNode.unfocus();
                   _removeOverlay();
                 },

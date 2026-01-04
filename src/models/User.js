@@ -85,8 +85,9 @@ const userSchema = new mongoose.Schema({
   // Rôles et permissions
   role: {
     type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+    enum: ['MEMBER', 'ADMIN'],
+    default: 'MEMBER',
+    index: true
   },
   roles: {
     type: [String],
@@ -149,6 +150,15 @@ const userSchema = new mongoose.Schema({
 
 // Hash du mot de passe avant sauvegarde
 userSchema.pre('save', async function(next) {
+  // Normaliser le rôle (compatibilité legacy)
+  if (this.role === 'user') {
+    this.role = 'MEMBER';
+  } else if (this.role === 'admin') {
+    this.role = 'ADMIN';
+  } else if (!this.role || this.role === '') {
+    this.role = 'MEMBER';
+  }
+  
   // Synchroniser isTwoFactorEnabled avec twoFactorEnabled
   if (this.isModified('twoFactorEnabled')) {
     this.isTwoFactorEnabled = this.twoFactorEnabled;

@@ -1,0 +1,130 @@
+{
+  "year": 2010,
+  "makeBlocks": [
+    {
+      "make": "HONDA",
+      "models": [
+        "CBF 600",
+        "CBR 1000RR",
+        "CBR 600RR"
+      ]
+    },
+    {
+      "make": "YAMAHA",
+      "models": [
+        "TMAX 500",
+        "XMAX 125",
+        "YZF-R1",
+        "YZF-R6"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "ER-6N",
+        "Ninja 650",
+        "Ninja ZX-10R",
+        "Ninja ZX-6R",
+        "Versys 650",
+        "Z750"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "GSX-R1000",
+        "GSX-R600",
+        "GSX-R750",
+        "SV650",
+        "V-Strom 1000",
+        "V-Strom 650"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "F 800 GS",
+        "R 1200 GS",
+        "S 1000 RR"
+      ]
+    },
+    {
+      "make": "KTM",
+      "models": []
+    },
+    {
+      "make": "DUCATI",
+      "models": [
+        "Monster 1100",
+        "Monster 696",
+        "Monster 796",
+        "Multistrada 1200"
+      ]
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "Speed Triple",
+        "Street Triple"
+      ]
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "Softail",
+        "Sportster"
+      ]
+    },
+    {
+      "make": "PIAGGIO",
+      "models": [
+        "Beverly 300",
+        "MP3",
+        "Vespa GTS"
+      ]
+    },
+    {
+      "make": "APRILIA",
+      "models": [
+        "RSV4",
+        "Shiver 750"
+      ]
+    },
+    {
+      "make": "MOTO GUZZI",
+      "models": []
+    },
+    {
+      "make": "HUSQVARNA",
+      "models": []
+    },
+    {
+      "make": "INDIAN",
+      "models": []
+    },
+    {
+      "make": "BENELLI",
+      "models": []
+    },
+    {
+      "make": "CFMOTO",
+      "models": []
+    },
+    {
+      "make": "KYMCO",
+      "models": []
+    },
+    {
+      "make": "SYM",
+      "models": []
+    },
+    {
+      "make": "ZERO",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT MOTOCYCLES",
+      "models": []
+    }
+  ]
+}

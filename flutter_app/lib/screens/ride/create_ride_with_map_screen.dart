@@ -1188,7 +1188,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                           }
                         });
                       },
-                      secondary: const Icon(Icons.highway),
+                      secondary: const Icon(Icons.route),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

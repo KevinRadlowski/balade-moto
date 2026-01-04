@@ -38,7 +38,7 @@ exports.validateCreateVehicle = [
     .isLength({ max: 100 })
     .withMessage('Le surnom ne peut pas dépasser 100 caractères'),
   
-  // Marque et modèle - obligatoires si selectionSource='VPIC'
+  // Marque et modèle - obligatoires si selectionSource='CATALOG', 'CATALOG_LOCAL' ou 'SUGGESTION'
   body('make')
     .optional()
     .trim()
@@ -46,7 +46,7 @@ exports.validateCreateVehicle = [
     .withMessage('La marque ne peut pas dépasser 50 caractères')
     .custom((value, { req }) => {
       const selectionSource = req.body.selectionSource;
-      if ((selectionSource === 'VPIC' || selectionSource === 'CATALOG') && (!value || value.trim().length === 0)) {
+      if ((selectionSource === 'CATALOG' || selectionSource === 'CATALOG_LOCAL' || selectionSource === 'SUGGESTION') && (!value || value.trim().length === 0)) {
         throw new Error(`La marque est requise lorsque selectionSource="${selectionSource}"`);
       }
       return true;
@@ -63,7 +63,7 @@ exports.validateCreateVehicle = [
     .withMessage('Le modèle ne peut pas dépasser 100 caractères')
     .custom((value, { req }) => {
       const selectionSource = req.body.selectionSource;
-      if ((selectionSource === 'VPIC' || selectionSource === 'CATALOG') && (!value || value.trim().length === 0)) {
+      if ((selectionSource === 'CATALOG' || selectionSource === 'CATALOG_LOCAL' || selectionSource === 'SUGGESTION') && (!value || value.trim().length === 0)) {
         throw new Error(`Le modèle est requis lorsque selectionSource="${selectionSource}"`);
       }
       return true;
@@ -74,7 +74,7 @@ exports.validateCreateVehicle = [
     .withMessage(`L'année doit être entre 1900 et ${new Date().getFullYear() + 1}`)
     .custom((value, { req }) => {
       const selectionSource = req.body.selectionSource;
-      if ((selectionSource === 'VPIC' || selectionSource === 'CATALOG') && !value) {
+      if ((selectionSource === 'CATALOG' || selectionSource === 'CATALOG_LOCAL' || selectionSource === 'SUGGESTION') && !value) {
         throw new Error(`L'année est requise lorsque selectionSource="${selectionSource}"`);
       }
       return true;
@@ -160,8 +160,8 @@ exports.validateCreateVehicle = [
   // Champs pour le catalogue externe (nouveau format unifié)
   body('selectionSource')
     .optional()
-    .isIn(['MANUAL', 'VPIC', 'CATALOG'])
-    .withMessage('selectionSource doit être "MANUAL", "VPIC" (déprécié, sera converti en CATALOG) ou "CATALOG"'),
+    .isIn(['MANUAL', 'CATALOG', 'CATALOG_LOCAL', 'SUGGESTION'])
+    .withMessage('selectionSource doit être "MANUAL", "CATALOG", "CATALOG_LOCAL" ou "SUGGESTION"'),
   
   // Nouveau format catalog (recommandé)
   body('catalog.provider')
@@ -246,15 +246,74 @@ exports.validateCreateVehicle = [
       return true;
     }),
   
-  // Ancien format externalCatalog (déprécié, conservé pour compatibilité)
+  // Format externalCatalog (nouveau format unifié)
   body('externalCatalog.provider')
     .optional()
-    .isIn(['VPIC'])
-    .withMessage('externalCatalog.provider doit être "VPIC" (déprécié, utiliser catalog.provider)')
+    .isIn(['CARAPI', 'LOCAL_FR', 'SUGGESTION'])
+    .withMessage('externalCatalog.provider doit être "CARAPI", "LOCAL_FR" ou "SUGGESTION"')
     .custom((value, { req }) => {
       const selectionSource = req.body.selectionSource;
-      if (value && selectionSource !== 'VPIC' && selectionSource !== 'CATALOG') {
-        throw new Error('externalCatalog.provider ne peut être fourni que si selectionSource="CATALOG" ou "VPIC"');
+      if (value && !['CATALOG', 'CATALOG_LOCAL', 'SUGGESTION'].includes(selectionSource)) {
+        throw new Error('externalCatalog.provider ne peut être fourni que si selectionSource="CATALOG", "CATALOG_LOCAL" ou "SUGGESTION"');
+      }
+      // Validation de cohérence
+      if (value === 'SUGGESTION' && selectionSource !== 'SUGGESTION') {
+        throw new Error('externalCatalog.provider="SUGGESTION" ne peut être utilisé que si selectionSource="SUGGESTION"');
+      }
+      if ((value === 'CARAPI' || value === 'LOCAL_FR') && selectionSource === 'SUGGESTION') {
+        throw new Error('externalCatalog.provider ne peut pas être "CARAPI" ou "LOCAL_FR" lorsque selectionSource="SUGGESTION"');
+      }
+      return true;
+    }),
+  body('externalCatalog.makeId')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('externalCatalog.makeId doit être une chaîne de caractères')
+    .custom((value, { req }) => {
+      const selectionSource = req.body.selectionSource;
+      if (value && !['CATALOG', 'CATALOG_LOCAL'].includes(selectionSource)) {
+        throw new Error('externalCatalog.makeId ne peut être fourni que si selectionSource="CATALOG" ou "CATALOG_LOCAL"');
+      }
+      return true;
+    }),
+  body('externalCatalog.modelId')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('externalCatalog.modelId doit être une chaîne de caractères')
+    .custom((value, { req }) => {
+      const selectionSource = req.body.selectionSource;
+      if (value && !['CATALOG', 'CATALOG_LOCAL'].includes(selectionSource)) {
+        throw new Error('externalCatalog.modelId ne peut être fourni que si selectionSource="CATALOG" ou "CATALOG_LOCAL"');
+      }
+      return true;
+    }),
+  body('externalCatalog.make')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('externalCatalog.make doit être une chaîne de caractères')
+    .custom((value, { req }) => {
+      const selectionSource = req.body.selectionSource;
+      if (value && selectionSource !== 'SUGGESTION') {
+        throw new Error('externalCatalog.make ne peut être fourni que si selectionSource="SUGGESTION"');
+      }
+      return true;
+    }),
+  body('externalCatalog.model')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('externalCatalog.model doit être une chaîne de caractères')
+    .custom((value, { req }) => {
+      const selectionSource = req.body.selectionSource;
+      if (value && selectionSource !== 'SUGGESTION') {
+        throw new Error('externalCatalog.model ne peut être fourni que si selectionSource="SUGGESTION"');
       }
       return true;
     }),
@@ -262,8 +321,8 @@ exports.validateCreateVehicle = [
     .optional()
     .custom((value, { req }) => {
       const selectionSource = req.body.selectionSource;
-      if (value && selectionSource !== 'VPIC' && selectionSource !== 'CATALOG') {
-        throw new Error('externalCatalog.raw ne peut être fourni que si selectionSource="CATALOG" ou "VPIC"');
+      if (value && !['CATALOG', 'CATALOG_LOCAL', 'SUGGESTION'].includes(selectionSource)) {
+        throw new Error('externalCatalog.raw ne peut être fourni que si selectionSource="CATALOG", "CATALOG_LOCAL" ou "SUGGESTION"');
       }
       return true;
     }),

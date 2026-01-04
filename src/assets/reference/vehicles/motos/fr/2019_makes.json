@@ -1,0 +1,157 @@
+{
+  "year": 2019,
+  "makeBlocks": [
+    {
+      "make": "HONDA",
+      "models": [
+        "Africa Twin CRF1000L",
+        "CB 500F",
+        "CB 650R",
+        "CBR 1000RR",
+        "CBR 600RR",
+        "Forza 125",
+        "NC 700X",
+        "NC 750X"
+      ]
+    },
+    {
+      "make": "YAMAHA",
+      "models": [
+        "MT-07",
+        "MT-09",
+        "MT-10",
+        "Tracer 900",
+        "XMAX 125",
+        "XMAX 300",
+        "YZF-R1",
+        "YZF-R6"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "Ninja 650",
+        "Ninja ZX-10R",
+        "Ninja ZX-6R",
+        "Versys 1000",
+        "Versys 650",
+        "Z650",
+        "Z900"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "GSX-R1000",
+        "GSX-R600",
+        "GSX-R750",
+        "GSX-S1000",
+        "GSX-S750",
+        "SV650",
+        "V-Strom 1000",
+        "V-Strom 650"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "F 850 GS",
+        "K 1600 GT",
+        "K 1600 GTL",
+        "R 1250 GS",
+        "S 1000 R",
+        "S 1000 RR"
+      ]
+    },
+    {
+      "make": "KTM",
+      "models": [
+        "1290 Super Adventure",
+        "1290 Super Duke R",
+        "390 Duke",
+        "790 Adventure",
+        "790 Duke",
+        "RC 390"
+      ]
+    },
+    {
+      "make": "DUCATI",
+      "models": [
+        "Monster 821",
+        "Multistrada 1260",
+        "Panigale 959",
+        "Panigale V4"
+      ]
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "Bonneville T100",
+        "Bonneville T120",
+        "Speed Triple",
+        "Street Triple",
+        "Tiger 800"
+      ]
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "Softail",
+        "Sportster",
+        "Street 750"
+      ]
+    },
+    {
+      "make": "PIAGGIO",
+      "models": [
+        "Beverly 300",
+        "MP3",
+        "Vespa GTS",
+        "Vespa Primavera"
+      ]
+    },
+    {
+      "make": "APRILIA",
+      "models": [
+        "RSV4",
+        "Tuono V4"
+      ]
+    },
+    {
+      "make": "MOTO GUZZI",
+      "models": []
+    },
+    {
+      "make": "HUSQVARNA",
+      "models": []
+    },
+    {
+      "make": "INDIAN",
+      "models": []
+    },
+    {
+      "make": "BENELLI",
+      "models": []
+    },
+    {
+      "make": "CFMOTO",
+      "models": []
+    },
+    {
+      "make": "KYMCO",
+      "models": []
+    },
+    {
+      "make": "SYM",
+      "models": []
+    },
+    {
+      "make": "ZERO",
+      "models": []
+    },
+    {
+      "make": "PEUGEOT MOTOCYCLES",
+      "models": []
+    }
+  ]
+}
