@@ -14,6 +14,9 @@ import '../../utils/background_helper.dart';
 import '../../constants/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import '../../providers/live_ride_provider.dart';
+import 'live_ride_screen.dart';
+import '../../utils/snackbar_helper.dart';
 
 class RideDetailScreen extends StatefulWidget {
   final String rideId;
@@ -76,13 +79,20 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
       final ride = await _apiService.getRideById(widget.rideId);
       
-      // Vérifier si l'utilisateur a déjà noté
+      // Vérifier si l'utilisateur a déjà noté (utiliser le système reviews pour la cohérence)
       bool hasRated = false;
       if (authService.user?.id != null) {
         try {
-          hasRated = await _apiService.hasUserRatedRide(widget.rideId, authService.user!.id);
+          final reviewCheck = await _apiService.hasUserReviewed(widget.rideId);
+          hasRated = reviewCheck['data']?['hasReviewed'] ?? false;
         } catch (e) {
           debugPrint('Erreur vérification note: $e');
+          // Fallback sur l'ancien système si le nouveau échoue
+          try {
+            hasRated = await _apiService.hasUserRatedRide(widget.rideId, authService.user!.id);
+          } catch (e2) {
+            debugPrint('Erreur vérification note (fallback): $e2');
+          }
         }
       }
 
@@ -220,6 +230,65 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     }
   }
 
+  Future<void> _startLiveRide() async {
+    if (_ride == null) return;
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final liveRideProvider = Provider.of<LiveRideProvider>(context, listen: false);
+      
+      // Vérifier que l'utilisateur est bien l'organisateur
+      if (authService.user?.id != _ride!.organisateur.id) {
+        SnackBarHelper.showError(context, 'Seul l\'organisateur peut démarrer la balade');
+        return;
+      }
+
+      // Démarrer la balade en direct
+      await liveRideProvider.startLiveRide(rideId: _ride!.id);
+
+      if (mounted) {
+        // Naviguer vers l'écran Live Ride
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => LiveRideScreen(
+              rideId: _ride!.id,
+              ride: _ride!,
+            ),
+          ),
+        );
+        
+        // Recharger les données de la balade pour mettre à jour le statut
+        _loadRide();
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, 'Erreur lors du démarrage: ${e.toString()}');
+      }
+    }
+  }
+
+  Future<void> _joinLiveRide() async {
+    if (_ride == null) return;
+
+    try {
+      if (mounted) {
+        // Naviguer directement vers l'écran Live Ride
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => LiveRideScreen(
+              rideId: _ride!.id,
+              ride: _ride!,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, 'Erreur: ${e.toString()}');
+      }
+    }
+  }
+
   Future<void> _toggleLike(bool newLikeState) async {
     if (_ride == null) return;
 
@@ -262,10 +331,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     });
 
     try {
-      await _apiService.createRating(
-        balade: _ride!.id,
-        note: rating,
-        commentaire: comment,
+      // Utiliser createOrUpdateReview pour la cohérence avec la liste "Mes balades"
+      await _apiService.createOrUpdateReview(
+        rideId: _ride!.id,
+        rating: rating,
+        comment: comment,
       );
 
       if (mounted) {
@@ -889,54 +959,24 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 
   Widget _buildActionButtons() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isOrganizer = _ride!.organisateur.id == authService.user?.id;
+    final isLive = _ride!.status == 'in_progress';
+    
     return Column(
       children: [
-        // Bouton principal : Participer ou Naviguer
-        if (!_isParticipant) ...[
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _joinRide,
-              icon: const Icon(Icons.person_add_outlined, size: 22),
-              label: const Text(
-                'Participer à la balade',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 4,
-              ),
-            ),
-          ),
-        ] else ...[
-          // Si participant, afficher "Naviguer" comme action principale
-          if (_ride!.waypoints != null && _ride!.waypoints!.isNotEmpty) ...[
+        // Si l'utilisateur est l'organisateur
+        if (isOrganizer) ...[
+          // Si la balade est programmée ET pas encore passée, afficher "Démarrer la balade"
+          if (_ride!.status == 'scheduled' && !_isRidePast) ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    builder: (context) => NavigationAppSelector(
-                      waypoints: _ride!.waypoints!,
-                      rideId: _ride!.id,
-                      rideName: _ride!.titre,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.navigation_outlined, size: 22),
+                onPressed: _startLiveRide,
+                icon: const Icon(Icons.play_arrow_outlined, size: 22),
                 label: const Text(
-                  'Naviguer',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  'Démarrer la balade',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.successColor,
@@ -949,40 +989,148 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-          ],
-          // Badge "Déjà participant" - version plus discrète
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppTheme.successColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.successColor.withOpacity(0.2),
-                width: 1,
+          ] else if (isLive) ...[
+            // Si la balade est en cours, afficher "Rejoindre la balade en cours"
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _joinLiveRide,
+                icon: const Icon(Icons.navigation_outlined, size: 22),
+                label: const Text(
+                  'Rejoindre la balade en cours',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: AppTheme.successColor.withOpacity(0.8),
-                  size: 16,
+          ],
+        ] else ...[
+          // Si l'utilisateur n'est pas l'organisateur
+          // Bouton principal : Participer ou Naviguer/Rejoindre
+          if (!_isParticipant) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _joinRide,
+                icon: const Icon(Icons.person_add_outlined, size: 22),
+                label: const Text(
+                  'Participer à la balade',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Vous participez',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.successColor.withOpacity(0.9),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
+              ),
+            ),
+          ] else ...[
+            // Si participant
+            if (isLive) ...[
+              // Si la balade est en cours, afficher "Rejoindre la balade en cours"
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _joinLiveRide,
+                  icon: const Icon(Icons.navigation_outlined, size: 22),
+                  label: const Text(
+                    'Rejoindre la balade en cours',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
                   ),
                 ),
-              ],
+              ),
+              const SizedBox(height: 12),
+            ] else if (!_isRidePast && _ride!.waypoints != null && _ride!.waypoints!.isNotEmpty) ...[
+              // Si la date/heure n'est pas passée, afficher "Naviguer"
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      builder: (context) => NavigationAppSelector(
+                        waypoints: _ride!.waypoints!,
+                        rideId: _ride!.id,
+                        rideName: _ride!.titre,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.navigation_outlined, size: 22),
+                  label: const Text(
+                    'Naviguer',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.successColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            // Badge "Déjà participant" - version plus discrète
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppTheme.successColor.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.successColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: AppTheme.successColor.withOpacity(0.8),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Vous participez',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.successColor.withOpacity(0.9),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
         
         // Actions secondaires : Like et Chat - version allégée

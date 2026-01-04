@@ -10,6 +10,12 @@ const {
   validateGetRidesNearby,
   validateRideId
 } = require('../validators/ride.validator');
+const liveRideController = require('../controllers/liveRide.controller');
+const {
+  validateRideId: validateLiveRideId,
+  validateReportIncident,
+  validateHeartbeat: validateLiveHeartbeat
+} = require('../validators/liveRide.validator');
 
 // Toutes les routes nécessitent une authentification JWT
 router.post('/', authMiddleware, validateCreateRide, rideController.createRide);
@@ -54,6 +60,22 @@ router.post('/:id/join', authMiddleware, validateRideId, rideController.joinRide
 router.delete('/:id/join', authMiddleware, validateRideId, rideController.leaveRide);
 router.post('/:id/like', authMiddleware, validateRideId, rideController.likeRide);
 router.post('/:id/note', authMiddleware, validateRideId, rideController.rateRide);
+router.post('/:id/complete', authMiddleware, validateRideId, rideController.completeRide);
+
+// Routes live ride (doivent être avant /:id pour éviter les conflits)
+router.post('/:id/start', authMiddleware, validateLiveRideId, liveRideController.startLiveRide);
+router.post('/:id/pause', authMiddleware, validateLiveRideId, liveRideController.pauseLiveRide);
+router.post('/:id/resume', authMiddleware, validateLiveRideId, liveRideController.resumeLiveRide);
+router.post('/:id/end', authMiddleware, validateLiveRideId, liveRideController.endLiveRide);
+router.post('/:id/incident', 
+  authMiddleware, 
+  rateLimitMiddleware(5, 60000), // 5 req/min pour les incidents
+  validateLiveRideId, 
+  validateReportIncident, 
+  liveRideController.reportIncident
+);
+router.get('/:id/live-status', authMiddleware, validateLiveRideId, liveRideController.getLiveRideStatus);
+router.post('/:id/heartbeat', authMiddleware, validateLiveRideId, validateLiveHeartbeat, liveRideController.sendHeartbeat);
 
 module.exports = router;
 

@@ -23,6 +23,8 @@ import 'add_maintenance_log_screen.dart';
 import 'edit_maintenance_item_screen.dart';
 import 'add_vehicle_screen.dart';
 import 'add_document_screen.dart';
+import '../../widgets/garage/vehicle_stats_card.dart';
+import '../../widgets/garage/maintenance_reminders_card.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
   final String vehicleId;
@@ -436,6 +438,26 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _buildOdometerCard(),
+            ),
+          ),
+          
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          
+          // Statistiques véhicule
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: VehicleStatsCard(vehicleId: widget.vehicleId),
+            ),
+          ),
+          
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          
+          // Rappels d'entretien
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: MaintenanceRemindersCard(vehicleId: widget.vehicleId),
             ),
           ),
           

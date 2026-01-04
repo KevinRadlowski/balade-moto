@@ -141,12 +141,72 @@ const userSchema = new mongoose.Schema({
   twoFactorSecret: {
     type: String,
     default: null
+  },
+  // Contact d'urgence
+  emergencyContact: {
+    name: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Le nom ne peut pas dépasser 100 caractères']
+    },
+    phone: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function(value) {
+          if (!value) return false;
+          // Accepter les emails
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (emailRegex.test(value)) return true;
+          // Accepter les numéros français (0 suivi de 9 chiffres) et internationaux (+ suivi de 8-15 chiffres)
+          const phoneRegex = /^(\+?\d{8,15}|0\d{9})$/;
+          return phoneRegex.test(value);
+        },
+        message: 'Format de téléphone invalide (doit être un email ou un numéro valide)'
+      }
+    },
+    relation: {
+      type: String,
+      enum: ['family', 'friend', 'colleague', 'other'],
+      default: 'family'
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Les notes ne peuvent pas dépasser 500 caractères']
+    }
+  },
+  // Statut de check-in (pour détection inactivité)
+  checkInStatus: {
+    lastHeartbeat: {
+      type: Date,
+      default: null
+    },
+    isActive: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    lastLocation: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: null
+      }
+    }
   }
 }, {
   timestamps: true
 });
 
 // Index unique sur pseudo (plus besoin de sparse car le pseudo est maintenant obligatoire)
+
+// Index pour améliorer les performances
+userSchema.index({ 'checkInStatus.isActive': 1, 'checkInStatus.lastHeartbeat': 1 }); // Pour les jobs cron
 
 // Hash du mot de passe avant sauvegarde
 userSchema.pre('save', async function(next) {

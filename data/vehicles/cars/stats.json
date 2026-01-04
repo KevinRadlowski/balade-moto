@@ -1,0 +1,9 @@
+{
+  "years": 57,
+  "makes": 12591,
+  "models": 53955,
+  "perSource": {
+    "wikidata": 7831,
+    "nhtsa": 4810
+  }
+}

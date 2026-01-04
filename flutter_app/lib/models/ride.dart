@@ -20,6 +20,8 @@ class Ride {
   final String? icsUrl;
   final int? totalLikes;
   final bool? hasUserLiked;
+  final String status; // Statut de la balade: scheduled, in_progress, completed, cancelled, postponed
+  final String? ridingStyle; // Style de conduite: calme, modere, sportif, mixte
 
   Ride({
     required this.id,
@@ -41,6 +43,8 @@ class Ride {
     this.icsUrl,
     this.totalLikes,
     this.hasUserLiked,
+    this.status = 'scheduled',
+    this.ridingStyle,
   });
 
   factory Ride.fromJson(Map<String, dynamic> json) {
@@ -80,6 +84,8 @@ class Ride {
       icsUrl: json['icsUrl'],
       totalLikes: json['totalLikes'],
       hasUserLiked: json['hasUserLiked'],
+      status: json['status'] ?? 'scheduled',
+      ridingStyle: json['ridingStyle'],
     );
   }
 

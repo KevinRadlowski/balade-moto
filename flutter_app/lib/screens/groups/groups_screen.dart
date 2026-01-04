@@ -53,6 +53,17 @@ class _GroupsScreenState extends State<GroupsScreen> {
     }
   }
 
+  Future<void> _navigateToCreateGroup() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CreateGroupScreen(),
+      ),
+    );
+    if (result == true) {
+      _loadGroups();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -78,20 +89,6 @@ class _GroupsScreenState extends State<GroupsScreen> {
               height: 32,
               fit: BoxFit.contain,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              final result = await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const CreateGroupScreen(),
-                ),
-              );
-              if (result == true) {
-                _loadGroups();
-              }
-            },
-            tooltip: 'Créer un groupe',
           ),
         ],
       ),
@@ -147,7 +144,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.group, size: 64, color: Colors.grey),
+                          const Icon(Icons.group, size: 64, color: Colors.grey),
                           const SizedBox(height: 16),
                           const Text(
                             'Aucun groupe disponible',
@@ -155,16 +152,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                           ),
                           const SizedBox(height: 8),
                           ElevatedButton.icon(
-                            onPressed: () async {
-                              final result = await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const CreateGroupScreen(),
-                                ),
-                              );
-                              if (result == true) {
-                                _loadGroups();
-                              }
-                            },
+                            onPressed: _navigateToCreateGroup,
                             icon: const Icon(Icons.add),
                             label: const Text('Créer un groupe'),
                           ),
@@ -239,8 +227,15 @@ class _GroupsScreenState extends State<GroupsScreen> {
                             ),
                           );
                         },
-                      ),
-                    ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _navigateToCreateGroup,
+        icon: const Icon(Icons.add),
+        label: const Text('Créer un groupe'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,7 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/waypoint.dart';
 import '../../models/ride.dart';
+import '../../widgets/rides/riding_style_chips.dart';
 
 class CreateRideWithMapScreen extends StatefulWidget {
   final Ride? duplicateRide;
@@ -30,17 +32,16 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   // État
   String _typeVehicule = 'moto';
   String _visibilite = 'publique';
+  String? _ridingStyle; // Style de conduite (obligatoire)
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
-  bool _avoidTolls = false;
-  bool _avoidHighways = false;
   
   // Carte et waypoints
   GoogleMapController? _mapController;
   List<Waypoint> _waypoints = [];
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
   LatLng? _currentLocation;
   int _nextOrder = 0;
   
@@ -89,30 +90,28 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         }
       });
       
-      // Mettre à jour les marqueurs et polylines après un court délai
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _updateMarkersAndPolylines();
-        }
-      });
+      // Mettre à jour les marqueurs et polylines
+      if (mounted) {
+        _updateMarkersAndPolylines();
+      }
     }
     
     _getCurrentLocation();
   }
 
+  Timer? _routeUpdateTimer;
+  bool _isCalculatingRoute = false;
+
   @override
   void dispose() {
+    _routeUpdateTimer?.cancel();
     _titreController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
-    // Vérifier que le contrôleur est initialisé avant de le disposer
-    if (_mapController != null) {
-      try {
-        _mapController!.dispose();
-      } catch (e) {
-        debugPrint('Erreur lors de la disposition du contrôleur de carte: $e');
-      }
-    }
+    // Ne pas disposer manuellement le contrôleur Google Maps sur web
+    // Flutter le fait automatiquement et cela peut causer des erreurs
+    // si la vue n'est pas encore construite
+    _mapController = null;
     super.dispose();
   }
 
@@ -374,8 +373,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         origin: origin,
         destination: destination,
         waypoints: waypointsParam,
-        avoidTolls: _avoidTolls,
-        avoidHighways: _avoidHighways,
       );
       
       debugPrint('🔵 Réponse du backend: ${response['success']}');
@@ -683,11 +680,12 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   }
 
 
-  Future<void> _updateMarkersAndPolylines() async {
+  void _updateMarkersAndPolylines() {
+    // Annuler le timer précédent s'il existe
+    _routeUpdateTimer?.cancel();
+    
+    // Mettre à jour les marqueurs immédiatement (pas besoin de debounce)
     _markers.clear();
-    _polylines.clear();
-
-    // Ajouter les marqueurs
     for (int i = 0; i < _waypoints.length; i++) {
       final waypoint = _waypoints[i];
       final markerId = MarkerId('waypoint_$i');
@@ -701,7 +699,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                 ? 'Départ' 
                 : waypoint.type == 'arrivee' 
                     ? 'Arrivée' 
-                    : 'Checkpoint ${i}',
+                    : 'Checkpoint $i',
             snippet: waypoint.address,
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
@@ -714,12 +712,35 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         ),
       );
     }
-
-    // Obtenir le tracé de la route qui suit les routes réelles
-    if (_waypoints.length >= 2) {
+    
+    setState(() {});
+    
+    // Debouncer le calcul de route (seulement si on a au moins 2 waypoints)
+    // Augmenté à 1500ms pour réduire le nombre de requêtes
+    if (_waypoints.length >= 2 && !_isCalculatingRoute) {
+      _routeUpdateTimer = Timer(const Duration(milliseconds: 1500), () {
+        _calculateRoute();
+      });
+    } else if (_waypoints.length < 2) {
+      // Si on a moins de 2 waypoints, supprimer la polyligne
+      _polylines.clear();
+      setState(() {});
+    }
+  }
+  
+  Future<void> _calculateRoute() async {
+    if (_waypoints.length < 2 || _isCalculatingRoute) {
+      return;
+    }
+    
+    _isCalculatingRoute = true;
+    _polylines.clear();
+    setState(() {});
+    
+    try {
       final routePoints = await _getRoutePoints();
       
-      if (routePoints.isNotEmpty) {
+      if (routePoints.isNotEmpty && mounted) {
         debugPrint('🔵 Création de la polyligne avec ${routePoints.length} points');
         debugPrint('🔵 Premier point: ${routePoints.first.latitude}, ${routePoints.first.longitude}');
         debugPrint('🔵 Dernier point: ${routePoints.last.latitude}, ${routePoints.last.longitude}');
@@ -734,22 +755,29 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
           ),
         );
         debugPrint('✅ Polyligne créée et ajoutée à la carte');
+        
+        if (mounted) {
+          setState(() {});
+        }
       } else {
         // Si on n'a pas de route, afficher un message mais ne pas tracer de ligne droite
         debugPrint('⚠️ Aucune route disponible, pas de tracé affiché');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Impossible de calculer l\'itinéraire. Vérifiez que l\'API Directions est activée.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
       }
+    } catch (e) {
+      debugPrint('❌ Erreur lors du calcul de la route: $e');
+      // Ne pas afficher d'erreur si c'est un rate limit (l'utilisateur sait déjà qu'il doit attendre)
+      if (mounted && !e.toString().contains('Trop de requêtes')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du calcul de l\'itinéraire: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      _isCalculatingRoute = false;
     }
-
-    setState(() {});
   }
 
   void _removeWaypoint(int index) {
@@ -789,6 +817,17 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   }
 
   Future<void> _submitForm() async {
+    // Valider le style de conduite (obligatoire)
+    if (_ridingStyle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner un style de conduite'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -843,6 +882,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         lieuArrivee: arrivee.address,
         rayon: 0, // Le rayon n'est plus utilisé lors de la création
         visibilite: _visibilite,
+        ridingStyle: _ridingStyle,
         localisation: {
           'latitude': depart.latitude,
           'longitude': depart.longitude,
@@ -994,7 +1034,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                                   ? 'Départ'
                                   : waypoint.type == 'arrivee'
                                       ? 'Arrivée'
-                                      : 'Checkpoint ${index}',
+                                      : 'Checkpoint $index',
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
@@ -1079,7 +1119,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _typeVehicule,
+                      initialValue: _typeVehicule,
                       decoration: const InputDecoration(
                         labelText: 'Type de véhicule *',
                         border: OutlineInputBorder(),
@@ -1094,6 +1134,17 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                           _typeVehicule = value!;
                         });
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    RidingStyleChips(
+                      selectedStyle: _ridingStyle,
+                      onStyleSelected: (style) {
+                        setState(() {
+                          _ridingStyle = style;
+                        });
+                      },
+                      isRequired: true,
+                      errorText: _ridingStyle == null ? 'Veuillez sélectionner un style de conduite' : null,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -1137,7 +1188,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _visibilite,
+                      initialValue: _visibilite,
                       decoration: const InputDecoration(
                         labelText: 'Visibilité',
                         border: OutlineInputBorder(),
@@ -1152,43 +1203,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                           _visibilite = value!;
                         });
                       },
-                    ),
-                    const SizedBox(height: 16),
-                    // Options d'itinéraire
-                    const Text(
-                      'Options d\'itinéraire',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      title: const Text('Éviter les péages'),
-                      subtitle: const Text('L\'itinéraire évitera les routes à péage'),
-                      value: _avoidTolls,
-                      onChanged: (value) {
-                        setState(() {
-                          _avoidTolls = value;
-                          // Recalculer la route si on a déjà des waypoints
-                          if (_waypoints.length >= 2) {
-                            _updateMarkersAndPolylines();
-                          }
-                        });
-                      },
-                      secondary: const Icon(Icons.toll),
-                    ),
-                    SwitchListTile(
-                      title: const Text('Éviter les autoroutes'),
-                      subtitle: const Text('L\'itinéraire évitera les autoroutes'),
-                      value: _avoidHighways,
-                      onChanged: (value) {
-                        setState(() {
-                          _avoidHighways = value;
-                          // Recalculer la route si on a déjà des waypoints
-                          if (_waypoints.length >= 2) {
-                            _updateMarkersAndPolylines();
-                          }
-                        });
-                      },
-                      secondary: const Icon(Icons.route),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

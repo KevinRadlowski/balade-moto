@@ -137,7 +137,55 @@ const rideSchema = new mongoose.Schema({
     default: 0,
     min: 0,
     max: 5
-  }
+  },
+  // Statut de la balade
+  status: {
+    type: String,
+    enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'postponed'],
+    default: 'scheduled',
+    index: true
+  },
+  // Style de conduite
+  ridingStyle: {
+    type: String,
+    enum: ['calme', 'modere', 'sportif', 'mixte'],
+    default: null
+  },
+  // Événements de la balade (pour mode live)
+  rideEvents: [{
+    type: {
+      type: String,
+      enum: ['started', 'paused', 'resumed', 'incident', 'completed', 'cancelled', 'participant_joined', 'participant_left'],
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    details: {
+      location: {
+        type: {
+          type: String,
+          enum: ['Point'],
+          default: 'Point'
+        },
+        coordinates: {
+          type: [Number], // [longitude, latitude]
+          default: null
+        }
+      },
+      description: {
+        type: String,
+        trim: true,
+        maxlength: [500, 'La description ne peut pas dépasser 500 caractères']
+      }
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -148,6 +196,8 @@ rideSchema.index({ date: 1 });
 rideSchema.index({ typeVehicule: 1 });
 rideSchema.index({ visibilite: 1 });
 rideSchema.index({ participants: 1 });
+rideSchema.index({ status: 1, date: 1 }); // Pour les requêtes par statut
+rideSchema.index({ ridingStyle: 1 }); // Pour les filtres par style
 // Index géospatial 2dsphere pour les requêtes de proximité
 rideSchema.index({ localisation: '2dsphere' });
 

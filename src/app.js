@@ -46,6 +46,11 @@ const adminCatalogRoutes = require('./routes/admin.catalog.routes');
 const adminUsersRoutes = require('./routes/admin.users.routes');
 const adminRidesRoutes = require('./routes/admin.rides.routes');
 const adminGroupsRoutes = require('./routes/admin.groups.routes');
+const feedbackRoutes = require('./routes/feedback.routes');
+const reputationRoutes = require('./routes/reputation.routes');
+const compatibilityRoutes = require('./routes/compatibility.routes');
+const liveRideRoutes = require('./routes/liveRide.routes');
+const checkInRoutes = require('./routes/checkIn.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -164,6 +169,11 @@ app.use('/api/admin/catalog', adminCatalogRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/admin/rides', adminRidesRoutes);
 app.use('/api/admin/groups', adminGroupsRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/reputation', reputationRoutes);
+app.use('/api/compatibility', compatibilityRoutes);
+app.use('/api/live-rides', liveRideRoutes);
+app.use('/api/check-in', checkInRoutes);
 
 // Route de test
 app.get('/', (req, res) => {

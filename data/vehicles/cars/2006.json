@@ -1,0 +1,2956 @@
+{
+  "year": 2006,
+  "makes": [
+    {
+      "make": "4-STAR",
+      "models": [
+        "HORSE TRAILER"
+      ]
+    },
+    {
+      "make": "4-STAR TRAILERS",
+      "models": [
+        "HORSE TRAILER"
+      ]
+    },
+    {
+      "make": "Abarth",
+      "models": [
+        "Abarth 1500 Biposto"
+      ]
+    },
+    {
+      "make": "AC Cars",
+      "models": [
+        "AC Greyhound"
+      ]
+    },
+    {
+      "make": "ACURA",
+      "models": [
+        "MDX",
+        "RL",
+        "RSX",
+        "TL",
+        "TSX"
+      ]
+    },
+    {
+      "make": "Adler",
+      "models": [
+        "Adler 2.5-litre"
+      ]
+    },
+    {
+      "make": "Advanced Design Tramontana",
+      "models": [
+        "Tramontana"
+      ]
+    },
+    {
+      "make": "ADVENTURE",
+      "models": [
+        "CODY",
+        "TIMBERLODGE"
+      ]
+    },
+    {
+      "make": "AIRSTREAM",
+      "models": [
+        "CLASSIC",
+        "SAFARI BAMBI"
+      ]
+    },
+    {
+      "make": "ALFA",
+      "models": [
+        "BASELINE",
+        "GOLD",
+        "SEE YA",
+        "SEEYA",
+        "TOYHOUSE"
+      ]
+    },
+    {
+      "make": "Alfa Romeo",
+      "models": [
+        "Alfa Romeo 164",
+        "Alfa Romeo 2000 Sportiva",
+        "Alfa Romeo 33.2",
+        "Alfa Romeo Canguro",
+        "Alfa Romeo Carabo",
+        "Alfa Romeo Dauphine",
+        "Alfa Romeo Giulietta Sprint Speciale",
+        "Alfa Romeo Kamal",
+        "Alfa Romeo Navajo",
+        "Alfa Romeo Nuvola",
+        "Alfa Romeo Scighera",
+        "Alfa Romeo Vola"
+      ]
+    },
+    {
+      "make": "ALL IN ONE MOBILITY",
+      "models": [
+        "TOWN & COUNTRY"
+      ]
+    },
+    {
+      "make": "AM General",
+      "models": [
+        "M151 MUTT"
+      ]
+    },
+    {
+      "make": "APRILIA",
+      "models": [
+        "CAPONORD",
+        "MILLE R",
+        "SCARABEO 500",
+        "TUONO"
+      ]
+    },
+    {
+      "make": "ARO",
+      "models": [
+        "ARO M461"
+      ]
+    },
+    {
+      "make": "ASTON MARTIN",
+      "models": [
+        "V8 VANTAGE"
+      ]
+    },
+    {
+      "make": "Aston Martin Lagonda",
+      "models": [
+        "Aston Martin Bulldog"
+      ]
+    },
+    {
+      "make": "Attica",
+      "models": [
+        "Dimitriadis 505"
+      ]
+    },
+    {
+      "make": "Audi",
+      "models": [
+        "Audi A8",
+        "Audi Avus quattro",
+        "Audi e-tron Frankfurt",
+        "Audi Le Mans quattro",
+        "Audi Nuvolari quattro",
+        "Audi quattro spyder",
+        "Audi Roadjet",
+        "Audi Rosemeyer",
+        "Audi RSQ",
+        "Audi Shooting Brake"
+      ]
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A3",
+        "A4",
+        "A6",
+        "A8",
+        "S4",
+        "TT"
+      ]
+    },
+    {
+      "make": "Auto Union",
+      "models": [
+        "DKW Junior"
+      ]
+    },
+    {
+      "make": "AUTOCAR",
+      "models": [
+        "WXLL"
+      ]
+    },
+    {
+      "make": "Autocars Co.",
+      "models": [
+        "SABRA sport",
+        "Sussita"
+      ]
+    },
+    {
+      "make": "Avions Voisin",
+      "models": [
+        "Avions Voisin C12",
+        "Voisin Laboratoire"
+      ]
+    },
+    {
+      "make": "Awtowelo",
+      "models": [
+        "BMW 321"
+      ]
+    },
+    {
+      "make": "Bandini Automobili",
+      "models": [
+        "Bandini 1000 P",
+        "Bandini formula junior"
+      ]
+    },
+    {
+      "make": "BEAVER COACH",
+      "models": [
+        "MONTEREY"
+      ]
+    },
+    {
+      "make": "Bentley",
+      "models": [
+        "Bentley S2",
+        "Bentley State Limousine"
+      ]
+    },
+    {
+      "make": "BENTLEY",
+      "models": [
+        "CONTINENTAL GT"
+      ]
+    },
+    {
+      "make": "Berkeley Cars",
+      "models": [
+        "Berkeley B95",
+        "Berkeley T-60"
+      ]
+    },
+    {
+      "make": "Bertha Benz",
+      "models": [
+        "Benz Patent-Motorwagen"
+      ]
+    },
+    {
+      "make": "Bertone",
+      "models": [
+        "Bertone Birusa",
+        "Bertone Suagna"
+      ]
+    },
+    {
+      "make": "BIG DOG",
+      "models": [
+        "K-9",
+        "MASTIFF",
+        "RIDGEBACK"
+      ]
+    },
+    {
+      "make": "BIGDOG",
+      "models": [
+        "BIG DOG"
+      ]
+    },
+    {
+      "make": "BIGFOOT",
+      "models": [
+        "B-21 FB"
+      ]
+    },
+    {
+      "make": "BISON",
+      "models": [
+        "ALUMASPORT"
+      ]
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": [
+        "ALL AMERICAN",
+        "MINI BIRD",
+        "WANDERLODGE M450 LXI"
+      ]
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "1 SERIES",
+        "3 SERIES",
+        "5 SERIES",
+        "6 SERIES",
+        "7 SERIES",
+        "BMW 321",
+        "BMW 700",
+        "BMW E1",
+        "BMW GINA",
+        "BMW H2R",
+        "BMW M1",
+        "BMW Nazca C2",
+        "BMW Turbo",
+        "F650 GS",
+        "F650 GS DAKAR",
+        "K 1200 GT",
+        "K 1200 R",
+        "K 1200 S",
+        "K1200 GT",
+        "K1200 R",
+        "K1200 S",
+        "K1200LT",
+        "M3",
+        "M5",
+        "M6",
+        "Mini Hatch",
+        "R 1200 GS",
+        "R 1200 GS ADVENTURE",
+        "R 1200 RT",
+        "R1200 GS",
+        "R1200 GS ADVENTURE",
+        "R1200 HP2",
+        "R1200 R",
+        "R1200 RT",
+        "Rolls-Royce 100EX",
+        "Rolls-Royce Phantom VII",
+        "X3",
+        "X5",
+        "X6",
+        "Z4"
+      ]
+    },
+    {
+      "make": "Borgward",
+      "models": [
+        "Borgward P100"
+      ]
+    },
+    {
+      "make": "BRAUN",
+      "models": [
+        "CENTURY-2",
+        "ENTERVAN"
+      ]
+    },
+    {
+      "make": "Bristol Cars",
+      "models": [
+        "Bristol 400"
+      ]
+    },
+    {
+      "make": "British Leyland",
+      "models": [
+        "Mini"
+      ]
+    },
+    {
+      "make": "British Motor",
+      "models": [
+        "Austin Cambridge",
+        "Austin Westminster",
+        "Austin-Healey 3000",
+        "Mini",
+        "Mini Moke",
+        "Riley 4",
+        "Vanden Plas Princess",
+        "Wolseley 6/99"
+      ]
+    },
+    {
+      "make": "Bucciali",
+      "models": [
+        "Bucciali TAV 12"
+      ]
+    },
+    {
+      "make": "Buckminster Fuller",
+      "models": [
+        "Dymaxion car"
+      ]
+    },
+    {
+      "make": "Buddy",
+      "models": [
+        "Kewet"
+      ]
+    },
+    {
+      "make": "BUELL",
+      "models": [
+        "BLAST",
+        "XB12R",
+        "XB12S",
+        "XB12X"
+      ]
+    },
+    {
+      "make": "Bugatti",
+      "models": [
+        "Bugatti Type 57 Atlantic"
+      ]
+    },
+    {
+      "make": "Bugatti Automobiles",
+      "models": [
+        "Bugatti 18/3 Chiron",
+        "Bugatti EB118"
+      ]
+    },
+    {
+      "make": "Bugatti Automobili",
+      "models": [
+        "Bugatti EB110"
+      ]
+    },
+    {
+      "make": "BUICK",
+      "models": [
+        "ALLURE",
+        "LACROSSE",
+        "LESABRE",
+        "LUCERNE",
+        "RAINIER",
+        "RENDEZVOUS",
+        "TERRAZA"
+      ]
+    },
+    {
+      "make": "Cadillac",
+      "models": [
+        "Cadillac Cien",
+        "Cadillac de Ville 1961-64",
+        "Cadillac de Ville series",
+        "Cadillac Eldorado Biarritz",
+        "Cadillac Le Mans",
+        "Cadillac Provoq",
+        "Cadillac Series 62",
+        "Cadillac Sixteen"
+      ]
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "CTS",
+        "DTS",
+        "ESCALADE",
+        "ESCALADE ESV",
+        "ESCALADE EXT",
+        "SRX",
+        "STS",
+        "XLR"
+      ]
+    },
+    {
+      "make": "Carl Benz",
+      "models": [
+        "Benz Patent-Motorwagen"
+      ]
+    },
+    {
+      "make": "CARRIAGE",
+      "models": [
+        "COMPASS"
+      ]
+    },
+    {
+      "make": "Carver",
+      "models": [
+        "Carver One"
+      ]
+    },
+    {
+      "make": "CEDAR CREEK",
+      "models": [
+        "FIFTH WHEEL"
+      ]
+    },
+    {
+      "make": "CHANGZHOU NANXIASHU",
+      "models": [
+        "2575"
+      ]
+    },
+    {
+      "make": "Checker",
+      "models": [
+        "Checker Aerobus",
+        "Checker Marathon",
+        "Checker Model A",
+        "Checker Superba"
+      ]
+    },
+    {
+      "make": "Chery Automobile",
+      "models": [
+        "Chery QQ"
+      ]
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "AVALANCHE",
+        "AVEO",
+        "BLAZER",
+        "C4500",
+        "C5500",
+        "C6500",
+        "C7500",
+        "C8500",
+        "COBALT",
+        "COLORADO",
+        "CORVETTE",
+        "CORVETTE Z06",
+        "DENALI",
+        "EQUINOX",
+        "EXPRESS",
+        "EXPRESS 2500",
+        "EXPRESS 3500 15 PASSENGER",
+        "G VAN BUS",
+        "G1500",
+        "HHR",
+        "IMPALA",
+        "KODIAK",
+        "MALIBU",
+        "MALIBU MAXX",
+        "MONTE CARLO",
+        "OPTRA",
+        "S10",
+        "SILVERADO",
+        "SSR",
+        "SUBURBAN",
+        "T-SERIES",
+        "TAHOE",
+        "TRAILBLAZER",
+        "TRAILBLAZER EXT",
+        "UPLANDER",
+        "W3500",
+        "W4500"
+      ]
+    },
+    {
+      "make": "Chevron Cars",
+      "models": [
+        "B1"
+      ]
+    },
+    {
+      "make": "CHG",
+      "models": [
+        "CF250T V5"
+      ]
+    },
+    {
+      "make": "CHRYSLER",
+      "models": [
+        "300",
+        "ASPEN",
+        "CHRYSLER",
+        "CROSSFIRE",
+        "CROSSFIRE ROADSTER",
+        "PACIFICA",
+        "PT CRUISER",
+        "PT CRUISER CONV",
+        "SEBRING",
+        "SRT8",
+        "TOWN & COUNTRY",
+        "VOYAGER"
+      ]
+    },
+    {
+      "make": "Chrysler Fevre Argentina S.A.",
+      "models": [
+        "Dodge Polara Argentina"
+      ]
+    },
+    {
+      "make": "Citroën",
+      "models": [
+        "Citroën Bijou",
+        "Citroën C-Airplay",
+        "Citroën C-Buggy",
+        "Citroën C-Métisse",
+        "Citroën DS Inside",
+        "Citroën ECO 2000",
+        "Citroën GS Camargue",
+        "Citroën Hypnos",
+        "Citroën SM",
+        "GT by Citroen"
+      ]
+    },
+    {
+      "make": "COACHMEN",
+      "models": [
+        "AURORA",
+        "CAPTIVA",
+        "CHAPARRAL",
+        "CROSS COUNTRY",
+        "EPIC",
+        "SPORTCOACH ENCORE",
+        "VELOCITY"
+      ]
+    },
+    {
+      "make": "COUNTRY COACH",
+      "models": [
+        "AFFINITY",
+        "ALLURE",
+        "INSPIRE"
+      ]
+    },
+    {
+      "make": "CROSSROADS",
+      "models": [
+        "CROSS TERRAIN",
+        "CRUISER",
+        "PARADISE POINTE",
+        "SUNSET TRAIL",
+        "ZINGER"
+      ]
+    },
+    {
+      "make": "Crow-Elkhart",
+      "models": [
+        "Black Crow"
+      ]
+    },
+    {
+      "make": "CRUISER RV",
+      "models": [
+        "CRUISER"
+      ]
+    },
+    {
+      "make": "CUSTOM CAMPERS",
+      "models": [
+        "LS"
+      ]
+    },
+    {
+      "make": "Dacia",
+      "models": [
+        "Dacia Logan"
+      ]
+    },
+    {
+      "make": "DAF",
+      "models": [
+        "DAF 600"
+      ]
+    },
+    {
+      "make": "Daihatsu",
+      "models": [
+        "Daihatsu Move Latte",
+        "Daihatsu Terios Kid"
+      ]
+    },
+    {
+      "make": "Daimler",
+      "models": [
+        "Daimler Majestic Major",
+        "Daimler SP250"
+      ]
+    },
+    {
+      "make": "Daimler-Benz",
+      "models": [
+        "Mercedes-Benz F100",
+        "Mercedes-Benz W06",
+        "Mercedes-Benz W111",
+        "Mercedes-Benz W126",
+        "Mercedes-Benz W136",
+        "Mercedes-Benz W29"
+      ]
+    },
+    {
+      "make": "DAMON",
+      "models": [
+        "ASTORIA PACIFIC",
+        "CHALLENGER",
+        "DAYBREAK",
+        "INTRUDER",
+        "TUSCANY"
+      ]
+    },
+    {
+      "make": "DB",
+      "models": [
+        "DB Le Mans"
+      ]
+    },
+    {
+      "make": "Delage",
+      "models": [
+        "Delage Type 15 S 8"
+      ]
+    },
+    {
+      "make": "Delahaye",
+      "models": [
+        "Delahaye Type 145",
+        "Delahaye Type 165"
+      ]
+    },
+    {
+      "make": "DIAMO",
+      "models": [
+        "VELUX"
+      ]
+    },
+    {
+      "make": "Dodge",
+      "models": [
+        "Dodge Coronet",
+        "Dodge Dart",
+        "Dodge EV",
+        "Dodge Kahuna",
+        "Dodge Matador",
+        "Dodge Monaco",
+        "Dodge Polara",
+        "Dodge Sidewinder",
+        "Dodge ZEO"
+      ]
+    },
+    {
+      "make": "DODGE",
+      "models": [
+        "CALIBER",
+        "CARAVAN",
+        "CHARGER",
+        "DAKOTA",
+        "DURANGO",
+        "GRAND CARAVAN",
+        "GRAND CARAVAN SXT",
+        "MAGNUM",
+        "RAM 1500",
+        "RAM 2500",
+        "RAM 3500",
+        "RAM SRT-10",
+        "SPRINTER 2500",
+        "SPRINTER 3500",
+        "STRATUS",
+        "VIPER"
+      ]
+    },
+    {
+      "make": "DODGEN",
+      "models": [
+        "DAKOTA"
+      ]
+    },
+    {
+      "make": "DOK-ING",
+      "models": [
+        "DOK-ING XD"
+      ]
+    },
+    {
+      "make": "Dome",
+      "models": [
+        "Dome Zero"
+      ]
+    },
+    {
+      "make": "Dongfeng Nissan Passenger Vehicle",
+      "models": [
+        "Nissan Sylphy"
+      ]
+    },
+    {
+      "make": "DUCATI",
+      "models": [
+        "1000GT",
+        "1000SS",
+        "620",
+        "749",
+        "999",
+        "HYPERMOTARD",
+        "MONSTER 1000",
+        "MONSTER 696",
+        "MONSTER S2R 1000",
+        "MONSTER S4 R",
+        "MONSTER S4RS",
+        "MTS 1000",
+        "MTS 620",
+        "S4 R 2006",
+        "SPORT CLASSIC",
+        "ST3",
+        "ST3 ABS"
+      ]
+    },
+    {
+      "make": "DUTCHMEN",
+      "models": [
+        "DUTCHMEN",
+        "GRAND JUNCTION",
+        "T@B"
+      ]
+    },
+    {
+      "make": "E-ONE",
+      "models": [
+        "F550"
+      ]
+    },
+    {
+      "make": "E-TON",
+      "models": [
+        "PN2B/BEAMER 50"
+      ]
+    },
+    {
+      "make": "Elcat Oy",
+      "models": [
+        "Elcat Cityvan",
+        "Elcat Cityvan 200",
+        "Elcat Cityvan 202"
+      ]
+    },
+    {
+      "make": "ELDORADO",
+      "models": [
+        "AEROTECH"
+      ]
+    },
+    {
+      "make": "ELITE",
+      "models": [
+        "LIVING QUARTER"
+      ]
+    },
+    {
+      "make": "Fabryka Samochodów Ciężarowych",
+      "models": [
+        "FSC Żuk"
+      ]
+    },
+    {
+      "make": "FEATHERLITE",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "Ferdinand Porsche",
+      "models": [
+        "Porsche P1"
+      ]
+    },
+    {
+      "make": "Ferrari",
+      "models": [
+        "Ferrari 500 Mondial",
+        "Ferrari Daytona",
+        "Ferrari FX",
+        "Ferrari FZ93",
+        "Ferrari Modulo",
+        "Ferrari Mythos",
+        "Ferrari P4/5 by Pininfarina",
+        "Ferrari Sigma"
+      ]
+    },
+    {
+      "make": "FERRARI",
+      "models": [
+        "F430"
+      ]
+    },
+    {
+      "make": "Fiat",
+      "models": [
+        "Alfa Romeo 164",
+        "Alfa Romeo Giulietta Sprint Speciale",
+        "Chrysler 200C EV",
+        "Chrysler ME Four-Twelve",
+        "Chrysler Neon",
+        "Fiat 1800/2100",
+        "Fiat Cinquecento I",
+        "Fiat Cinquecento II",
+        "Fiat Doblò Mk1",
+        "Fiat Downtown",
+        "Fiat FCC Adventure",
+        "Fiat Palio I",
+        "Fiat Panda",
+        "Fiat Panda Hydrogen",
+        "Fiat Phylla",
+        "Fiat Pininfarina Cabriolet",
+        "Fiat Seicento I",
+        "Fiat Seicento II",
+        "Fiat Seicento III",
+        "Fiat Strada I",
+        "Fiat Trepiùno",
+        "Fiat Turbina",
+        "Fiat Uno I",
+        "Fiat Uno II",
+        "Lancia Delta S4",
+        "Lancia Ypsilon I",
+        "Maserati 5000 GT"
+      ]
+    },
+    {
+      "make": "Fiat Professional",
+      "models": [
+        "Citroën Jumper II - Peugeot Boxer II - Fiat Ducato III"
+      ]
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": [
+        "AMERICAN EAGLE",
+        "AMERICAN HERITAGE",
+        "BOUNDER",
+        "BOUNDER DIESEL",
+        "CHEYENNE",
+        "CLASS C",
+        "DISCOVERY",
+        "EXCURSION",
+        "EXPEDITION",
+        "FLAIR",
+        "GEARBOX",
+        "MALLARD",
+        "PACE ARROW",
+        "PROVIDENCE",
+        "PROWLER",
+        "REVOLUTION",
+        "SOUTHWIND",
+        "TERRY",
+        "TIOGA",
+        "WILDERNESS",
+        "WILDERNESS ADVANTAGE"
+      ]
+    },
+    {
+      "make": "FONTAINE",
+      "models": [
+        "FTW"
+      ]
+    },
+    {
+      "make": "Ford",
+      "models": [
+        "Edsel Corsair",
+        "Ford Airstream",
+        "Ford Anglia",
+        "Ford Elite",
+        "Ford Escape",
+        "Ford Escort",
+        "Ford F-250 Super Chief",
+        "Ford Fairlane",
+        "Ford Fairlane Crown Victoria Skyliner",
+        "Ford Fairmont",
+        "Ford Falcon",
+        "Ford Fusion Americas",
+        "Ford Galaxie",
+        "Ford Granada North America",
+        "Ford GT90",
+        "Ford Interceptor",
+        "Ford LTD",
+        "Ford LTD Crown Victoria",
+        "Ford LTD II",
+        "Ford Maverick",
+        "Ford Model T",
+        "Ford Mondeo 2nd generation",
+        "Ford Mustang I",
+        "Ford Parklane",
+        "Ford Pinto",
+        "Ford Ranchero",
+        "Ford Reflex",
+        "Ford Shelby GR-1",
+        "Ford SYNus",
+        "Ford Taurus",
+        "Ford Taurus 1st generation",
+        "Ford Taurus 2nd generation",
+        "Ford Taurus 3rd generation",
+        "Ford Taurus 4th generation",
+        "Ford Tempo",
+        "Ford Thunderbird",
+        "Ford Torino",
+        "Ford Windstar",
+        "Lincoln Futura",
+        "Lincoln MKZ",
+        "Lincoln Versailles",
+        "M151 MUTT",
+        "Mercedes-Benz Bionic",
+        "Mercury Bobcat",
+        "Mercury Capri",
+        "Mercury Comet",
+        "Mercury Cougar",
+        "Mercury Cyclone",
+        "Mercury Cyclone Spoiler II",
+        "Mercury Grand Marquis",
+        "Mercury Marauder",
+        "Mercury Marquis",
+        "Mercury Meteor",
+        "Mercury Monarch",
+        "Mercury Montego",
+        "Mercury Montego 2nd generation",
+        "Mercury Montego 3rd generation",
+        "Mercury Monterey",
+        "Mercury Monterey minivan",
+        "Mercury Mystique",
+        "Mercury Park Lane",
+        "Mercury S-55",
+        "Mercury Sable",
+        "Mercury Zephyr",
+        "Merkur XR4Ti"
+      ]
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "500",
+        "CROWN VICTORIA",
+        "E-150",
+        "E-250",
+        "E-350 15 PASSENGER",
+        "E-450",
+        "E-550",
+        "E250",
+        "ESCAPE",
+        "ESCAPE HYBRID",
+        "EXPEDITION",
+        "EXPLORER",
+        "F-150",
+        "F-250",
+        "F-250 SD",
+        "F-350",
+        "F-350 SD",
+        "F-450 SD",
+        "F-550 SD",
+        "F-650 SD",
+        "FIVE HUNDRED",
+        "FOCUS",
+        "FORD GT",
+        "FREESTAR",
+        "FREESTYLE",
+        "FUSION",
+        "GT",
+        "LCF",
+        "LCF 450 SERIES",
+        "LCF 550 SERIES",
+        "MUSTANG",
+        "RANGER",
+        "STRIPPED CHASSIS",
+        "SUPER DUTY",
+        "TAURUS"
+      ]
+    },
+    {
+      "make": "Ford Argentina",
+      "models": [
+        "Ford Fairlane Argentina",
+        "Ford Falcon Argentina",
+        "Ford Ranchero Argentina"
+      ]
+    },
+    {
+      "make": "Ford Australia",
+      "models": [
+        "Ford Capri Australia",
+        "Ford Fairlane Australia",
+        "Ford Fairmont Australia",
+        "Ford Falcon Australia",
+        "Ford Landau Australia"
+      ]
+    },
+    {
+      "make": "Ford do Brasil",
+      "models": [
+        "Ford Corcel",
+        "Ford EcoSport",
+        "Ford Ka",
+        "Ford Landau Brazil",
+        "Ford Pampa",
+        "Ford Verona",
+        "Ford Versailles Brazil"
+      ]
+    },
+    {
+      "make": "Ford Germany",
+      "models": [
+        "Ford Fusion Europe",
+        "Ford Granada Europe",
+        "Ford Scorpio",
+        "Ford Taunus"
+      ]
+    },
+    {
+      "make": "Ford Lio Ho Motor",
+      "models": [
+        "Ford Laser"
+      ]
+    },
+    {
+      "make": "Ford of Britain",
+      "models": [
+        "Ford Corsair",
+        "Ford Granada Europe",
+        "Ford Popular",
+        "Ford Zephyr"
+      ]
+    },
+    {
+      "make": "Ford of Europe",
+      "models": [
+        "Ford Capri",
+        "Ford Mondeo",
+        "Ford Orion",
+        "Ford Sierra"
+      ]
+    },
+    {
+      "make": "Ford-Vairogs",
+      "models": [
+        "Ford-Vairogs Junior",
+        "Ford-Vairogs V8 Standart"
+      ]
+    },
+    {
+      "make": "FOREST RIVER",
+      "models": [
+        "ALL AMERICAN SPORT RV",
+        "CARDINAL",
+        "CHEROKEE",
+        "FORESTER",
+        "LEXINGTON GT",
+        "PUMA",
+        "ROCKWOOD",
+        "SANDPIPER",
+        "SIERRA",
+        "SUNSEEKER",
+        "TRAVEL TRAILER",
+        "WILDCAT",
+        "WILDWOOD"
+      ]
+    },
+    {
+      "make": "FOUR WINDS",
+      "models": [
+        "CHATEAU",
+        "CHATEAU SPORT",
+        "DUTCHMEN",
+        "FUN MOVER",
+        "HURRICANE",
+        "INFINITY",
+        "MANDALAY",
+        "SIESTA"
+      ]
+    },
+    {
+      "make": "Frans Engelbert Lindström",
+      "models": [
+        "Korvensuu"
+      ]
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": [
+        "BUSINESS CLASS M2",
+        "BUSINESS CLASS M2 106V",
+        "CASCADIA",
+        "CENTURY",
+        "CENTURY CLASS",
+        "CENTURY ST",
+        "CLASSIC",
+        "COLUMBIA",
+        "CORONADO",
+        "FLD120",
+        "M2",
+        "SPRINTER 2500",
+        "SPRINTER 3500",
+        "X-LINE",
+        "XC-R"
+      ]
+    },
+    {
+      "make": "GAC Toyota",
+      "models": [
+        "Toyota Corolla Levin"
+      ]
+    },
+    {
+      "make": "GAZ",
+      "models": [
+        "Chaika",
+        "GAZ-13",
+        "GAZ-16",
+        "GAZ-62"
+      ]
+    },
+    {
+      "make": "GEM",
+      "models": [
+        "NEV"
+      ]
+    },
+    {
+      "make": "General",
+      "models": [
+        "Beaumont (automobile)",
+        "Buick Apollo",
+        "Buick Centurion",
+        "Buick Century",
+        "Buick Electra",
+        "Buick Invicta",
+        "Buick LeSabre",
+        "Buick Opel",
+        "Buick Riviera",
+        "Buick Skylark",
+        "Buick Wildcat",
+        "Cadillac Cien",
+        "Cadillac Cyclone",
+        "Cadillac Eldorado Biarritz",
+        "Cadillac Le Mans",
+        "Cadillac Provoq",
+        "Cadillac Series 62",
+        "Cadillac Sixteen",
+        "Chevrolet Biscayne",
+        "Chevrolet C/K",
+        "Chevrolet Caprice",
+        "Chevrolet Caprice 9C1",
+        "Chevrolet Chevy II / Nova",
+        "Chevrolet Copper-Cooled",
+        "Chevrolet Corvair",
+        "Chevrolet El Camino",
+        "Chevrolet Groove",
+        "Chevrolet Impala",
+        "Chevrolet Kingswood",
+        "Chevrolet Montana",
+        "Chevrolet Monte Carlo",
+        "Chevrolet Monza USA",
+        "Chevrolet Parkwood",
+        "Chevrolet Series FB",
+        "Chevrolet Superior",
+        "Daewoo Matiz",
+        "General Motors Sequel",
+        "Holden Coupe 60",
+        "Holden Efijy",
+        "Oldsmobile 442",
+        "Oldsmobile Cutlass",
+        "Oldsmobile Cutlass Calais",
+        "Oldsmobile Cutlass Ciera",
+        "Oldsmobile Cutlass N-body",
+        "Oldsmobile Cutlass Supreme",
+        "Oldsmobile Model 43",
+        "Oldsmobile Series 40",
+        "Oldsmobile Toronado",
+        "Pontiac 6",
+        "Pontiac Bonneville Special",
+        "Pontiac Catalina",
+        "Pontiac Parisienne",
+        "Pontiac Silver Streak"
+      ]
+    },
+    {
+      "make": "General de México",
+      "models": [
+        "Chevrolet Chevy Mexico",
+        "Chevrolet Corsa"
+      ]
+    },
+    {
+      "make": "General do Brasil",
+      "models": [
+        "Chevrolet Chevy 500",
+        "Chevrolet Corsa",
+        "Chevrolet Monza Brazil",
+        "Chevrolet Opala"
+      ]
+    },
+    {
+      "make": "General of Argentina",
+      "models": [
+        "Chevrolet 400",
+        "Chevrolet Chevy Argentina",
+        "Chevrolet Corsa",
+        "Opel K-180"
+      ]
+    },
+    {
+      "make": "GEORGIE BOY",
+      "models": [
+        "LANDAU"
+      ]
+    },
+    {
+      "make": "Glas",
+      "models": [
+        "Goggomobil",
+        "Goggomobil Dart"
+      ]
+    },
+    {
+      "make": "GLAVAL",
+      "models": [
+        "BUS"
+      ]
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "C4500",
+        "C5500",
+        "CANYON",
+        "ENVOY",
+        "ENVOY XL",
+        "G1500",
+        "SAVANA",
+        "SAVANA 3500 15 PASSENGER",
+        "SIERRA",
+        "T-SERIES",
+        "W3500",
+        "W4500",
+        "YUKON",
+        "YUKON XL"
+      ]
+    },
+    {
+      "make": "GMT vehicles",
+      "models": [
+        "GMT Rivelaine"
+      ]
+    },
+    {
+      "make": "GREAT DANE",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "GULF STREAM",
+      "models": [
+        "CANYON TRAIL",
+        "ENDURA",
+        "FRIENDSHIP",
+        "G-FORCE",
+        "INDEPENDENCE",
+        "SUN VOYAGER",
+        "TOURMASTER",
+        "TRACK & TRAIL",
+        "VISTA CRUISER",
+        "YELLOWSTONE"
+      ]
+    },
+    {
+      "make": "H&H TRAILER",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "HARLEY-DAVIDSON",
+      "models": [
+        "DYNA",
+        "FLHRCI",
+        "FLHRI",
+        "FLHRSI",
+        "FLHT",
+        "FLHTCI",
+        "FLHTCUI",
+        "FLHTCUSE",
+        "FLHTI",
+        "FLHTPI",
+        "FLHXI",
+        "FLSTC",
+        "FLSTCI",
+        "FLSTF",
+        "FLSTFI",
+        "FLSTI",
+        "FLTRI",
+        "FXD",
+        "FXDBI",
+        "FXDCI",
+        "FXDI",
+        "FXDLI",
+        "FXDWGI",
+        "FXST",
+        "FXSTBI",
+        "FXSTSI",
+        "VRSCA",
+        "VRSCD",
+        "VRSCR",
+        "VRSCSE2",
+        "XL1200C",
+        "XL1200L",
+        "XL1200R",
+        "XL883",
+        "XL883C",
+        "XL883R"
+      ]
+    },
+    {
+      "make": "HAUL MASTER",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "HAULMARK",
+      "models": [
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "HEARTLAND",
+      "models": [
+        "BIG HORN",
+        "BIGHORN",
+        "LANDMARK"
+      ]
+    },
+    {
+      "make": "Henney",
+      "models": [
+        "Henney Kilowatt"
+      ]
+    },
+    {
+      "make": "HINO",
+      "models": [
+        "NA6J"
+      ]
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": [
+        "ADMIRAL SE",
+        "ALUMASCAPE",
+        "ENDEAVOR",
+        "HOLIDAY RAMBLER",
+        "NEPTUNE",
+        "SAVOY LX",
+        "SAVOY SL",
+        "VACATIONER"
+      ]
+    },
+    {
+      "make": "HOME AND PARK",
+      "models": [
+        "ROADTREK 210"
+      ]
+    },
+    {
+      "make": "Honda",
+      "models": [
+        "Acura MDX",
+        "Honda EV-N",
+        "Honda HSC",
+        "Honda Integra SJ",
+        "Honda WOW",
+        "Isuzu Gemini"
+      ]
+    },
+    {
+      "make": "HONDA",
+      "models": [
+        "ACCORD",
+        "ACCORD HYBRID",
+        "CBR1000RR",
+        "CBR600RR",
+        "CIVIC",
+        "CIVIC GX",
+        "CIVIC HYBRID",
+        "CIVIC SI",
+        "CMX250C",
+        "CR-V",
+        "ELEMENT",
+        "GL1800",
+        "INSIGHT",
+        "NPS50",
+        "ODYSSEY",
+        "PILOT",
+        "PS250",
+        "RIDGELINE",
+        "S2000",
+        "ST1300",
+        "ST1300A",
+        "ST1300P",
+        "VFR800",
+        "VT1100C",
+        "VT600",
+        "VT750",
+        "VT750C",
+        "VTX1300",
+        "VTX1800C",
+        "VTX1800N",
+        "VTX1800R"
+      ]
+    },
+    {
+      "make": "http://www.wikidata.org/.well-known/genid/8c0c1182ed8c71c53d269eb1ed134118",
+      "models": [
+        "Renault Trafic II"
+      ]
+    },
+    {
+      "make": "HUMMER",
+      "models": [
+        "H2",
+        "H3"
+      ]
+    },
+    {
+      "make": "HYOSUNG",
+      "models": [
+        "GV650"
+      ]
+    },
+    {
+      "make": "Hyundai",
+      "models": [
+        "Hyundai Clix"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "ACCENT",
+        "AZERA",
+        "ELANTRA",
+        "ENTOURAGE",
+        "SANTA FE",
+        "SONATA",
+        "TIBURON",
+        "TUCSON",
+        "XG350"
+      ]
+    },
+    {
+      "make": "IC",
+      "models": [
+        "CE"
+      ]
+    },
+    {
+      "make": "IC BUS",
+      "models": [
+        "CESB"
+      ]
+    },
+    {
+      "make": "Indianapolis Automobile and Vehicle",
+      "models": [
+        "Black"
+      ]
+    },
+    {
+      "make": "Industrias Kaiser Argentina",
+      "models": [
+        "IKA-Renault Torino"
+      ]
+    },
+    {
+      "make": "INFINITI",
+      "models": [
+        "FX35/45",
+        "G35 COUPE",
+        "G35 SEDAN",
+        "J30",
+        "M35/45",
+        "QX4",
+        "QX56"
+      ]
+    },
+    {
+      "make": "INTERNATIONAL",
+      "models": [
+        "3000",
+        "4000",
+        "4300",
+        "7400",
+        "9900I",
+        "CE",
+        "CF500",
+        "RA027"
+      ]
+    },
+    {
+      "make": "International Harvester",
+      "models": [
+        "International L-Series"
+      ]
+    },
+    {
+      "make": "Iran Khodro",
+      "models": [
+        "Paykan"
+      ]
+    },
+    {
+      "make": "Isuzu",
+      "models": [
+        "Isuzu Gemini"
+      ]
+    },
+    {
+      "make": "ISUZU",
+      "models": [
+        "ASCENDER 5",
+        "ASCENDER 7",
+        "FTR",
+        "I-280",
+        "I-350",
+        "NPR"
+      ]
+    },
+    {
+      "make": "Italdesign Giugiaro",
+      "models": [
+        "Lamborghini Calà"
+      ]
+    },
+    {
+      "make": "ITASCA",
+      "models": [
+        "ELLIPSE",
+        "MERIDIAN",
+        "NAVION",
+        "SUNCRUISER",
+        "SUNOVA",
+        "SUNRISE"
+      ]
+    },
+    {
+      "make": "Jaeger Motor Car",
+      "models": [
+        "Jaeger"
+      ]
+    },
+    {
+      "make": "JAGUAR",
+      "models": [
+        "S-TYPE",
+        "X-TYPE",
+        "X-TYPE SPORTSWAGEN",
+        "XJ",
+        "XJ8",
+        "XK"
+      ]
+    },
+    {
+      "make": "Jaguar Cars",
+      "models": [
+        "Jaguar Mark 2",
+        "Jaguar Mark IX",
+        "Jaguar XJ220",
+        "Jaguar XK 180"
+      ]
+    },
+    {
+      "make": "JAYCO",
+      "models": [
+        "JAY FEATHER",
+        "RECON",
+        "SENECA"
+      ]
+    },
+    {
+      "make": "JEEP",
+      "models": [
+        "COMMANDER",
+        "GRAND CHEROKEE",
+        "LAREDO",
+        "LIBERTY",
+        "WRANGLER"
+      ]
+    },
+    {
+      "make": "Kaiser Jeep",
+      "models": [
+        "M151 MUTT"
+      ]
+    },
+    {
+      "make": "Karosseriewerke Weinsberg",
+      "models": [
+        "NSU/Fiat Weinsberg 500"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "EN500C6F",
+        "EX250F6F",
+        "KL650A",
+        "KL650A6F",
+        "KL650E",
+        "KLR650",
+        "KLX250H6F",
+        "VN1500T6F",
+        "VN1600A6F",
+        "VN1600B6F",
+        "VN1600D6F",
+        "VN1600G6F",
+        "VN2000D1",
+        "VN2000D6F",
+        "VN750A6F",
+        "VN900B6F",
+        "VN900D6F",
+        "VN900D6FL",
+        "VULCAN",
+        "ZG1000A6F",
+        "ZX1000D6F",
+        "ZX14",
+        "ZX1400A6F",
+        "ZX14A6F",
+        "ZX636C6F"
+      ]
+    },
+    {
+      "make": "KENWORTH",
+      "models": [
+        "C500",
+        "T2000",
+        "T600",
+        "T800",
+        "W900"
+      ]
+    },
+    {
+      "make": "KEYSTONE",
+      "models": [
+        "CAMBRIDGE",
+        "COUGAR",
+        "EVEREST",
+        "HORNET",
+        "MONTANA",
+        "MONTANA-MOUNTAINEER",
+        "MOUNTAINEER",
+        "OUTBACK",
+        "RAPTOR",
+        "SPRINGDALE",
+        "SPRINTER",
+        "ZEPPELIN"
+      ]
+    },
+    {
+      "make": "Kia",
+      "models": [
+        "Ford Festiva",
+        "Kia Kue",
+        "Kia morning"
+      ]
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "AMANTI",
+        "OPTIMA",
+        "RIO",
+        "SEDONA",
+        "SORENTO",
+        "SPECTRA",
+        "SPORTAGE"
+      ]
+    },
+    {
+      "make": "KME",
+      "models": [
+        "RENEGADE FIRE ENGINE"
+      ]
+    },
+    {
+      "make": "KrAZ",
+      "models": [
+        "KrAZ-221"
+      ]
+    },
+    {
+      "make": "KTM",
+      "models": [
+        "300 XC-W",
+        "640 ADVENTURE",
+        "950 ADVENTURE",
+        "950 SUPERMOTO"
+      ]
+    },
+    {
+      "make": "KYMCO",
+      "models": [
+        "AGILITY"
+      ]
+    },
+    {
+      "make": "KZRV",
+      "models": [
+        "COYOTE",
+        "DURANGO",
+        "ESCALADE",
+        "FRONTIER",
+        "SPORTSMEN",
+        "SPORTSTER"
+      ]
+    },
+    {
+      "make": "Lamborghini",
+      "models": [
+        "Lamborghini 3500 GTZ",
+        "Lamborghini 350GTV",
+        "Lamborghini Athon",
+        "Lamborghini Bravo",
+        "Lamborghini Estoque",
+        "Lamborghini Faena",
+        "Lamborghini Gallardo",
+        "Lamborghini P140",
+        "Lamborghini Pregunta"
+      ]
+    },
+    {
+      "make": "LAMBORGHINI",
+      "models": [
+        "GALLARDO"
+      ]
+    },
+    {
+      "make": "Lancia",
+      "models": [
+        "Lancia Delta I",
+        "Lancia Delta II",
+        "Lancia Delta S4",
+        "Lancia Ypsilon I"
+      ]
+    },
+    {
+      "make": "LAND ROVER",
+      "models": [
+        "DISCOVERY",
+        "LR3",
+        "RANGE ROVER",
+        "RANGE ROVER SPORT"
+      ]
+    },
+    {
+      "make": "LEXUS",
+      "models": [
+        "ES330",
+        "GS300/430",
+        "GX470",
+        "IS 300",
+        "IS250/350",
+        "LS430",
+        "LX470",
+        "RX330",
+        "RX400H",
+        "SC430"
+      ]
+    },
+    {
+      "make": "LIEBHERR",
+      "models": [
+        "LTM 1220"
+      ]
+    },
+    {
+      "make": "Lincoln",
+      "models": [
+        "Lincoln MKR"
+      ]
+    },
+    {
+      "make": "LINCOLN",
+      "models": [
+        "LS",
+        "MARK LT",
+        "NAVIGATOR",
+        "TOWN CAR",
+        "ZEPHYR"
+      ]
+    },
+    {
+      "make": "Lion-Peugeot",
+      "models": [
+        "Lion-Peugeot Types VY and VY2"
+      ]
+    },
+    {
+      "make": "LONG CHIH",
+      "models": [
+        "LCI-745TC"
+      ]
+    },
+    {
+      "make": "LOTUS",
+      "models": [
+        "ELISE",
+        "EXIGE",
+        "EXIZE"
+      ]
+    },
+    {
+      "make": "Lotus Cars",
+      "models": [
+        "Lotus Elan M100"
+      ]
+    },
+    {
+      "make": "MACK",
+      "models": [
+        "DM"
+      ]
+    },
+    {
+      "make": "Maserati",
+      "models": [
+        "Maserati 150 GT",
+        "Maserati 5000 GT",
+        "Maserati Medici"
+      ]
+    },
+    {
+      "make": "MASERATI",
+      "models": [
+        "GRANSPORT",
+        "QUATTROPORTE"
+      ]
+    },
+    {
+      "make": "Mazda",
+      "models": [
+        "Ford Festiva",
+        "Ford Laser",
+        "Mazda Furai",
+        "Mazda K360",
+        "Mazda Kabura",
+        "Mazda Kiyora",
+        "Mazda Nagare",
+        "Mazda Premacy Hydrogen RE Hybrid",
+        "Mazda RX-500",
+        "Mazda RX-8 Hydrogen RE",
+        "Mazda Ryuga",
+        "Mazda Taiki"
+      ]
+    },
+    {
+      "make": "MAZDA",
+      "models": [
+        "B-SERIES",
+        "MAZDA3",
+        "MAZDA5",
+        "MAZDA6",
+        "MPV",
+        "MX-5/ MIATA",
+        "RX-8",
+        "TRIBUTE"
+      ]
+    },
+    {
+      "make": "MCKENZIE",
+      "models": [
+        "STARWOOD LX"
+      ]
+    },
+    {
+      "make": "MERCEDES BENZ",
+      "models": [
+        "GL320",
+        "M-CLASS"
+      ]
+    },
+    {
+      "make": "Mercedes-Benz",
+      "models": [
+        "Chrysler Pacifica",
+        "Jeep Hurricane",
+        "Jeep Trailhawk",
+        "Mercedes-Benz F200",
+        "Mercedes-Benz F400",
+        "Mercedes-Benz F700",
+        "Mercedes-Benz Ocean Drive",
+        "Mercedes-Benz W06",
+        "Mercedes-Benz W210",
+        "Mercedes-Benz W906",
+        "Smart Crosstown"
+      ]
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "C-CLASS",
+        "CL-CLASS",
+        "CLK-CLASS",
+        "CLS-CLASS",
+        "E-CLASS",
+        "GLK350",
+        "ML-CLASS",
+        "R-CLASS",
+        "S-CLASS",
+        "SL-CLASS",
+        "SLK-CLASS"
+      ]
+    },
+    {
+      "make": "MERCURY",
+      "models": [
+        "GRAND MARQUIS",
+        "MARINER",
+        "MARINER HYBRID",
+        "MILAN",
+        "MONTEGO",
+        "MONTEREY",
+        "MOUNTAINEER",
+        "SABLE"
+      ]
+    },
+    {
+      "make": "MINI",
+      "models": [
+        "COOPER",
+        "COOPER S CONVERTIBLE"
+      ]
+    },
+    {
+      "make": "Mitsubishi",
+      "models": [
+        "Mitsubishi 500",
+        "Mitsubishi eK",
+        "Mitsubishi PX33"
+      ]
+    },
+    {
+      "make": "MITSUBISHI",
+      "models": [
+        "ECLIPSE",
+        "ECLIPSE SPYDER",
+        "ENDEAVOR",
+        "GALANT",
+        "LANCER",
+        "LANCER EVOLUTION",
+        "MONTERO",
+        "OUTLANDER",
+        "RAIDER"
+      ]
+    },
+    {
+      "make": "MITSUBISHI FUSO",
+      "models": [
+        "FE84D"
+      ]
+    },
+    {
+      "make": "MO TRAILER",
+      "models": [
+        "SP"
+      ]
+    },
+    {
+      "make": "MONACO COACH",
+      "models": [
+        "CAYMAN",
+        "DIPLOMAT",
+        "EXECUTIVE",
+        "KNIGHT",
+        "LAPALMA",
+        "MONARCH SE",
+        "SIGNATURE",
+        "WINDSOR"
+      ]
+    },
+    {
+      "make": "Monteverdi",
+      "models": [
+        "Monteverdi 250 Z"
+      ]
+    },
+    {
+      "make": "Morris",
+      "models": [
+        "Morris Oxford Farina"
+      ]
+    },
+    {
+      "make": "Moskvitch",
+      "models": [
+        "Moskvitch 2140"
+      ]
+    },
+    {
+      "make": "MOTO GUZZI",
+      "models": [
+        "BREVA 1100",
+        "GRISO"
+      ]
+    },
+    {
+      "make": "Nash",
+      "models": [
+        "Ajax"
+      ]
+    },
+    {
+      "make": "NATIONAL RV",
+      "models": [
+        "DOLPHIN",
+        "SEA BREEZE",
+        "SEA BREEZE LX",
+        "SURF SIDE"
+      ]
+    },
+    {
+      "make": "Nesselsdorfer Wagenbau-Fabriks-Gesellschaft",
+      "models": [
+        "NW Präsident"
+      ]
+    },
+    {
+      "make": "NEWMAR",
+      "models": [
+        "DUTCH STAR",
+        "KOUNTRY STAR"
+      ]
+    },
+    {
+      "make": "Nissan",
+      "models": [
+        "Datsun 200B",
+        "Datsun Sports",
+        "Nissan Bevel",
+        "Nissan Bluebird",
+        "Nissan Cima",
+        "Nissan Forum",
+        "Nissan Gloria",
+        "Nissan MID4",
+        "Nissan Navara D22",
+        "Nissan Nuvu",
+        "Nissan Sylphy",
+        "Nissan URGE",
+        "Nissan X-Trail I"
+      ]
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "350Z",
+        "ALTIMA",
+        "ARMADA",
+        "FRONTIER CREW CAB",
+        "FRONTIER KING CAB",
+        "MAXIMA",
+        "MURANO",
+        "PATHFINDER",
+        "QUEST",
+        "SENTRA",
+        "TITAN",
+        "XTERRA"
+      ]
+    },
+    {
+      "make": "NISSAN MOTORSPORTS & CUSTOMIZING",
+      "models": [
+        "AUTECH"
+      ]
+    },
+    {
+      "make": "NMKV",
+      "models": [
+        "Mitsubishi eK"
+      ]
+    },
+    {
+      "make": "North German Automobile and Engine",
+      "models": [
+        "Lloyd Arabella"
+      ]
+    },
+    {
+      "make": "NU WA",
+      "models": [
+        "HITCHHIKER II LS"
+      ]
+    },
+    {
+      "make": "Opel",
+      "models": [
+        "Opel Kapitän",
+        "Opel Trixx"
+      ]
+    },
+    {
+      "make": "Orient",
+      "models": [
+        "Orient Electric"
+      ]
+    },
+    {
+      "make": "PACE AMERICAN",
+      "models": [
+        "RALLYE EXPLORER",
+        "TRAILER"
+      ]
+    },
+    {
+      "make": "Packard",
+      "models": [
+        "Packard Predictor"
+      ]
+    },
+    {
+      "make": "Panhard",
+      "models": [
+        "Panhard PL 17"
+      ]
+    },
+    {
+      "make": "PETERBILT",
+      "models": [
+        "335",
+        "378",
+        "379"
+      ]
+    },
+    {
+      "make": "PETERSON",
+      "models": [
+        "EXCEL LIMITED EDITION"
+      ]
+    },
+    {
+      "make": "Peugeot",
+      "models": [
+        "Citroën Bijou",
+        "Citroën SM",
+        "GT by Citroen",
+        "Peugeot 20Cup",
+        "Peugeot 4002",
+        "Peugeot 406 Coupé 2.2 HDi",
+        "Peugeot 806 Runabout",
+        "Peugeot Asphalte",
+        "Peugeot BB1",
+        "Peugeot Flux",
+        "Peugeot Hoggar",
+        "Peugeot Oxia 405",
+        "Peugeot Prologue HYmotion4",
+        "Peugeot Proxima",
+        "Peugeot Quark",
+        "Peugeot Touareg",
+        "Peugeot VLV"
+      ]
+    },
+    {
+      "make": "PIAGGIO",
+      "models": [
+        "BV 500",
+        "GTS 250"
+      ]
+    },
+    {
+      "make": "PIERCE",
+      "models": [
+        "ENFORCER"
+      ]
+    },
+    {
+      "make": "PILGRIM",
+      "models": [
+        "OPEN ROAD"
+      ]
+    },
+    {
+      "make": "Pininfarina",
+      "models": [
+        "Ford Ka",
+        "Peugeot 406 Coupé 2.2 HDi"
+      ]
+    },
+    {
+      "make": "Plymouth",
+      "models": [
+        "Plymouth Barracuda",
+        "Plymouth Fury",
+        "Plymouth Fury B-body"
+      ]
+    },
+    {
+      "make": "PONTIAC",
+      "models": [
+        "G6",
+        "GRAND PRIX",
+        "GTO",
+        "MONTANA",
+        "SOLSTICE",
+        "TORRENT",
+        "VIBE"
+      ]
+    },
+    {
+      "make": "Porsche",
+      "models": [
+        "Porsche 356/1",
+        "Porsche 64",
+        "Porsche 695",
+        "Porsche 968"
+      ]
+    },
+    {
+      "make": "PORSCHE",
+      "models": [
+        "911 CARRERA",
+        "911 CARRERA 4",
+        "911 CARRERA CABRIOLET",
+        "BOXSTER",
+        "CAYENNE",
+        "CAYMAN S"
+      ]
+    },
+    {
+      "make": "R-VISION",
+      "models": [
+        "TRAIL-LITE"
+      ]
+    },
+    {
+      "make": "RELIANCE TRAILER",
+      "models": [
+        "TRANSFER TRAILER CHASSIS"
+      ]
+    },
+    {
+      "make": "Renault",
+      "models": [
+        "Alpine A108",
+        "La Genoveva",
+        "Renault 5 II",
+        "Renault Altica",
+        "Renault Egeus",
+        "Renault Espace III",
+        "Renault Estafette",
+        "Renault Master II",
+        "Renault Nepta",
+        "Renault Ondelios",
+        "Renault Zoom"
+      ]
+    },
+    {
+      "make": "Renault Argentina",
+      "models": [
+        "IKA-Renault Torino"
+      ]
+    },
+    {
+      "make": "Riga Autobus Factory",
+      "models": [
+        "RAF-977"
+      ]
+    },
+    {
+      "make": "Rinspeed",
+      "models": [
+        "Rinspeed eXasis",
+        "Rinspeed zaZen"
+      ]
+    },
+    {
+      "make": "ROAD SYSTEMS",
+      "models": [
+        "DAAA-01"
+      ]
+    },
+    {
+      "make": "ROADMASTER",
+      "models": [
+        "CAMPMASTER"
+      ]
+    },
+    {
+      "make": "Rolls-Royce Motor Cars",
+      "models": [
+        "Rolls-Royce Phantom V"
+      ]
+    },
+    {
+      "make": "Rover",
+      "models": [
+        "Mini"
+      ]
+    },
+    {
+      "make": "Rust Heinz",
+      "models": [
+        "Phantom Corsair"
+      ]
+    },
+    {
+      "make": "SAAB",
+      "models": [
+        "9-2X",
+        "9-3",
+        "9-5",
+        "9-7X"
+      ]
+    },
+    {
+      "make": "Saab Automobile",
+      "models": [
+        "Saab 9-X Air",
+        "Saab 9-X Biohybrid",
+        "Saab 95",
+        "Saab 98",
+        "Saab Aero-X",
+        "Saab EV-1",
+        "Ursaab"
+      ]
+    },
+    {
+      "make": "SAFARI COACH",
+      "models": [
+        "CHEETAH",
+        "TREK"
+      ]
+    },
+    {
+      "make": "SAIC General",
+      "models": [
+        "Buick Excelle"
+      ]
+    },
+    {
+      "make": "SATURN",
+      "models": [
+        "ION",
+        "RELAY",
+        "VUE"
+      ]
+    },
+    {
+      "make": "Sbarro",
+      "models": [
+        "Sbarro GT12"
+      ]
+    },
+    {
+      "make": "SCION",
+      "models": [
+        "TC",
+        "XA",
+        "XB",
+        "XD"
+      ]
+    },
+    {
+      "make": "SEAT",
+      "models": [
+        "SEAT Bocanegra",
+        "SEAT Bolero",
+        "SEAT Cupra GT",
+        "SEAT Fórmula",
+        "SEAT Tango",
+        "SEAT Tribu"
+      ]
+    },
+    {
+      "make": "Sevel",
+      "models": [
+        "Citroën C25"
+      ]
+    },
+    {
+      "make": "Škoda Auto",
+      "models": [
+        "Škoda 420",
+        "Škoda Felicia",
+        "Škoda Joyster",
+        "Škoda Octavia",
+        "Škoda Octavia (1959)",
+        "Škoda Octavia II",
+        "Skoda Yeti Roadster"
+      ]
+    },
+    {
+      "make": "SKYLINE",
+      "models": [
+        "NOMAD",
+        "WEEKENDER"
+      ]
+    },
+    {
+      "make": "SPARTAN",
+      "models": [
+        "MOTORHOME"
+      ]
+    },
+    {
+      "make": "SPRINTER",
+      "models": [
+        "2500",
+        "3500"
+      ]
+    },
+    {
+      "make": "Spyker Cars",
+      "models": [
+        "Spyker D8"
+      ]
+    },
+    {
+      "make": "STARCRAFT",
+      "models": [
+        "ANTIGUA TRAVEL TRAILERS",
+        "ARUBA",
+        "HOMESTEAD",
+        "STARCRAFT ST"
+      ]
+    },
+    {
+      "make": "Stellantis",
+      "models": [
+        "Chrysler 300",
+        "Chrysler 300M",
+        "Chrysler Akino",
+        "Chrysler Atlantic",
+        "Chrysler Firepower",
+        "Chrysler Turbine Car",
+        "Dodge Charger",
+        "Dodge Charger 1981",
+        "Dodge Charger Daytona",
+        "Dodge Charger LX",
+        "Dodge SRT-4",
+        "Dodge Stratus"
+      ]
+    },
+    {
+      "make": "STERLING",
+      "models": [
+        "ACTERRA",
+        "LT"
+      ]
+    },
+    {
+      "make": "STRATOS",
+      "models": [
+        "BOAT TRAILER"
+      ]
+    },
+    {
+      "make": "Studebaker",
+      "models": [
+        "Studebaker Lark"
+      ]
+    },
+    {
+      "make": "Subaru",
+      "models": [
+        "Subaru B11S",
+        "Subaru B9 Scrambler",
+        "Subaru BRAT",
+        "Subaru G4e",
+        "Subaru Impreza 22B STi-Version",
+        "Subaru R1e"
+      ]
+    },
+    {
+      "make": "SUBARU",
+      "models": [
+        "BAJA",
+        "FORESTER",
+        "IMPREZA",
+        "LEGACY",
+        "OUTBACK",
+        "TRIBECA",
+        "WRX"
+      ]
+    },
+    {
+      "make": "SUNDOWNER",
+      "models": [
+        "SUNLITE LQ"
+      ]
+    },
+    {
+      "make": "SUNNYBROOK",
+      "models": [
+        "298BH",
+        "FIFTH WHEEL TRAILER",
+        "TITAN",
+        "TRAVEL TRAILER"
+      ]
+    },
+    {
+      "make": "SUTPHEN",
+      "models": [
+        "CHASSIS"
+      ]
+    },
+    {
+      "make": "SUZUKI",
+      "models": [
+        "AERIO",
+        "AN400",
+        "AN650",
+        "BOULEVARD M109R",
+        "C50 (BOULEVARD)",
+        "C90T",
+        "DL1000",
+        "DL650",
+        "DR-Z400S",
+        "DR200SE",
+        "FORENZA",
+        "GRAND VITARA",
+        "GRAND VITARA XL-7",
+        "GS500F",
+        "GSX-R1000",
+        "GSX-R600",
+        "GSX-R750",
+        "GSX1300R",
+        "GZ250",
+        "KATANA",
+        "LS650P",
+        "RENO",
+        "SV1000S",
+        "SV650S",
+        "VERONA",
+        "VL1500T",
+        "VL800",
+        "VS800GL",
+        "VZR1800"
+      ]
+    },
+    {
+      "make": "Suzuki Motor",
+      "models": [
+        "Suzuki GSX-R/4",
+        "Suzuki Kei"
+      ]
+    },
+    {
+      "make": "Talbot-Lago",
+      "models": [
+        "Talbot-Lago T150 C 4,5 l"
+      ]
+    },
+    {
+      "make": "Tata",
+      "models": [
+        "Tata Sierra"
+      ]
+    },
+    {
+      "make": "Tatra",
+      "models": [
+        "Tatra Baghira"
+      ]
+    },
+    {
+      "make": "THOMAS BUILT BUSES",
+      "models": [
+        "C2",
+        "FS-65",
+        "SAF-T-LINER",
+        "SAF-T-LINER C2",
+        "SAF-T-LINER HDX"
+      ]
+    },
+    {
+      "make": "THOR CALIFORNIA",
+      "models": [
+        "JAZZ",
+        "TAHOE"
+      ]
+    },
+    {
+      "make": "THOR MOTOR COACH",
+      "models": [
+        "HURRICANE"
+      ]
+    },
+    {
+      "make": "TIFFIN",
+      "models": [
+        "ALLEGRO",
+        "ALLEGRO BAY",
+        "ALLEGRO BUS"
+      ]
+    },
+    {
+      "make": "TL",
+      "models": [
+        "CELEBRITY"
+      ]
+    },
+    {
+      "make": "Tokyu Kogyo Kurogane",
+      "models": [
+        "Kurogane Baby"
+      ]
+    },
+    {
+      "make": "Toyota",
+      "models": [
+        "Toyota Corolla Levin",
+        "Toyota FT-HS",
+        "Toyota Hybrid X",
+        "Toyota i-REAL",
+        "Toyota i-unit"
+      ]
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "4RUNNER",
+        "AVALON",
+        "CAMRY",
+        "COROLLA",
+        "FJ CRUISER",
+        "HIGHLANDER",
+        "HIGHLANDER HYBRID",
+        "LANDCRUISER",
+        "MATRIX",
+        "PRIUS",
+        "RAV4",
+        "SEQUOIA",
+        "SIENNA",
+        "SOLARA",
+        "TACOMA",
+        "TUNDRA",
+        "YARIS"
+      ]
+    },
+    {
+      "make": "TRAILSTAR",
+      "models": [
+        "P16",
+        "PT160",
+        "PT170"
+      ]
+    },
+    {
+      "make": "TRAVEL SUPREME",
+      "models": [
+        "D70",
+        "MOTORHOME"
+      ]
+    },
+    {
+      "make": "Triumph",
+      "models": [
+        "Triumph Herald",
+        "Triumph Italia"
+      ]
+    },
+    {
+      "make": "TRIUMPH",
+      "models": [
+        "BONNEVILLE",
+        "BONNEVILLE T100",
+        "DAYTONA 675",
+        "DAYTONA 955I",
+        "DAYTONA TRIPLE 675",
+        "ROCKET III",
+        "ROCKET III CLASSIC",
+        "SCRAMBLER",
+        "SPEED TRIPLE 1050CCM",
+        "SPRINT ST",
+        "SPRINT ST 1050",
+        "SPRINT ST 1050CCM",
+        "TIGER",
+        "TIGER 1050",
+        "TRIUMPH ROCKET III"
+      ]
+    },
+    {
+      "make": "Tucker",
+      "models": [
+        "Tucker ’48"
+      ]
+    },
+    {
+      "make": "TWIST N GO",
+      "models": [
+        "MILANO ML151"
+      ]
+    },
+    {
+      "make": "UD",
+      "models": [
+        "UD1800",
+        "UD2000",
+        "UD2600",
+        "UD3300"
+      ]
+    },
+    {
+      "make": "UNIMOG",
+      "models": [
+        "U500NA"
+      ]
+    },
+    {
+      "make": "UNIVERSAL",
+      "models": [
+        "ELITE II"
+      ]
+    },
+    {
+      "make": "URAL",
+      "models": [
+        "RETRO"
+      ]
+    },
+    {
+      "make": "VAN HOOL",
+      "models": [
+        "T2140"
+      ]
+    },
+    {
+      "make": "Vauxhall",
+      "models": [
+        "Vauxhall SRV"
+      ]
+    },
+    {
+      "make": "VICTORY",
+      "models": [
+        "CNSS",
+        "HAMMER",
+        "JACKPOT",
+        "KINGPIN",
+        "TOURING CRUISER",
+        "VEGAS",
+        "VEGAS EIGHT BALL"
+      ]
+    },
+    {
+      "make": "VIKING",
+      "models": [
+        "EPIC",
+        "LEGEND"
+      ]
+    },
+    {
+      "make": "VMI",
+      "models": [
+        "SUMMIT"
+      ]
+    },
+    {
+      "make": "Volkswagen",
+      "models": [
+        "Volkswagen LT I",
+        "Volkswagen LT II"
+      ]
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "GOLF",
+        "GOLF/GTI",
+        "JETTA",
+        "NEW BEETLE",
+        "PASSAT",
+        "PHAETON",
+        "RABBIT",
+        "TOUAREG"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": [
+        "780",
+        "C70",
+        "S40",
+        "S60",
+        "S80",
+        "V50",
+        "V70",
+        "VH",
+        "VN",
+        "VNL",
+        "VNM",
+        "VT",
+        "XC70",
+        "XC90"
+      ]
+    },
+    {
+      "make": "Volvo Cars",
+      "models": [
+        "Volvo 140 Series",
+        "Volvo 145",
+        "Volvo 244 DLS",
+        "Volvo ÖV 4",
+        "Volvo Philip",
+        "Volvo YCC"
+      ]
+    },
+    {
+      "make": "WESTERN",
+      "models": [
+        "ALPINE",
+        "ALPINE COACH",
+        "APEX"
+      ]
+    },
+    {
+      "make": "WESTERN STAR",
+      "models": [
+        "4900",
+        "4900EX",
+        "6900"
+      ]
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": [
+        "ADVENTURER",
+        "JOURNEY",
+        "OUTLOOK",
+        "SIGHTSEER",
+        "TOUR",
+        "VIEW",
+        "VOYAGE"
+      ]
+    },
+    {
+      "make": "WORKHORSE",
+      "models": [
+        "CLASS A",
+        "W18",
+        "W20",
+        "W21",
+        "W22",
+        "W24"
+      ]
+    },
+    {
+      "make": "YAMAHA",
+      "models": [
+        "1100 SILVERADO",
+        "CP250",
+        "FJR13",
+        "FJR1300",
+        "FJR1300A",
+        "FJR1300AE",
+        "FZ1",
+        "FZ6",
+        "MAJESTY",
+        "ROAD STAR",
+        "ROADLINER",
+        "STRATOLINER",
+        "SX230",
+        "V-STAR",
+        "XV1700",
+        "XV19",
+        "XV1900",
+        "XVS11",
+        "XVS1100",
+        "XVS1900",
+        "XVS65",
+        "XVZ13",
+        "YP400",
+        "YZF-R1",
+        "YZF-R6",
+        "YZFR1",
+        "YZFR6"
+      ]
+    },
+    {
+      "make": "Yulon Motor",
+      "models": [
+        "Yulon Arex"
+      ]
+    },
+    {
+      "make": "ZiL",
+      "models": [
+        "ZIL-111"
+      ]
+    }
+  ]
+}

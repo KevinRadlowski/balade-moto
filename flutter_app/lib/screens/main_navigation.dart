@@ -19,6 +19,20 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  Future<void> _refreshTokenSilently() async {
+    if (!mounted) return;
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      if (authService.isAuthenticated) {
+        await authService.refreshToken();
+      }
+    } catch (e) {
+      // Ignorer les erreurs silencieusement - le token sera rafraîchi lors de la prochaine requête
+      if (mounted) {
+        debugPrint('[MainNavigation] Erreur lors du rafraîchissement silencieux du token: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +99,8 @@ class _MainNavigationState extends State<MainNavigation> {
             currentIndex: safeIndex,
             onTap: (index) {
               navigationState.setIndex(index);
+              // Rafraîchir le token silencieusement lors du changement d'onglet
+              _refreshTokenSilently();
             },
             items: items,
           ),

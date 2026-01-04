@@ -3,6 +3,9 @@ const Ride = require('../models/Ride');
 const User = require('../models/User');
 const NotificationSent = require('../models/NotificationSent');
 const emailService = require('./email.service');
+const maintenanceReminderService = require('./maintenanceReminder.service');
+const checkInService = require('./checkIn.service');
+const reputationService = require('./reputation.service');
 
 // Vérifier et envoyer les notifications pour les balades dans 1 heure
 const checkAndSendNotifications = async () => {
@@ -79,18 +82,87 @@ const checkAndSendNotifications = async () => {
   }
 };
 
-// Démarrer le scheduler
+// Vérifier les rappels d'entretien échus
+const checkMaintenanceReminders = async () => {
+  try {
+    const processed = await maintenanceReminderService.checkDueReminders();
+    if (processed > 0) {
+      console.log(`✅ ${processed} rappels d'entretien traités`);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la vérification des rappels d\'entretien:', error);
+  }
+};
+
+// Vérifier l'inactivité des utilisateurs
+const checkUserInactivity = async () => {
+  try {
+    const alertsSent = await checkInService.checkInactivity();
+    if (alertsSent > 0) {
+      console.log(`✅ ${alertsSent} alertes d'inactivité envoyées`);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la vérification d\'inactivité:', error);
+  }
+};
+
+// Mettre à jour les scores de réputation
+const updateReputationScores = async () => {
+  try {
+    const users = await User.find({});
+    let updated = 0;
+
+    for (const user of users) {
+      try {
+        await reputationService.calculateReputationScore(user._id);
+        updated++;
+      } catch (error) {
+        console.error(`Erreur lors de la mise à jour de la réputation pour ${user._id}:`, error);
+      }
+    }
+
+    if (updated > 0) {
+      console.log(`✅ ${updated} scores de réputation mis à jour`);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des scores de réputation:', error);
+  }
+};
+
+// Démarrer tous les schedulers
 const startNotificationScheduler = () => {
-  // Exécuter toutes les minutes
+  // Notifications de balades (toutes les minutes)
   cron.schedule('* * * * *', () => {
     checkAndSendNotifications();
   });
 
-  console.log('Scheduler de notifications démarré (vérification toutes les minutes)');
+  // Rappels d'entretien (tous les jours à 9h)
+  cron.schedule('0 9 * * *', () => {
+    checkMaintenanceReminders();
+  });
+
+  // Vérification d'inactivité (toutes les 5 minutes)
+  cron.schedule('*/5 * * * *', () => {
+    checkUserInactivity();
+  });
+
+  // Mise à jour des scores de réputation (tous les jours à 2h)
+  cron.schedule('0 2 * * *', () => {
+    updateReputationScores();
+  });
+
+  console.log('✅ Schedulers démarrés:');
+  console.log('   - Notifications de balades: toutes les minutes');
+  console.log('   - Rappels d\'entretien: tous les jours à 9h');
+  console.log('   - Vérification d\'inactivité: toutes les 5 minutes');
+  console.log('   - Mise à jour réputation: tous les jours à 2h');
 };
 
 module.exports = {
   checkAndSendNotifications,
+  checkMaintenanceReminders,
+  checkUserInactivity,
+  updateReputationScores,
   startNotificationScheduler
 };
 

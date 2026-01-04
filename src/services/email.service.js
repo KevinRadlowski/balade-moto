@@ -235,11 +235,133 @@ const sendRideReminderEmail = async (email, ride, userName) => {
   }
 };
 
+// Envoyer un email de rappel d'entretien
+const sendMaintenanceReminderEmail = async (email, reminder, vehicle, user) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const userName = user.firstName 
+    ? `${user.firstName} ${user.lastName || ''}`.trim()
+    : user.email;
+
+  const vehicleName = vehicle.nickname || `${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Véhicule';
+
+  const mailOptions = {
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    to: email,
+    subject: `Ride Together - Rappel d'entretien: ${reminder.description || reminder.type}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Rappel d'entretien</h2>
+        <p>Bonjour ${userName},</p>
+        <p>Il est temps d'effectuer un entretien sur votre <strong>${vehicleName}</strong> :</p>
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #FF6F00; margin-top: 0;">${reminder.description || reminder.type}</h3>
+          ${reminder.nextDueKm ? `<p><strong>Échéance kilométrage :</strong> ${reminder.nextDueKm} km</p>` : ''}
+          ${reminder.nextDueDate ? `<p><strong>Échéance date :</strong> ${new Date(reminder.nextDueDate).toLocaleDateString('fr-FR')}</p>` : ''}
+        </div>
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          N'oubliez pas de mettre à jour votre garage après l'entretien ! 🔧
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de rappel d\'entretien:', error);
+    throw error;
+  }
+};
+
+// Envoyer une alerte d'urgence
+const sendEmergencyAlertEmail = async (email, user, reason) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const userName = user.firstName 
+    ? `${user.firstName} ${user.lastName || ''}`.trim()
+    : user.email;
+
+  const mailOptions = {
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    to: email,
+    subject: `Ride Together - ALERTE URGENCE: ${userName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #D32F2F;">🚨 ALERTE URGENCE</h2>
+        <p><strong>${userName}</strong> a déclenché une alerte d'urgence.</p>
+        <div style="background-color: #ffebee; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #D32F2F;">
+          <p><strong>Raison :</strong> ${reason || 'Non spécifiée'}</p>
+          <p><strong>Date :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+        </div>
+        <p style="color: #D32F2F; font-weight: bold;">
+          Veuillez contacter ${userName} immédiatement.
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'alerte d\'urgence:', error);
+    throw error;
+  }
+};
+
+// Envoyer une alerte d'inactivité
+const sendInactivityAlertEmail = async (email, user) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const userName = user.firstName 
+    ? `${user.firstName} ${user.lastName || ''}`.trim()
+    : user.email;
+
+  const mailOptions = {
+    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    to: email,
+    subject: `Ride Together - Alerte d'inactivité: ${userName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #F57C00;">⚠️ Alerte d'inactivité</h2>
+        <p>Nous n'avons pas reçu de signal de vie de <strong>${userName}</strong> depuis plus de 30 minutes.</p>
+        <div style="background-color: #fff3e0; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <p><strong>Dernier signal :</strong> ${user.checkInStatus?.lastHeartbeat ? new Date(user.checkInStatus.lastHeartbeat).toLocaleString('fr-FR') : 'Inconnu'}</p>
+          <p><strong>Date de l'alerte :</strong> ${new Date().toLocaleString('fr-FR')}</p>
+        </div>
+        <p>Veuillez vérifier que tout va bien.</p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'alerte d\'inactivité:', error);
+    throw error;
+  }
+};
+
 // Exporter les fonctions ET le transporter
 module.exports = {
   sendVerificationEmail,
   sendUnlockEmail,
   sendRideReminderEmail,
+  sendMaintenanceReminderEmail,
+  sendEmergencyAlertEmail,
+  sendInactivityAlertEmail,
   transporter: transporter || { verify: () => {} }
 };
 

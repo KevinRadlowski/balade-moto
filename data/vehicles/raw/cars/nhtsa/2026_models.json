@@ -1,0 +1,438 @@
+{
+  "year": 2026,
+  "makeBlocks": [
+    {
+      "make": "AIRSTREAM",
+      "models": []
+    },
+    {
+      "make": "AMERICAN COACH",
+      "models": []
+    },
+    {
+      "make": "APRILIA",
+      "models": []
+    },
+    {
+      "make": "AUDI",
+      "models": [
+        "A6 ALLROAD",
+        "Q6 E-TRON",
+        "S E-TRON GT"
+      ]
+    },
+    {
+      "make": "AUTOCAR",
+      "models": []
+    },
+    {
+      "make": "BENTLEY",
+      "models": []
+    },
+    {
+      "make": "BLUE BIRD",
+      "models": []
+    },
+    {
+      "make": "BMW",
+      "models": [
+        "IX XDRIVE45",
+        "X3",
+        "X6",
+        "X7"
+      ]
+    },
+    {
+      "make": "BRAUN",
+      "models": []
+    },
+    {
+      "make": "BRAUN AMBULANCES",
+      "models": []
+    },
+    {
+      "make": "BRENNER",
+      "models": []
+    },
+    {
+      "make": "CADILLAC",
+      "models": [
+        "CT5",
+        "LYRIQ",
+        "VISTIQ"
+      ]
+    },
+    {
+      "make": "CARRY-ON",
+      "models": []
+    },
+    {
+      "make": "CHEVROLET",
+      "models": [
+        "COLORADO",
+        "EQUINOX",
+        "SILVERADO 1500",
+        "SILVERADO EV",
+        "TAHOE",
+        "TRAVERSE",
+        "TRAX"
+      ]
+    },
+    {
+      "make": "COACHMEN",
+      "models": []
+    },
+    {
+      "make": "DUCATI",
+      "models": []
+    },
+    {
+      "make": "EAST TO WEST",
+      "models": []
+    },
+    {
+      "make": "ENDERA",
+      "models": []
+    },
+    {
+      "make": "ENTEGRA",
+      "models": []
+    },
+    {
+      "make": "FCCC",
+      "models": []
+    },
+    {
+      "make": "FLEETWOOD",
+      "models": []
+    },
+    {
+      "make": "FONTAINE",
+      "models": []
+    },
+    {
+      "make": "FORD",
+      "models": [
+        "F-650"
+      ]
+    },
+    {
+      "make": "FOREST RIVER",
+      "models": [
+        "FLAGSTAFF",
+        "SPIRIT"
+      ]
+    },
+    {
+      "make": "Forest River Bus",
+      "models": []
+    },
+    {
+      "make": "FORETRAVEL",
+      "models": []
+    },
+    {
+      "make": "FREIGHTLINER",
+      "models": [
+        "CASCADIA"
+      ]
+    },
+    {
+      "make": "GENESIS",
+      "models": [
+        "G80",
+        "GV70",
+        "GV80 Coupe"
+      ]
+    },
+    {
+      "make": "GMC",
+      "models": [
+        "SIERRA 1500",
+        "SIERRA EV",
+        "TERRAIN",
+        "YUKON XL"
+      ]
+    },
+    {
+      "make": "GRAND DESIGN",
+      "models": []
+    },
+    {
+      "make": "GREAT DANE",
+      "models": []
+    },
+    {
+      "make": "HEARTLAND",
+      "models": []
+    },
+    {
+      "make": "HOLIDAY RAMBLER",
+      "models": []
+    },
+    {
+      "make": "HONDA",
+      "models": [
+        "CIVIC",
+        "CR-V",
+        "HR-V",
+        "ODYSSEY",
+        "PASSPORT"
+      ]
+    },
+    {
+      "make": "HYUNDAI",
+      "models": [
+        "IONIQ 5",
+        "IONIQ 9",
+        "KONA",
+        "PALISADE",
+        "SANTA FE"
+      ]
+    },
+    {
+      "make": "HYUNDAI TRANSLEAD",
+      "models": []
+    },
+    {
+      "make": "IC BUS",
+      "models": []
+    },
+    {
+      "make": "INFINITI",
+      "models": [
+        "QX60",
+        "QX80"
+      ]
+    },
+    {
+      "make": "INTERNATIONAL",
+      "models": []
+    },
+    {
+      "make": "ISUZU",
+      "models": []
+    },
+    {
+      "make": "JAYCO",
+      "models": []
+    },
+    {
+      "make": "JAYCO FIFTH WHEEL",
+      "models": []
+    },
+    {
+      "make": "JEEP",
+      "models": [
+        "WRANGLER"
+      ]
+    },
+    {
+      "make": "KAWASAKI",
+      "models": [
+        "NINJA ZX-6R"
+      ]
+    },
+    {
+      "make": "KENWORTH",
+      "models": []
+    },
+    {
+      "make": "KEYSTONE",
+      "models": []
+    },
+    {
+      "make": "KIA",
+      "models": [
+        "CARNIVAL",
+        "CARNIVAL HYBRID",
+        "K5",
+        "SPORTAGE"
+      ]
+    },
+    {
+      "make": "KME",
+      "models": []
+    },
+    {
+      "make": "LAND ROVER",
+      "models": [
+        "RANGE ROVER VELAR"
+      ]
+    },
+    {
+      "make": "LEXUS",
+      "models": []
+    },
+    {
+      "make": "LINCOLN",
+      "models": [
+        "NAUTILUS"
+      ]
+    },
+    {
+      "make": "LUCID",
+      "models": []
+    },
+    {
+      "make": "MACK",
+      "models": []
+    },
+    {
+      "make": "MALIBU BOATS",
+      "models": []
+    },
+    {
+      "make": "MCI",
+      "models": []
+    },
+    {
+      "make": "MERCEDES-BENZ",
+      "models": [
+        "AMG GLS63",
+        "AMG GT63",
+        "GLE 450 4MATIC"
+      ]
+    },
+    {
+      "make": "MICRO BIRD",
+      "models": []
+    },
+    {
+      "make": "MINI",
+      "models": [
+        "COUNTRYMAN S ALL4"
+      ]
+    },
+    {
+      "make": "NEW FLYER",
+      "models": []
+    },
+    {
+      "make": "NISSAN",
+      "models": [
+        "FRONTIER",
+        "MURANO",
+        "ROGUE"
+      ]
+    },
+    {
+      "make": "NUCAMP",
+      "models": []
+    },
+    {
+      "make": "PETERBILT",
+      "models": [
+        "579"
+      ]
+    },
+    {
+      "make": "PORSCHE",
+      "models": [
+        "PANAMERA"
+      ]
+    },
+    {
+      "make": "PREVOST",
+      "models": []
+    },
+    {
+      "make": "RAM",
+      "models": [
+        "1500",
+        "2500",
+        "3500"
+      ]
+    },
+    {
+      "make": "SMEAL",
+      "models": []
+    },
+    {
+      "make": "SPARTAN FIRE",
+      "models": []
+    },
+    {
+      "make": "STORYTELLER OVERLAND",
+      "models": []
+    },
+    {
+      "make": "SUZUKI",
+      "models": []
+    },
+    {
+      "make": "TEMSA",
+      "models": []
+    },
+    {
+      "make": "TESLA",
+      "models": [
+        "CYBERTRUCK",
+        "MODEL S",
+        "MODEL Y",
+        "ROBOTAXI (MODEL Y)"
+      ]
+    },
+    {
+      "make": "THOMAS BUILT BUSES",
+      "models": []
+    },
+    {
+      "make": "THOR MOTOR COACH",
+      "models": [
+        "FOUR WINDS"
+      ]
+    },
+    {
+      "make": "TIFFIN",
+      "models": []
+    },
+    {
+      "make": "TOYOTA",
+      "models": [
+        "CAMRY HYBRID",
+        "COROLLA",
+        "COROLLA CROSS",
+        "GRAND HIGHLANDER",
+        "PRIUS",
+        "PRIUS PLUG-IN HYBRID",
+        "SEQUOIA HYBRID",
+        "SIENNA HYBRID",
+        "TUNDRA"
+      ]
+    },
+    {
+      "make": "TRIPLE E",
+      "models": []
+    },
+    {
+      "make": "VOLKSWAGEN",
+      "models": [
+        "TIGUAN"
+      ]
+    },
+    {
+      "make": "VOLVO",
+      "models": [
+        "VNL (4)",
+        "XC60PHEV"
+      ]
+    },
+    {
+      "make": "WABASH",
+      "models": []
+    },
+    {
+      "make": "WABASH NATIONAL",
+      "models": []
+    },
+    {
+      "make": "WESTERN STAR",
+      "models": []
+    },
+    {
+      "make": "WINNEBAGO",
+      "models": []
+    }
+  ]
+}

@@ -227,6 +227,9 @@ exports.verifyEmail = async (req, res) => {
       console.log('Email déjà vérifié');
       // Si c'est GET, retourner une page HTML
       if (req.method === 'GET') {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const loginUrl = `${frontendUrl}/login`;
+        
         return res.status(200).send(`
           <!DOCTYPE html>
           <html>
@@ -265,14 +268,36 @@ exports.verifyEmail = async (req, res) => {
                 color: #666;
                 line-height: 1.6;
               }
+              .countdown {
+                color: #999;
+                font-size: 14px;
+                margin-top: 20px;
+              }
             </style>
           </head>
           <body>
             <div class="container">
               <div class="info">ℹ</div>
               <h1>Email déjà vérifié</h1>
-              <p>Votre compte a déjà été activé. Vous pouvez vous connecter à l'application.</p>
+              <p>Votre compte a déjà été activé. Vous allez être redirigé vers la page de connexion dans <span id="countdown">5</span> secondes...</p>
+              <p class="countdown">Redirection en cours...</p>
             </div>
+            <script>
+              let seconds = 5;
+              const countdownElement = document.getElementById('countdown');
+              const loginUrl = '${loginUrl}';
+              
+              const countdown = setInterval(function() {
+                seconds--;
+                if (countdownElement) {
+                  countdownElement.textContent = seconds;
+                }
+                if (seconds <= 0) {
+                  clearInterval(countdown);
+                  window.location.href = loginUrl;
+                }
+              }, 1000);
+            </script>
           </body>
           </html>
         `);
@@ -294,6 +319,9 @@ exports.verifyEmail = async (req, res) => {
 
     // Si c'est une requête GET (depuis le lien email), retourner une page HTML
     if (req.method === 'GET') {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const loginUrl = `${frontendUrl}/login`;
+      
       return res.status(200).send(`
         <!DOCTYPE html>
         <html>
@@ -332,14 +360,36 @@ exports.verifyEmail = async (req, res) => {
               color: #666;
               line-height: 1.6;
             }
+            .countdown {
+              color: #999;
+              font-size: 14px;
+              margin-top: 20px;
+            }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="success">✓</div>
             <h1>Email vérifié avec succès !</h1>
-            <p>Votre compte a été activé. Vous pouvez maintenant vous connecter à l'application.</p>
+            <p>Votre compte a été activé. Vous allez être redirigé vers la page de connexion dans <span id="countdown">5</span> secondes...</p>
+            <p class="countdown">Redirection en cours...</p>
           </div>
+          <script>
+            let seconds = 5;
+            const countdownElement = document.getElementById('countdown');
+            const loginUrl = '${loginUrl}';
+            
+            const countdown = setInterval(function() {
+              seconds--;
+              if (countdownElement) {
+                countdownElement.textContent = seconds;
+              }
+              if (seconds <= 0) {
+                clearInterval(countdown);
+                window.location.href = loginUrl;
+              }
+            }, 1000);
+          </script>
         </body>
         </html>
       `);

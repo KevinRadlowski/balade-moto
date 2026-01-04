@@ -5,6 +5,9 @@ const icsService = require('../services/ics.service');
 const https = require('https');
 const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError } = require('../utils/errors');
 const { routeCache, geocodeCache, reverseGeocodeCache } = require('../utils/cache');
+const compatibilityService = require('../services/compatibility.service');
+const achievementService = require('../services/achievement.service');
+const vehicleStatsService = require('../services/vehicleStats.service');
 
 exports.createRide = async (req, res, next) => {
   try {
@@ -82,7 +85,10 @@ exports.createRide = async (req, res, next) => {
       organisateur: req.user._id,
       visibilite: visibilite || 'publique',
       participants: [req.user._id], // L'organisateur est automatiquement participant
-      localisation: rideLocalisation
+      localisation: rideLocalisation,
+      status: 'scheduled', // Statut par défaut
+      ridingStyle: req.body.ridingStyle || null, // Style de conduite (optionnel)
+      rideEvents: [] // Initialiser les événements
     };
 
     if (hasWaypoints) {
@@ -1161,15 +1167,40 @@ exports.joinRide = async (req, res) => {
       });
     }
 
+    // Calculer la compatibilité avec l'organisateur (optionnel, pour warning)
+    let compatibility = null;
+    try {
+      compatibility = await compatibilityService.checkCompatibility(
+        req.user._id.toString(),
+        ride.organisateur.toString(),
+        ride._id.toString()
+      );
+    } catch (error) {
+      // Ne pas bloquer si le check de compatibilité échoue
+      console.warn('Erreur lors du calcul de compatibilité:', error);
+    }
+
     // Ajouter l'utilisateur aux participants
     ride.participants.push(req.user._id);
+    
+    // Ajouter un événement participant_joined
+    ride.rideEvents.push({
+      type: 'participant_joined',
+      timestamp: new Date(),
+      userId: req.user._id,
+      details: {}
+    });
+    
     await ride.save();
     await ride.populate('participants', 'firstName lastName pseudo');
 
     res.status(200).json({
       success: true,
       message: 'Vous avez rejoint la balade avec succès',
-      data: { ride }
+      data: { 
+        ride,
+        compatibility: compatibility || undefined // Inclure seulement si calculé
+      }
     });
   } catch (error) {
     if (error.name === 'CastError') {
@@ -1224,6 +1255,15 @@ exports.leaveRide = async (req, res, next) => {
     ride.participants = ride.participants.filter(
       p => p.toString() !== req.user._id.toString()
     );
+    
+    // Ajouter un événement participant_left
+    ride.rideEvents.push({
+      type: 'participant_left',
+      timestamp: new Date(),
+      userId: req.user._id,
+      details: {}
+    });
+    
     await ride.save();
     await ride.populate('participants', 'firstName lastName pseudo');
 
@@ -1371,6 +1411,95 @@ exports.rateRide = async (req, res, next) => {
       message: 'Erreur lors de l\'ajout de la note',
       error: error.message
     });
+  }
+};
+
+// Marquer une balade comme terminée et mettre à jour les stats
+exports.completeRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { distanceKm, cost } = req.body;
+    const userId = req.user._id;
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      throw new NotFoundError('Balade non trouvée');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== userId.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut marquer la balade comme terminée');
+    }
+
+    // Vérifier que la balade est en cours
+    if (ride.status !== 'in_progress') {
+      throw new BadRequestError('La balade doit être en cours pour être terminée');
+    }
+
+    // Mettre à jour le statut
+    ride.status = 'completed';
+
+    // Ajouter un événement
+    ride.rideEvents.push({
+      type: 'completed',
+      timestamp: new Date(),
+      userId: userId,
+      details: {}
+    });
+
+    await ride.save();
+
+    // Mettre à jour les stats véhicule pour tous les participants
+    const Vehicle = require('../models/Vehicle');
+    for (const participantId of ride.participants) {
+      try {
+        // Trouver le véhicule actif du participant
+        const vehicle = await Vehicle.findOne({
+          ownerUserId: participantId,
+          active: true,
+          type: ride.typeVehicule
+        });
+
+        if (vehicle) {
+          // Mettre à jour les stats
+          await vehicleStatsService.updateStatsOnRideCompletion(vehicle._id, {
+            distanceKm: distanceKm || 0,
+            cost: cost || 0
+          });
+
+          // Vérifier et débloquer les badges
+          await achievementService.checkAndAwardAchievements(
+            participantId.toString(),
+            'ride_completed',
+            { rideId: ride._id }
+          );
+        }
+      } catch (error) {
+        console.error(`Erreur lors de la mise à jour des stats pour ${participantId}:`, error);
+      }
+    }
+
+    // Mettre à jour la réputation de tous les participants
+    const reputationService = require('../services/reputation.service');
+    for (const participantId of ride.participants) {
+      try {
+        await reputationService.calculateReputationScore(participantId.toString());
+      } catch (error) {
+        console.error(`Erreur lors de la mise à jour de la réputation pour ${participantId}:`, error);
+      }
+    }
+
+    await ride.populate('organisateur', 'firstName lastName pseudo');
+    await ride.populate('participants', 'firstName lastName pseudo');
+
+    res.json({
+      success: true,
+      message: 'Balade marquée comme terminée',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
   }
 };
 

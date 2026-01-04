@@ -145,6 +145,16 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon Garage'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
       ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(

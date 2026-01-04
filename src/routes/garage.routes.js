@@ -30,12 +30,24 @@ const {
 // Toutes les routes nécessitent une authentification JWT
 router.use(authMiddleware);
 
+// Contrôleurs additionnels (définis avant leur utilisation)
+const vehicleStatsController = require('../controllers/vehicleStats.controller');
+const {
+  validateVehicleId: validateVehicleIdStats,
+  validateUpdateStats
+} = require('../validators/vehicleStats.validator');
+
 // Routes pour les véhicules
 router.post('/vehicles', validateCreateVehicle, garageController.createVehicle);
 router.get('/vehicles', validateGetVehicles, garageController.getVehicles);
 router.get('/vehicles/:id', validateVehicleId, garageController.getVehicle);
 router.patch('/vehicles/:id', validateVehicleId, validateUpdateVehicle, garageController.updateVehicle);
 router.delete('/vehicles/:id', validateVehicleId, garageController.deleteVehicle);
+// Route pour les statistiques d'un véhicule (format alternatif compatible avec le frontend)
+router.get('/vehicles/:id/stats', validateVehicleId, (req, res, next) => {
+  req.params.vehicleId = req.params.id;
+  return vehicleStatsController.getVehicleStats(req, res, next);
+});
 // Upload d'une seule photo (compatibilité)
 router.post('/vehicles/:id/photo', validateVehicleId, uploadVehiclePhoto, garageController.uploadVehiclePhoto);
 
@@ -73,6 +85,26 @@ router.delete('/vehicles/:id/documents/:documentId', validateVehicleId, validate
 
 // Routes pour la recherche vPIC (catalogue véhicules)
 // Routes vPIC supprimées - utilisation de /api/catalog/carquery à la place
+
+// Routes pour les statistiques véhicule
+router.get('/vehicle-stats/:vehicleId', validateVehicleIdStats, vehicleStatsController.getVehicleStats);
+router.post('/vehicle-stats/:vehicleId/update', validateVehicleIdStats, validateUpdateStats, vehicleStatsController.updateVehicleStats);
+
+// Routes pour les rappels d'entretien
+const maintenanceReminderController = require('../controllers/maintenanceReminder.controller');
+const {
+  validateCreateReminder,
+  validateUpdateReminder,
+  validateSnooze,
+  validateMarkAsDone
+} = require('../validators/maintenanceReminder.validator');
+router.get('/maintenance-reminders', maintenanceReminderController.getReminders);
+router.post('/maintenance-reminders', validateCreateReminder, maintenanceReminderController.createReminder);
+router.get('/maintenance-reminders/:id', maintenanceReminderController.getReminderById);
+router.patch('/maintenance-reminders/:id', validateUpdateReminder, maintenanceReminderController.updateReminder);
+router.delete('/maintenance-reminders/:id', maintenanceReminderController.deleteReminder);
+router.post('/maintenance-reminders/:id/snooze', validateSnooze, maintenanceReminderController.snoozeReminder);
+router.post('/maintenance-reminders/:id/done', validateMarkAsDone, maintenanceReminderController.markAsDone);
 
 module.exports = router;
 

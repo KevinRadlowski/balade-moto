@@ -8,6 +8,9 @@ import '../../utils/background_helper.dart';
 import '../../config/api_config.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../widgets/profile/reputation_card.dart';
+import '../../widgets/profile/emergency_contact_card.dart';
+import '../../providers/emergency_contact_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,6 +34,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _loadProfile();
     _checkBiometricStatus();
+    // Charger le contact d'urgence au premier build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = Provider.of<EmergencyContactProvider>(context, listen: false);
+        provider.loadContact();
+      }
+    });
   }
 
   Future<void> _checkBiometricStatus() async {
@@ -574,6 +584,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
+                          // Section réputation et badges
+                          if (_user != null)
+                            ReputationCard(userId: _user!.id),
+                          const SizedBox(height: 16),
+                          // Section contact d'urgence
+                          const EmergencyContactCard(),
+                          const SizedBox(height: 16),
                           // Section paramètres de sécurité
                           if (_biometricAvailable) ...[
                             Container(
@@ -594,7 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   SwitchListTile(
-                                    title: Text('$_biometricTypeName'),
+                                    title: Text(_biometricTypeName),
                                     subtitle: Text('Utiliser $_biometricTypeName pour se connecter'),
                                     value: _biometricEnabled,
                                     onChanged: (value) async {

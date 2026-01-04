@@ -83,15 +83,16 @@ class AverageRatingDisplay extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     StarRating(
                       rating: filledStars + (hasHalfStar ? 1 : 0),
                       size: 18,
                       color: Colors.amber,
                     ),
-                    if (showDetails && totalRatings > 0) ...[
-                      const SizedBox(width: 8),
+                    if (showDetails && totalRatings > 0)
                       Text(
                         '($totalRatings ${totalRatings > 1 ? 'notes' : 'note'})',
                         style: TextStyle(
@@ -99,7 +100,6 @@ class AverageRatingDisplay extends StatelessWidget {
                           color: Colors.grey.shade600,
                         ),
                       ),
-                    ],
                   ],
                 ),
               ],
@@ -108,7 +108,7 @@ class AverageRatingDisplay extends StatelessWidget {
           // Barre de progression visuelle
           if (showDetails) ...[
             const SizedBox(width: 16),
-            Container(
+            SizedBox(
               width: 60,
               height: 60,
               child: Stack(

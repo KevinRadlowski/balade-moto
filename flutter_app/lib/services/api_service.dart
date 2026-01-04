@@ -705,6 +705,7 @@ class ApiService {
     required String lieuArrivee,
     double rayon = 0,
     String visibilite = 'publique',
+    String? ridingStyle,
     Map<String, dynamic>? localisation,
     List<Map<String, dynamic>>? waypoints, // Nouveau système de waypoints
   }) async {
@@ -722,6 +723,7 @@ class ApiService {
           'lieuArrivee': lieuArrivee,
           'rayon': rayon,
           'visibilite': visibilite,
+          if (ridingStyle != null) 'ridingStyle': ridingStyle,
           if (localisation != null) 'localisation': localisation,
           if (waypoints != null && waypoints.isNotEmpty) 'waypoints': waypoints,
         }),

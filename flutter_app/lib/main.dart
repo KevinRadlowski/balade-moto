@@ -13,6 +13,13 @@ import 'screens/main_navigation.dart';
 import 'screens/navigation/step_by_step_navigation_screen.dart';
 import 'services/navigation/navigation_service.dart';
 import 'services/navigation_state.dart';
+import 'providers/feedback_provider.dart';
+import 'providers/live_ride_provider.dart';
+import 'providers/compatibility_provider.dart';
+import 'providers/vehicle_stats_provider.dart';
+import 'providers/maintenance_reminder_provider.dart';
+import 'providers/emergency_contact_provider.dart';
+import 'providers/check_in_provider.dart';
 
 /// Widget qui limite la largeur maximale de l'application à 400px sur desktop
 /// et centre le contenu horizontalement
@@ -97,6 +104,27 @@ class _MyAppState extends State<MyApp> {
         ),
         ChangeNotifierProvider(
           create: (_) => NavigationState(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => FeedbackProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LiveRideProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CompatibilityProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VehicleStatsProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MaintenanceReminderProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => EmergencyContactProvider(apiService: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CheckInProvider(apiService: apiService),
         ),
       ],
       child: Consumer<AuthService>(
