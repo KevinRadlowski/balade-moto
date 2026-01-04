@@ -37,6 +37,10 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
   
+  // Préférences d'itinéraire
+  bool _avoidTolls = false;
+  bool _avoidHighways = false;
+  
   // Carte et waypoints
   GoogleMapController? _mapController;
   List<Waypoint> _waypoints = [];
@@ -373,6 +377,8 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         origin: origin,
         destination: destination,
         waypoints: waypointsParam,
+        avoidTolls: _avoidTolls,
+        avoidHighways: _avoidHighways,
       );
       
       debugPrint('🔵 Réponse du backend: ${response['success']}');
@@ -1185,6 +1191,45 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Options d'itinéraire
+                    Card(
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            title: const Text('Éviter les péages'),
+                            subtitle: const Text('Calculer un itinéraire sans péages'),
+                            value: _avoidTolls,
+                            onChanged: (value) {
+                              setState(() {
+                                _avoidTolls = value;
+                              });
+                              // Recalculer la route si on a déjà des waypoints
+                              if (_waypoints.length >= 2) {
+                                _updateMarkersAndPolylines();
+                              }
+                            },
+                            secondary: const Icon(Icons.attach_money),
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            title: const Text('Éviter les autoroutes'),
+                            subtitle: const Text('Calculer un itinéraire sans autoroutes'),
+                            value: _avoidHighways,
+                            onChanged: (value) {
+                              setState(() {
+                                _avoidHighways = value;
+                              });
+                              // Recalculer la route si on a déjà des waypoints
+                              if (_waypoints.length >= 2) {
+                                _updateMarkersAndPolylines();
+                              }
+                            },
+                            secondary: const Icon(Icons.route),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
