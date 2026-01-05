@@ -288,3 +288,4 @@ Exemples :
 - [ ] Mode offline avec synchronisation différée
 
 
+

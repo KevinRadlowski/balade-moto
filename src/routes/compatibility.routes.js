@@ -10,3 +10,4 @@ router.get('/check', authMiddleware, validateCheckCompatibility, compatibilityCo
 module.exports = router;
 
 
+

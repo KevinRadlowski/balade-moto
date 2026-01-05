@@ -78,3 +78,4 @@ vehicleStatsSchema.index({ rideCount: -1 });
 module.exports = mongoose.model('VehicleStats', vehicleStatsSchema);
 
 
+

@@ -94,3 +94,4 @@ maintenanceReminderSchema.index({ nextDueDate: 1 }); // Pour les jobs cron
 module.exports = mongoose.model('MaintenanceReminder', maintenanceReminderSchema);
 
 
+
