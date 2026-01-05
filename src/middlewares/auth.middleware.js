@@ -28,6 +28,15 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    // Vérifier si l'utilisateur est banni
+    if (user.banned) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.',
+        banned: true
+      });
+    }
+
     // Vérifier que le rôle dans le token correspond au rôle en base (sécurité)
     if (decoded.role && decoded.role !== user.role) {
       // Le rôle a changé, mettre à jour le token serait mieux mais pour l'instant on accepte

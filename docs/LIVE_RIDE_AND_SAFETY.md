@@ -287,3 +287,4 @@ Exemples :
 - [ ] Intégration avec services d'urgence (112)
 - [ ] Mode offline avec synchronisation différée
 
+

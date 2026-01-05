@@ -354,6 +354,85 @@ const sendInactivityAlertEmail = async (email, user) => {
   }
 };
 
+// Envoyer un email de contact au support
+const sendContactEmail = async ({ fromEmail, subject, message }) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const supportEmail = 'kevin.radlowski@gmail.com';
+  
+  const mailOptions = {
+    from: emailConfig.from ? `"Ride Together Contact" <${emailConfig.from}>` : `"Ride Together Contact" <${emailConfig.user}>`,
+    to: supportEmail,
+    replyTo: fromEmail,
+    subject: `[Contact Support] ${subject}`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Contact Support - ${subject}</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f7fa;">
+          <tr>
+            <td align="center" style="padding: 40px 20px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
+                <!-- Header -->
+                <tr>
+                  <td bgcolor="#3F51B5" style="background-color: #3F51B5; padding: 40px; text-align: center;">
+                    <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Nouveau message de contact</h1>
+                  </td>
+                </tr>
+                <!-- Contenu principal -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <h2 style="color: #212121; font-size: 20px; font-weight: 600; margin: 0 0 20px 0;">Informations du contact</h2>
+                    <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 10px 0;">
+                      <strong>Email:</strong> ${fromEmail}
+                    </p>
+                    <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                      <strong>Sujet:</strong> ${subject}
+                    </p>
+                    
+                    <h2 style="color: #212121; font-size: 20px; font-weight: 600; margin: 30px 0 20px 0;">Message</h2>
+                    <div style="background-color: #f5f7fa; padding: 20px; border-radius: 8px; border-left: 4px solid #3F51B5;">
+                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message.replace(/\n/g, '<br>')}</p>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="background-color: #10181F; padding: 30px 40px; text-align: center;">
+                    <p style="color: #ffffff; font-size: 14px; margin: 0; opacity: 0.9;">
+                      <strong>Ride Together</strong> - Support
+                    </p>
+                    <p style="color: #ffffff; font-size: 12px; margin: 10px 0 0 0; opacity: 0.7;">
+                      Vous pouvez répondre directement à cet email pour contacter l'utilisateur.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de contact:', error);
+    throw error;
+  }
+};
+
 // Exporter les fonctions ET le transporter
 module.exports = {
   sendVerificationEmail,
@@ -362,6 +441,7 @@ module.exports = {
   sendMaintenanceReminderEmail,
   sendEmergencyAlertEmail,
   sendInactivityAlertEmail,
+  sendContactEmail,
   transporter: transporter || { verify: () => {} }
 };
 

@@ -192,7 +192,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(
                 labelText: 'Type de document *',
                 prefixIcon: Icon(Icons.description),

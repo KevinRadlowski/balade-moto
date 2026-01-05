@@ -27,7 +27,7 @@ class RideFiltersChips extends StatefulWidget {
   final Function(String, String) onSortChanged;
   final VoidCallback onClearFilters;
 
-  const RideFiltersChips({
+  const RideFiltersChips({super.key, 
     required this.typeVehicule,
     this.visibilite,
     this.dateDebut,

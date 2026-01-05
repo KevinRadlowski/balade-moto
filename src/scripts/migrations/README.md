@@ -52,3 +52,4 @@ node src/scripts/migrations/006_backfill_maintenance_reminders.js
 - Les migrations sont idempotentes (peuvent être exécutées plusieurs fois sans problème)
 - Les migrations vérifient l'existence des données avant de créer de nouveaux documents
 
+

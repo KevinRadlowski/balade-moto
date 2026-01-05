@@ -13,6 +13,7 @@ import '../../exceptions/resend_email_exception.dart';
 import '../../widgets/auth/social_auth_buttons.dart';
 import '../../widgets/legal/terms_consent_banner.dart';
 import 'register_screen.dart';
+import 'contact_support_screen.dart';
 import '../main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _requires2FA = false;
   String? _errorMessage;
   bool _showResendButton = false;
+  bool _showContactSupportButton = false;
   bool _isResending = false;
   int _cooldownSeconds = 0;
   Timer? _cooldownTimer;
@@ -404,11 +406,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? e.message 
                   : 'Votre email n\'a pas été vérifié. Veuillez vérifier votre boîte mail et cliquer sur le lien de validation, ou renvoyer un nouvel email de vérification.';
               _showResendButton = true;
+              _showContactSupportButton = false;
+              break;
+              
+            case AuthException.accountBanned:
+              _errorMessage = (e.message.isNotEmpty) 
+                  ? e.message 
+                  : 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.';
+              _showResendButton = false;
+              _showContactSupportButton = true;
               break;
               
             case AuthException.twoFactorRequired:
               _requires2FA = true;
               _errorMessage = null; // Pas d'erreur pour 2FA, juste besoin du code
+              _showResendButton = false;
+              _showContactSupportButton = false;
               break;
               
             case AuthException.invalidCredentials:
@@ -416,6 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? e.message 
                   : 'Email ou mot de passe incorrect';
               _showResendButton = false;
+              _showContactSupportButton = false;
               break;
               
             case AuthException.accountLocked:
@@ -423,6 +437,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? e.message 
                   : 'Votre compte a été verrouillé. Veuillez contacter le support.';
               _showResendButton = false;
+              _showContactSupportButton = false;
               break;
               
             default:
@@ -430,6 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? e.message 
                   : 'Une erreur est survenue lors de la connexion.';
               _showResendButton = false;
+              _showContactSupportButton = false;
           }
         });
         return;
@@ -941,6 +957,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ? 'Renvoyer dans ${_cooldownSeconds}s'
                                           : 'Renvoyer l\'email de vérification',
                                       style: const TextStyle(fontSize: 14),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Theme.of(context).colorScheme.primary,
+                                      side: BorderSide(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        width: 1.5,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (_showContactSupportButton) ...[
+                                  const SizedBox(height: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => ContactSupportScreen(
+                                            userEmail: _emailController.text.trim(),
+                                            subject: 'Compte Banni',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.support_agent_outlined, size: 18),
+                                    label: const Text(
+                                      'Contacter le support',
+                                      style: TextStyle(fontSize: 14),
                                     ),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: Theme.of(context).colorScheme.primary,

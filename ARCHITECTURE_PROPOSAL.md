@@ -580,3 +580,4 @@ lib/
 - Patterns: Controllers → Services → Models (backend), Repository → Provider → Screen (Flutter)
 - Design: Material 3, Google Fonts Inter, couleurs définies dans `AppTheme`
 
+

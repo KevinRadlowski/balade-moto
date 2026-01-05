@@ -51,6 +51,7 @@ const reputationRoutes = require('./routes/reputation.routes');
 const compatibilityRoutes = require('./routes/compatibility.routes');
 const liveRideRoutes = require('./routes/liveRide.routes');
 const checkInRoutes = require('./routes/checkIn.routes');
+const contactRoutes = require('./routes/contact.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -174,6 +175,7 @@ app.use('/api/reputation', reputationRoutes);
 app.use('/api/compatibility', compatibilityRoutes);
 app.use('/api/live-rides', liveRideRoutes);
 app.use('/api/check-in', checkInRoutes);
+app.use('/contact', contactRoutes);
 
 // Route de test
 app.get('/', (req, res) => {

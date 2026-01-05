@@ -27,3 +27,4 @@ router.post('/:id/heartbeat', authMiddleware, validateRideId, validateHeartbeat,
 
 module.exports = router;
 
+

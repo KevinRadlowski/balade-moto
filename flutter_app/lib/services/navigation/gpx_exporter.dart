@@ -49,7 +49,7 @@ class GPXExporter {
       case 'arrivee':
         return 'Arrivée';
       case 'checkpoint':
-        return 'Point ${index}';
+        return 'Point $index';
       default:
         return 'Point ${index + 1}';
     }

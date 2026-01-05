@@ -200,9 +200,7 @@ exports.updateUser = async (req, res, next) => {
     }
 
     if (banned !== undefined) {
-      // Si le modèle User n'a pas de champ banned, on peut utiliser un champ personnalisé
-      // ou simplement ignorer cette option
-      // user.banned = banned;
+      user.banned = banned === true;
     }
 
     await user.save();

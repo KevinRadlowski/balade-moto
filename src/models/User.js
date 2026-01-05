@@ -124,6 +124,12 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Bannissement utilisateur
+  banned: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   // Authentification à deux facteurs
   twoFactorEnabled: {
     type: Boolean,

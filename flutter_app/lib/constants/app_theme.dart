@@ -45,7 +45,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
         surface: surfaceColor,
@@ -54,7 +54,6 @@ class AppTheme {
         onSecondary: lightText,
         onSurface: darkText,
         onError: lightText,
-        background: lightBackground,
       ),
       scaffoldBackgroundColor: lightBackground,
       appBarTheme: AppBarTheme(
@@ -191,7 +190,7 @@ class AppTheme {
         ),
         color: surfaceColor,
       ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: secondaryColor,
         foregroundColor: lightText,
         elevation: 4,
@@ -227,16 +226,15 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
-        surface: const Color(0xFF1E1E1E),
+        surface: Color(0xFF1E1E1E),
         error: errorColor,
         onPrimary: lightText,
         onSecondary: lightText,
         onSurface: lightText,
         onError: lightText,
-        background: darkBackground,
       ),
       scaffoldBackgroundColor: darkBackground,
       appBarTheme: AppBarTheme(

@@ -10,3 +10,4 @@ router.get('/status', authMiddleware, checkInController.getCheckInStatus);
 
 module.exports = router;
 
+

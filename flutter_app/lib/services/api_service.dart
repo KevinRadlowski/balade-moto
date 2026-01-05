@@ -205,8 +205,22 @@ class ApiService {
         
         final message = responseData['message'] ?? 'Erreur de connexion';
         
-        // Gérer spécifiquement les erreurs 403 (email non vérifié)
+        // Gérer spécifiquement les erreurs 403 (email non vérifié ou compte banni)
         if (response.statusCode == 403) {
+          // Vérifier si c'est un compte banni
+          final isBanned = responseData['banned'] == true || 
+                          message.toLowerCase().contains('banni') ||
+                          message.toLowerCase().contains('banned');
+          
+          if (isBanned) {
+            throw AuthException(
+              code: AuthException.accountBanned,
+              message: message,
+              statusCode: 403,
+            );
+          }
+          
+          // Sinon, c'est probablement un email non vérifié
           throw AuthException(
             code: AuthException.emailNotVerified,
             message: message,
@@ -332,8 +346,28 @@ class ApiService {
           final errorData = jsonDecode(response.body);
           final errorMessage = errorData['message'] ?? response.body;
           debugPrint('🔍 [DEBUG API] Erreur parsée: $errorMessage');
+          
+          // Vérifier si c'est un compte banni
+          if (response.statusCode == 403) {
+            final isBanned = errorData['banned'] == true || 
+                            errorMessage.toLowerCase().contains('banni') ||
+                            errorMessage.toLowerCase().contains('banned');
+            
+            if (isBanned) {
+              throw AuthException(
+                code: AuthException.accountBanned,
+                message: errorMessage,
+                statusCode: 403,
+              );
+            }
+          }
+          
           throw Exception(errorMessage);
         } catch (e) {
+          // Si c'est déjà une AuthException, la relancer
+          if (e is AuthException) {
+            rethrow;
+          }
           // Si le parsing échoue, utiliser directement response.body
           if (e is FormatException) {
             debugPrint('🔍 [DEBUG API] Erreur de parsing JSON, utilisation de response.body brut');
@@ -406,6 +440,35 @@ class ApiService {
       );
     } else {
       throw Exception(responseData['message'] ?? 'Erreur lors du renvoi de l\'email');
+    }
+  }
+
+  /// Envoyer un email de contact au support
+  Future<Map<String, dynamic>> sendContactEmail({
+    required String email,
+    required String subject,
+    required String message,
+  }) async {
+    // Endpoint public, ne pas utiliser le token
+    // Utiliser apiBaseUrl au lieu de baseUrl car /contact n'est pas sous /api
+    final apiBaseUrl = baseUrl.replaceAll('/api', '');
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/contact'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+        'subject': subject,
+        'message': message,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'envoi du message');
     }
   }
 

@@ -521,8 +521,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                         radius: 20,
                                       )
                                     : const CircleAvatar(
-                                        child: Icon(Icons.person),
                                         radius: 20,
+                                        child: Icon(Icons.person),
                                       ),
                                 title: Text(pseudo),
                                 subtitle: Text(email),

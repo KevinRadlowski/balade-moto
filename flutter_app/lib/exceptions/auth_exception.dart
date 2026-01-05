@@ -18,11 +18,13 @@ class AuthException implements Exception {
   static const String emailNotVerified = 'EMAIL_NOT_VERIFIED';
   static const String invalidCredentials = 'INVALID_CREDENTIALS';
   static const String accountLocked = 'ACCOUNT_LOCKED';
+  static const String accountBanned = 'ACCOUNT_BANNED';
   static const String twoFactorRequired = 'TWO_FACTOR_REQUIRED';
   static const String tokenExpired = 'TOKEN_EXPIRED';
   static const String unauthorized = 'UNAUTHORIZED';
   static const String unknown = 'UNKNOWN';
 }
+
 
 
 

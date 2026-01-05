@@ -179,7 +179,7 @@ class TermsScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.info_outline_rounded,
                     color: AppTheme.primaryColor,
                     size: 24,
@@ -228,7 +228,7 @@ class TermsScreen extends StatelessWidget {
                   width: 4,
                   height: 24,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
                         AppTheme.primaryColor,
                         AppTheme.secondaryColor,

@@ -227,7 +227,7 @@ class PrivacyScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.shield_outlined,
                     color: AppTheme.secondaryColor,
                     size: 24,
@@ -276,7 +276,7 @@ class PrivacyScreen extends StatelessWidget {
                   width: 4,
                   height: 24,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
                         AppTheme.secondaryColor,
                         AppTheme.primaryColor,

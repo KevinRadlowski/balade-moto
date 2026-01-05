@@ -20,6 +20,11 @@ const socketAuth = async (socket, next) => {
       return next(new Error('Utilisateur non trouvé'));
     }
 
+    // Vérifier si l'utilisateur est banni
+    if (user.banned) {
+      return next(new Error('Votre compte a été banni'));
+    }
+
     // Ajouter l'utilisateur au socket
     socket.user = user;
     socket.userId = user._id.toString();

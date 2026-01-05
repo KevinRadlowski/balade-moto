@@ -215,7 +215,7 @@ class _TermsConsentBannerState extends State<TermsConsentBanner> {
                           ),
                           TextSpan(
                             text: 'Conditions Générales d\'Utilisation',
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppTheme.primaryColor,
                               fontWeight: FontWeight.w700,
                               decoration: TextDecoration.underline,
@@ -227,7 +227,7 @@ class _TermsConsentBannerState extends State<TermsConsentBanner> {
                           const TextSpan(text: ' et notre '),
                           TextSpan(
                             text: 'Politique de Confidentialité',
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppTheme.primaryColor,
                               fontWeight: FontWeight.w700,
                               decoration: TextDecoration.underline,
@@ -254,12 +254,12 @@ class _TermsConsentBannerState extends State<TermsConsentBanner> {
                               _showPrivacy();
                             });
                           },
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.description_outlined,
                             size: 18,
                             color: AppTheme.primaryColor,
                           ),
-                          label: Text(
+                          label: const Text(
                             'Lire',
                             style: TextStyle(
                               color: AppTheme.primaryColor,
@@ -310,15 +310,15 @@ class _TermsConsentBannerState extends State<TermsConsentBanner> {
                               ),
                               elevation: 0,
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.check_circle_outline,
                                   color: Colors.white,
                                   size: 20,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text(
                                   'Accepter',
                                   style: TextStyle(

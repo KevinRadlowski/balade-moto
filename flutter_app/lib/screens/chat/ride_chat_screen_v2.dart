@@ -65,7 +65,7 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
   bool _isSilentMode = false;
   bool _isFavorite = false;
   bool _isSelectingMessages = false;
-  Set<String> _selectedMessageIds = {};
+  final Set<String> _selectedMessageIds = {};
   
   String? _rideOrganizerId;
 
@@ -113,7 +113,7 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
       }
 
       _chatService.setToken(token);
-      _currentUser = await authService.user;
+      _currentUser = authService.user;
 
       await _loadRideInfo();
 

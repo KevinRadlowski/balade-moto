@@ -70,7 +70,7 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
   bool _isSilentMode = false;
   bool _isFavorite = false;
   bool _isSelectingMessages = false;
-  Set<String> _selectedMessageIds = {};
+  final Set<String> _selectedMessageIds = {};
   
   // Informations du groupe
   String? _groupCreatorId;
@@ -118,7 +118,7 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
       }
 
       _chatService.setToken(token);
-      _currentUser = await authService.user;
+      _currentUser = authService.user;
 
       // Charger les informations du groupe pour vérifier si l'utilisateur est le créateur
       await _loadGroupInfo();
@@ -1808,7 +1808,7 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
       final token = await authService.storage.read(key: 'token');
       apiService.setToken(token);
       
-      final currentUser = await authService.user;
+      final currentUser = authService.user;
       await apiService.removeMemberFromGroup(widget.groupId, currentUser!.id);
       
       if (mounted) {

@@ -475,6 +475,15 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Vérifier si l'utilisateur est banni
+    if (user.banned) {
+      return res.status(403).json({
+        success: false,
+        message: 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.',
+        banned: true
+      });
+    }
+
     // Vérifier si l'email est vérifié
     if (!user.emailVerified) {
       return res.status(403).json({

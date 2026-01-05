@@ -188,7 +188,7 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
     if (_vehicleCurrentKm != null && kmValue > _vehicleCurrentKm!) {
       SnackBarHelper.showError(
         context,
-        'Le kilométrage ne peut pas être supérieur au kilométrage actuel du véhicule (${_vehicleCurrentKm} km)',
+        'Le kilométrage ne peut pas être supérieur au kilométrage actuel du véhicule ($_vehicleCurrentKm km)',
       );
       return;
     }
@@ -288,7 +288,7 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(
                 labelText: 'Catégorie *',
                 prefixIcon: Icon(Icons.category),
@@ -330,11 +330,11 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
               decoration: InputDecoration(
                 labelText: 'Kilométrage au moment du service *',
                 hintText: _vehicleCurrentKm != null 
-                    ? 'Ex: 5500 (max: ${_vehicleCurrentKm} km)'
+                    ? 'Ex: 5500 (max: $_vehicleCurrentKm km)'
                     : 'Ex: 5500',
                 prefixIcon: const Icon(Icons.speed),
                 helperText: _vehicleCurrentKm != null
-                    ? 'Kilométrage actuel du véhicule: ${_vehicleCurrentKm} km'
+                    ? 'Kilométrage actuel du véhicule: $_vehicleCurrentKm km'
                     : null,
               ),
               keyboardType: TextInputType.number,
@@ -348,7 +348,7 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
                 }
                 // Vérifier que le kilométrage ne dépasse pas le kilométrage actuel du véhicule
                 if (_vehicleCurrentKm != null && km > _vehicleCurrentKm!) {
-                  return 'Le kilométrage ne peut pas être supérieur au kilométrage actuel du véhicule (${_vehicleCurrentKm} km)';
+                  return 'Le kilométrage ne peut pas être supérieur au kilométrage actuel du véhicule ($_vehicleCurrentKm km)';
                 }
                 return null;
               },
@@ -361,7 +361,7 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
                 hintText: 'Ex: 50',
                 prefixIcon: Icon(Icons.euro),
               ),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -385,11 +385,11 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
             const SizedBox(height: 16),
             // Sélecteur de document (facture, etc.)
             InputDecorator(
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Document (optionnel)',
                 hintText: 'Facture, photo, PDF...',
-                prefixIcon: const Icon(Icons.attach_file),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.attach_file),
+                border: OutlineInputBorder(),
               ),
               child: InkWell(
                 onTap: _pickFile,
@@ -409,7 +409,7 @@ class _AddMaintenanceLogScreenState extends State<AddMaintenanceLogScreen> {
                         onPressed: _clearSelectedFile,
                       )
                     else if (_existingDocumentUrl != null && _selectedFile == null)
-                      Icon(
+                      const Icon(
                         Icons.check_circle_outline,
                         color: Colors.green,
                       )

@@ -227,6 +227,15 @@ exports.googleAuth = async (req, res, next) => {
     });
     
     if (user) {
+      // Vérifier si l'utilisateur est banni
+      if (user.banned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.',
+          banned: true
+        });
+      }
+      
       // Mettre à jour les informations si nécessaire
       if (!user.authProvider) {
         user.authProvider = 'google';
@@ -283,7 +292,8 @@ exports.googleAuth = async (req, res, next) => {
           lastName: user.lastName,
           avatarUrl: user.avatarUrl,
           role: user.role,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          banned: user.banned || false
         }
       }
     });
@@ -330,6 +340,15 @@ exports.appleAuth = async (req, res, next) => {
     });
     
     if (user) {
+      // Vérifier si l'utilisateur est banni
+      if (user.banned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.',
+          banned: true
+        });
+      }
+      
       // Mettre à jour les informations si nécessaire
       if (!user.authProvider) {
         user.authProvider = 'apple';
@@ -382,7 +401,8 @@ exports.appleAuth = async (req, res, next) => {
           lastName: user.lastName,
           avatarUrl: user.avatarUrl,
           role: user.role,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          banned: user.banned || false
         }
       }
     });
@@ -429,6 +449,15 @@ exports.facebookAuth = async (req, res, next) => {
     });
     
     if (user) {
+      // Vérifier si l'utilisateur est banni
+      if (user.banned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Votre compte a été banni. Veuillez contacter le support pour plus d\'informations.',
+          banned: true
+        });
+      }
+      
       // Mettre à jour les informations si nécessaire
       if (!user.authProvider) {
         user.authProvider = 'facebook';
@@ -485,7 +514,8 @@ exports.facebookAuth = async (req, res, next) => {
           lastName: user.lastName,
           avatarUrl: user.avatarUrl,
           role: user.role,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          banned: user.banned || false
         }
       }
     });
