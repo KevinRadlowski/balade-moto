@@ -25,7 +25,7 @@ class Reputation {
       userId: json['userId'] is Map
           ? (json['userId']['_id'] ?? json['userId']['id'] ?? '').toString()
           : json['userId']?.toString() ?? '',
-      score: json['score'] ?? 50,
+      score: json['score'] ?? 0,
       rideCount: json['rideCount'] ?? 0,
       punctualityScore: json['punctualityScore'] ?? 50,
       cancellationRate: (json['cancellationRate'] ?? 0).toDouble(),

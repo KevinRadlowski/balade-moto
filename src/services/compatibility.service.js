@@ -67,9 +67,9 @@ const checkCompatibility = async (userId1, userId2, rideId = null) => {
     // 4. Ont déjà fait des balades ensemble
     const ridesTogether = await Ride.countDocuments({
       $or: [
-        { organisateur: userId1, participants: userId2 },
-        { organisateur: userId2, participants: userId1 },
-        { organisateur: { $in: [userId1, userId2] }, participants: { $in: [userId1, userId2] } }
+        { organisateur: userId1, 'participants.userId': userId2 },
+        { organisateur: userId2, 'participants.userId': userId1 },
+        { organisateur: { $in: [userId1, userId2] }, 'participants.userId': { $in: [userId1, userId2] } }
       ],
       date: { $lt: new Date() }
     });

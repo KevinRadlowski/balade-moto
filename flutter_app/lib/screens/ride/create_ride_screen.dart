@@ -5,6 +5,7 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../home/home_screen.dart';
 
 class CreateRideScreen extends StatefulWidget {
   const CreateRideScreen({super.key});
@@ -210,6 +211,8 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        // Rafraîchir l'écran d'accueil avant de revenir
+        HomeScreen.refresh(context);
         Navigator.of(context).pop(true); // Retour avec succès
       }
     } catch (e) {

@@ -73,7 +73,28 @@ class Ride {
       visibilite: json['visibilite'] ?? 'publique',
       participants: json['participants'] != null
           ? (json['participants'] as List)
-              .map((p) => UserParticipant.fromJson(p))
+              .map((p) {
+                // Gérer la nouvelle structure avec userId comme sous-document
+                if (p is Map && p.containsKey('userId')) {
+                  // Si userId est un objet (populé), utiliser ses données
+                  final userId = p['userId'];
+                  if (userId is Map) {
+                    return UserParticipant.fromJson({
+                      'id': userId['_id'] ?? userId['id'] ?? '',
+                      'firstName': userId['firstName'],
+                      'lastName': userId['lastName'],
+                      'pseudo': userId['pseudo'],
+                    });
+                  } else {
+                    // Si userId est juste un ID, utiliser l'ID
+                    return UserParticipant.fromJson({
+                      'id': userId.toString(),
+                    });
+                  }
+                }
+                // Ancienne structure (participant direct)
+                return UserParticipant.fromJson(p);
+              })
               .toList()
           : [],
       likes: json['likes'] != null 

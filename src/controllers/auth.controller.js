@@ -43,6 +43,10 @@ exports.register = async (req, res, next) => {
       throw new ConflictError('Ce pseudo est déjà utilisé');
     }
 
+    // Vérifier si on doit ignorer la vérification email en développement
+    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' ||
+                                 (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+
     // Générer un token de vérification email
     const emailVerificationToken = generateEmailVerificationToken();
     const emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 heures
@@ -53,7 +57,7 @@ exports.register = async (req, res, next) => {
       password,
       pseudo: pseudo.trim(),
       role: 'MEMBER', // Par défaut MEMBER
-      emailVerified: false,
+      emailVerified: skipEmailVerification, // Auto-vérifier en mode développement
       emailVerificationToken,
       emailVerificationExpires,
       emailVerificationLastSent: new Date()
@@ -484,13 +488,24 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Vérifier si l'email est vérifié
-    if (!user.emailVerified) {
+    // Vérifier si on doit ignorer la vérification email en développement
+    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' ||
+                                 (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+
+    // Vérifier si l'email est vérifié (sauf en mode développement avec vérification désactivée)
+    if (!user.emailVerified && !skipEmailVerification) {
       return res.status(403).json({
         success: false,
         message: 'Veuillez vérifier votre email avant de vous connecter. Si vous n\'avez pas reçu l\'email, vous pouvez le renvoyer.',
         emailVerified: false
       });
+    }
+
+    // En mode développement, auto-vérifier l'email si ce n'est pas déjà fait
+    if (!user.emailVerified && skipEmailVerification) {
+      user.emailVerified = true;
+      await user.save();
+      console.log(`✅ Email auto-vérifié pour ${user.email} (mode développement)`);
     }
 
     // Vérifier le code 2FA si activé

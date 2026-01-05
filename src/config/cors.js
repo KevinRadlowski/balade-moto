@@ -61,34 +61,48 @@ function getAllowedOrigins() {
  */
 function buildCorsOptions() {
   const allowedOrigins = getAllowedOrigins();
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
   
   return {
     origin: (origin, callback) => {
       // Autoriser les requêtes sans origin (mobile apps natifs, Postman, curl, etc.)
       if (!origin) {
+        if (isDevelopment) {
+          console.log('✅ CORS: Requête sans origin autorisée (app native/Postman)');
+        }
         return callback(null, true);
       }
       
-      // En développement, autoriser tous les ports localhost
+      // En développement, autoriser tous les ports localhost et 127.0.0.1
       if (isDevelopment) {
-        if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        if (origin.startsWith('http://localhost:') || 
+            origin.startsWith('http://127.0.0.1:') ||
+            origin.startsWith('http://192.168.1.70:')) {
+          console.log(`✅ CORS: Origin autorisée en développement: ${origin}`);
           return callback(null, true);
         }
       }
       
       // Si allowedOrigins est null, autoriser toutes les origines (FRONTEND_URL="*")
       if (allowedOrigins === null) {
+        if (isDevelopment) {
+          console.log(`✅ CORS: Origin autorisée (FRONTEND_URL="*"): ${origin}`);
+        }
         return callback(null, true);
       }
       
       // Vérifier si l'origine est dans la whitelist
       if (allowedOrigins.includes(origin)) {
+        if (isDevelopment) {
+          console.log(`✅ CORS: Origin dans whitelist: ${origin}`);
+        }
         callback(null, true);
       } else {
         // Log uniquement en développement ou si DEBUG_CORS est défini
         if (isDevelopment || process.env.DEBUG_CORS === 'true') {
           console.warn(`🚫 CORS blocked for origin: ${origin}`);
+          console.warn(`   NODE_ENV: ${process.env.NODE_ENV || 'non défini'}`);
+          console.warn(`   isDevelopment: ${isDevelopment}`);
           console.warn(`   Allowed origins:`, allowedOrigins);
         }
         callback(new Error(`CORS: Origin ${origin} is not allowed`));

@@ -193,7 +193,7 @@ const sendHeartbeat = async (rideId, userId, location) => {
     }
 
     // Vérifier que l'utilisateur est participant
-    const isParticipant = ride.participants.some(p => p.toString() === userId.toString());
+    const isParticipant = ride.participants.some(p => p.userId && p.userId.toString() === userId.toString());
     if (!isParticipant && ride.organisateur.toString() !== userId.toString()) {
       throw new Error('Vous n\'êtes pas participant à cette balade');
     }
@@ -221,7 +221,7 @@ const getLiveRideStatus = async (rideId) => {
   try {
     const ride = await Ride.findById(rideId)
       .populate('organisateur', 'firstName lastName pseudo avatarUrl')
-      .populate('participants', 'firstName lastName pseudo avatarUrl');
+      .populate('participants.userId', 'firstName lastName pseudo avatarUrl');
 
     if (!ride) {
       throw new Error('Balade non trouvée');

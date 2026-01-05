@@ -16,14 +16,18 @@ const calculateReputationScore = async (userId) => {
       reputation = new Reputation({ userId });
     }
 
-    // Compter les balades
-    const rideCount = await Ride.countDocuments({
-      $or: [
-        { organisateur: userId },
-        { participants: userId }
-      ],
+    // Compter les balades (organisateur ou participant)
+    const ridesAsOrganizer = await Ride.countDocuments({
+      organisateur: userId,
       date: { $lt: new Date() }
     });
+    
+    const ridesAsParticipant = await Ride.countDocuments({
+      'participants.userId': userId,
+      date: { $lt: new Date() }
+    });
+    
+    const rideCount = ridesAsOrganizer + ridesAsParticipant;
 
     // Calculer la note moyenne
     const ratings = await Rating.find({ utilisateur: userId });
@@ -41,7 +45,7 @@ const calculateReputationScore = async (userId) => {
     const totalFeedbacks = feedbacks.length;
 
     // Calculer le score (formule simple)
-    let score = 50; // Score de base
+    let score = 0; // Score de base (démarre à 0 pour les nouveaux utilisateurs)
 
     // Bonus pour nombre de balades (max +30)
     if (rideCount > 0) {
@@ -68,11 +72,14 @@ const calculateReputationScore = async (userId) => {
     // Clamp entre 0 et 100
     score = Math.min(Math.max(score, 0), 100);
 
+    // Calculer le score de ponctualité
+    const punctualityScore = await calculatePunctualityScore(userId);
+
     // Mettre à jour la réputation
     reputation.score = score;
     reputation.rideCount = rideCount;
     reputation.feedbackCount = totalFeedbacks;
-    reputation.punctualityScore = 50; // TODO: Calculer basé sur historique
+    reputation.punctualityScore = punctualityScore;
     reputation.cancellationRate = 0; // TODO: Calculer basé sur historique
 
     await reputation.save();
@@ -81,6 +88,73 @@ const calculateReputationScore = async (userId) => {
   } catch (error) {
     console.error('Erreur lors du calcul du score de réputation:', error);
     throw error;
+  }
+};
+
+/**
+ * Calcule le score de ponctualité d'un utilisateur
+ * @param {String} userId - ID de l'utilisateur
+ * @returns {Promise<Number>} Score de ponctualité (0-100)
+ */
+const calculatePunctualityScore = async (userId) => {
+  try {
+    // Récupérer toutes les balades où l'utilisateur était participant
+    // Inclure les balades passées ET les balades en cours (même si la date est dans le futur)
+    // car la ponctualité peut être validée pendant que la balade est en cours
+    const pastRides = await Ride.find({
+      'participants.userId': userId,
+      $or: [
+        { date: { $lt: new Date() } }, // Balades passées
+        { status: { $in: ['in_progress', 'completed'] } } // Balades en cours ou terminées
+      ]
+    }).select('date heure participants status');
+
+    if (pastRides.length === 0) {
+      // Pas de balades passées, retourner 50 (neutre)
+      return 50;
+    }
+
+    let onTimeCount = 0;
+    let lateCount = 0;
+    let totalValidated = 0;
+
+    for (const ride of pastRides) {
+      // Trouver le participant correspondant
+      const participant = ride.participants.find(
+        p => p.userId && p.userId.toString() === userId.toString()
+      );
+
+      if (!participant) continue;
+
+      // Si l'arrivée n'a pas été enregistrée, ignorer cette balade
+      if (!participant.arrivalTime) continue;
+
+      // Ne compter que les balades où la ponctualité a été explicitement validée par l'organisateur
+      // (isOnTime doit être true ou false, pas null/undefined)
+      if (participant.isOnTime === true) {
+        onTimeCount++;
+        totalValidated++;
+      } else if (participant.isOnTime === false) {
+        lateCount++;
+        totalValidated++;
+      }
+      // Si isOnTime est null/undefined, ignorer cette balade (pas encore validée)
+    }
+
+    // Si aucune balade n'a été validée, retourner 50 (neutre)
+    if (totalValidated === 0) {
+      return 50;
+    }
+
+    // Calculer le pourcentage de ponctualité
+    const punctualityPercentage = (onTimeCount / totalValidated) * 100;
+    
+    // Clamp entre 0 et 100
+    return Math.min(Math.max(Math.round(punctualityPercentage), 0), 100);
+  } catch (error) {
+    console.error('Erreur lors du calcul du score de ponctualité:', error);
+    // En cas d'erreur, retourner 50 (neutre)
+    return 50;
   }
 };
 
@@ -135,6 +209,7 @@ const getReputation = async (userId) => {
 
 module.exports = {
   calculateReputationScore,
+  calculatePunctualityScore,
   updateReputationOnFeedback,
   getReputationLevel,
   getReputation

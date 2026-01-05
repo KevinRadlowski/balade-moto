@@ -61,6 +61,8 @@ router.delete('/:id/join', authMiddleware, validateRideId, rideController.leaveR
 router.post('/:id/like', authMiddleware, validateRideId, rideController.likeRide);
 router.post('/:id/note', authMiddleware, validateRideId, rideController.rateRide);
 router.post('/:id/complete', authMiddleware, validateRideId, rideController.completeRide);
+router.post('/:id/arrival', authMiddleware, validateRideId, rideController.markArrival);
+router.post('/:id/participants/:userId/validate-punctuality', authMiddleware, validateRideId, rideController.validatePunctuality);
 
 // Routes live ride (doivent être avant /:id pour éviter les conflits)
 router.post('/:id/start', authMiddleware, validateLiveRideId, liveRideController.startLiveRide);

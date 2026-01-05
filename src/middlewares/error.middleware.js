@@ -68,6 +68,18 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Erreurs CORS
+  if (err.message && err.message.startsWith('CORS:')) {
+    return res.status(403).json({
+      success: false,
+      message: err.message,
+      ...(process.env.NODE_ENV === 'development' && {
+        error: 'Origine non autorisée par la politique CORS',
+        origin: req.headers.origin
+      })
+    });
+  }
+
   // Erreur par défaut
   const statusCode = err.statusCode || 500;
   const message = process.env.NODE_ENV === 'development' 

@@ -816,6 +816,218 @@ class _LiveRideScreenState extends State<LiveRideScreen> {
     }
   }
 
+  Future<void> _showParticipants() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final apiService = authService.apiService;
+    final isOrganizer = authService.user?.id == widget.ride.organisateur.id;
+
+    // Récupérer les données à jour de la balade
+    Ride? ride;
+    try {
+      ride = await apiService.getRideById(widget.rideId);
+    } catch (e) {
+      // Si erreur, utiliser les données actuelles
+      ride = widget.ride;
+    }
+
+    if (!mounted) return;
+    final currentRide = ride;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people, size: 28, color: AppTheme.primaryColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Participants',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${currentRide.participants.length} participant${currentRide.participants.length > 1 ? 's' : ''}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Liste des participants
+              Expanded(
+                child: currentRide.participants.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucun participant',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: currentRide.participants.length,
+                        itemBuilder: (context, index) {
+                          final participant = currentRide.participants[index];
+                          final displayName = participant.pseudo ?? 'Utilisateur';
+                          final isOrganizerParticipant = currentRide.organisateur.id == participant.id;
+                          
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: isOrganizerParticipant 
+                                  ? AppTheme.primaryColor.withOpacity(0.2)
+                                  : AppTheme.primaryColor.withOpacity(0.1),
+                              child: Icon(
+                                Icons.person,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  displayName,
+                                  style: TextStyle(
+                                    fontWeight: isOrganizerParticipant ? FontWeight.w600 : FontWeight.w500,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                if (isOrganizerParticipant) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Organisateur',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            // Pour l'organisateur, afficher les actions de validation de ponctualité
+                            trailing: isOrganizer && !isOrganizerParticipant
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+                                        onPressed: () => _validatePunctuality(currentRide.id, participant.id, true),
+                                        tooltip: 'Marquer comme à l\'heure',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                                        onPressed: () => _validatePunctuality(currentRide.id, participant.id, false),
+                                        tooltip: 'Marquer comme en retard',
+                                      ),
+                                    ],
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _validatePunctuality(String rideId, String userId, bool isOnTime) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = authService.apiService;
+      await apiService.validatePunctuality(rideId, userId, isOnTime);
+      
+      if (mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          isOnTime 
+            ? 'Le participant a été marqué comme étant à l\'heure'
+            : 'Le participant a été marqué comme étant en retard',
+        );
+        
+        // Rafraîchir la liste des participants
+        Navigator.pop(context);
+        _showParticipants();
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Erreur lors de la validation: ${e.toString()}',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final liveRideProvider = Provider.of<LiveRideProvider>(context);
@@ -931,10 +1143,19 @@ class _LiveRideScreenState extends State<LiveRideScreen> {
                           ),
                     ),
                     const SizedBox(height: 8),
+                    Text(
+                      'Participants: ${widget.ride.participants.length}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     if (state != null) ...[
+                      // Afficher le nombre de participants actifs (ceux qui ont envoyé leur position)
+                      // Si aucun participant n'a envoyé de position mais qu'il y a des participants,
+                      // considérer qu'ils sont tous actifs (ils sont dans la balade en cours)
                       Text(
-                        'Participants actifs: ${state.participantPositions.length}',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        'Participants actifs: ${state.participantPositions.length > 0 ? state.participantPositions.length : widget.ride.participants.length}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
                       ),
                       if (state.lastEvent != null) ...[
                         const SizedBox(height: 4),
@@ -945,7 +1166,27 @@ class _LiveRideScreenState extends State<LiveRideScreen> {
                               ),
                         ),
                       ],
+                    ] else ...[
+                      // Si pas d'état, afficher le nombre total de participants comme actifs
+                      Text(
+                        'Participants actifs: ${widget.ride.participants.length}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                      ),
                     ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _showParticipants,
+                        icon: const Icon(Icons.people_outline, size: 18),
+                        label: Text('Voir les participants (${widget.ride.participants.length})'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

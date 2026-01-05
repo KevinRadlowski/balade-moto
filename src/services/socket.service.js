@@ -64,7 +64,7 @@ const initializeSocket = (server) => {
 
         // Vérifier que l'utilisateur est participant ou organisateur
         const isParticipant = ride.participants.some(
-          p => p.toString() === socket.userId
+          p => p.userId && p.userId.toString() === socket.userId
         );
         const isOrganizer = ride.organisateur.toString() === socket.userId;
 
@@ -231,7 +231,7 @@ const initializeSocket = (server) => {
 
         // Vérifier que l'utilisateur est participant ou organisateur
         const isParticipant = ride.participants.some(
-          p => p.toString() === socket.userId
+          p => p.userId && p.userId.toString() === socket.userId
         );
         const isOrganizer = ride.organisateur.toString() === socket.userId;
 

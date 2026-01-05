@@ -24,6 +24,14 @@ class HomeScreen extends StatefulWidget {
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
+  
+  // Méthode statique pour rafraîchir l'écran depuis l'extérieur
+  static void refresh(BuildContext? context) {
+    if (context != null) {
+      final state = context.findAncestorStateOfType<_HomeScreenState>();
+      state?.refresh();
+    }
+  }
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -64,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Méthode publique pour rafraîchir les données
+  Future<void> refresh() async {
+    await _loadData();
   }
 
   Future<void> _loadData() async {

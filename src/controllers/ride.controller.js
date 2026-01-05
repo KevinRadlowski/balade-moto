@@ -84,7 +84,7 @@ exports.createRide = async (req, res, next) => {
       rayon: rayon || 0,
       organisateur: req.user._id,
       visibilite: visibilite || 'publique',
-      participants: [req.user._id], // L'organisateur est automatiquement participant
+      participants: [{ userId: req.user._id }], // L'organisateur est automatiquement participant
       localisation: rideLocalisation,
       status: 'scheduled', // Statut par défaut
       ridingStyle: req.body.ridingStyle || null, // Style de conduite (optionnel)
@@ -107,7 +107,7 @@ exports.createRide = async (req, res, next) => {
 
     await ride.save();
     await ride.populate('organisateur', 'firstName lastName pseudo email');
-    await ride.populate('participants', 'firstName lastName pseudo');
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
 
     res.status(201).json({
       success: true,
@@ -156,20 +156,31 @@ exports.getRides = async (req, res) => {
           localisation: {
             $exists: true,
             $ne: null
-          },
-          $or: [
-            { visibilite: 'publique' },
-            { organisateur: req.user._id },
-            { participants: req.user._id }
-          ]
+          }
         };
+
+        if (participant) {
+          // Si on filtre par participant, on veut les balades où l'utilisateur est participant OU organisateur
+          // Peu importe la visibilité (car s'il est participant, il a le droit de voir)
+          filter.$or = [
+            { 'participants.userId': participant },
+            { organisateur: participant }
+          ];
+        } else {
+          // Sinon, appliquer le filtre de visibilité normal
+          if (visibilite && ['privee', 'publique'].includes(visibilite)) {
+            filter.visibilite = visibilite;
+          } else {
+            filter.$or = [
+              { visibilite: 'publique' },
+              { organisateur: req.user._id },
+              { 'participants.userId': req.user._id }
+            ];
+          }
+        }
 
         if (typeVehicule && ['moto', 'voiture'].includes(typeVehicule)) {
           filter.typeVehicule = typeVehicule;
-        }
-
-        if (visibilite && ['privee', 'publique'].includes(visibilite)) {
-          filter.visibilite = visibilite;
         }
 
         if (dateDebut || dateFin) {
@@ -187,10 +198,6 @@ exports.getRides = async (req, res) => {
 
         if (organisateur) {
           filter.organisateur = organisateur;
-        }
-
-        if (participant) {
-          filter.participants = participant;
         }
 
         if (search) {
@@ -299,15 +306,25 @@ exports.getRides = async (req, res) => {
       filter.typeVehicule = typeVehicule;
     }
 
-    if (visibilite && ['privee', 'publique'].includes(visibilite)) {
-      filter.visibilite = visibilite;
-    } else {
-      // Montrer les publiques et les privées où l'utilisateur est participant/organisateur
+    if (participant) {
+      // Si on filtre par participant, on veut les balades où l'utilisateur est participant OU organisateur
+      // Peu importe la visibilité (car s'il est participant, il a le droit de voir)
       filter.$or = [
-        { visibilite: 'publique' },
-        { organisateur: req.user._id },
-        { participants: req.user._id }
+        { 'participants.userId': participant },
+        { organisateur: participant }
       ];
+    } else {
+      // Sinon, appliquer le filtre de visibilité normal
+      if (visibilite && ['privee', 'publique'].includes(visibilite)) {
+        filter.visibilite = visibilite;
+      } else {
+        // Montrer les publiques et les privées où l'utilisateur est participant/organisateur
+        filter.$or = [
+          { visibilite: 'publique' },
+          { organisateur: req.user._id },
+          { 'participants.userId': req.user._id }
+        ];
+      }
     }
 
     if (dateDebut || dateFin) {
@@ -327,10 +344,6 @@ exports.getRides = async (req, res) => {
       filter.organisateur = organisateur;
     }
 
-    if (participant) {
-      filter.participants = participant;
-    }
-
     if (search) {
       filter.$or = [
         ...(filter.$or || []),
@@ -345,7 +358,7 @@ exports.getRides = async (req, res) => {
 
     const rides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -430,7 +443,7 @@ exports.getPastRides = async (req, res) => {
         $or: [
           { visibilite: 'publique' },
           { organisateur: req.user._id },
-          { participants: req.user._id }
+          { 'participants.userId': req.user._id }
         ]
       },
       {
@@ -453,7 +466,7 @@ exports.getPastRides = async (req, res) => {
 
     let rides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit) * 2);
@@ -475,7 +488,7 @@ exports.getPastRides = async (req, res) => {
     rides = rides.slice(0, parseInt(limit));
     const allRides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort(sort);
     
     const filteredRides = allRides.filter(ride => {
@@ -567,7 +580,7 @@ exports.getMyPastRides = async (req, res) => {
         {
           $or: [
             { organisateur: req.user._id },
-            { participants: req.user._id }
+            { 'participants.userId': req.user._id }
           ]
         },
         {
@@ -595,7 +608,7 @@ exports.getMyPastRides = async (req, res) => {
 
     let rides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit) * 2);
@@ -617,7 +630,7 @@ exports.getMyPastRides = async (req, res) => {
     rides = rides.slice(0, parseInt(limit));
     const allRides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort(sort);
     
     const filteredRides = allRides.filter(ride => {
@@ -780,7 +793,7 @@ exports.getRidesNearby = async (req, res) => {
       $or: [
         { visibilite: 'publique' },
         { organisateur: req.user._id },
-        { participants: req.user._id }
+        { 'participants.userId': req.user._id }
       ]
     };
 
@@ -917,7 +930,7 @@ exports.getRideById = async (req, res, next) => {
 
     const ride = await Ride.findById(id)
       .populate('organisateur', 'firstName lastName pseudo email vehiclePreference')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .populate('likes', 'firstName lastName pseudo');
 
     if (!ride) {
@@ -1045,7 +1058,7 @@ exports.updateRide = async (req, res, next) => {
 
     await ride.save();
     await ride.populate('organisateur', 'firstName lastName pseudo email');
-    await ride.populate('participants', 'firstName lastName pseudo');
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
 
     res.status(200).json({
       success: true,
@@ -1157,7 +1170,7 @@ exports.joinRide = async (req, res) => {
 
     // Vérifier si l'utilisateur est déjà participant (comparaison de string pour éviter les problèmes d'ObjectId)
     const isAlreadyParticipant = ride.participants.some(
-      p => p.toString() === req.user._id.toString()
+      p => p.userId && p.userId.toString() === req.user._id.toString()
     );
     
     if (isAlreadyParticipant) {
@@ -1180,8 +1193,10 @@ exports.joinRide = async (req, res) => {
       console.warn('Erreur lors du calcul de compatibilité:', error);
     }
 
-    // Ajouter l'utilisateur aux participants
-    ride.participants.push(req.user._id);
+    // Ajouter l'utilisateur aux participants avec la nouvelle structure
+    ride.participants.push({
+      userId: req.user._id
+    });
     
     // Ajouter un événement participant_joined
     ride.rideEvents.push({
@@ -1192,7 +1207,7 @@ exports.joinRide = async (req, res) => {
     });
     
     await ride.save();
-    await ride.populate('participants', 'firstName lastName pseudo');
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
 
     res.status(200).json({
       success: true,
@@ -1265,7 +1280,7 @@ exports.leaveRide = async (req, res, next) => {
     });
     
     await ride.save();
-    await ride.populate('participants', 'firstName lastName pseudo');
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
 
     res.status(200).json({
       success: true,
@@ -1491,7 +1506,7 @@ exports.completeRide = async (req, res, next) => {
     }
 
     await ride.populate('organisateur', 'firstName lastName pseudo');
-    await ride.populate('participants', 'firstName lastName pseudo');
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
 
     res.json({
       success: true,
@@ -1524,13 +1539,13 @@ exports.getCalendar = async (req, res, next) => {
     filter.$or = [
       { visibilite: 'publique' },
       { organisateur: req.user._id },
-      { participants: req.user._id }
+      { 'participants.userId': req.user._id }
     ];
 
     // Récupérer les balades
     const rides = await Ride.find(filter)
       .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo')
       .sort({ date: 1, heure: 1 });
 
     // Formater les balades pour le calendrier
@@ -1968,3 +1983,170 @@ exports.geocodeAddress = async (req, res, next) => {
   }
 };
 
+// Indiquer son arrivée au lieu de départ (pour un participant)
+exports.markArrival = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Balade non trouvée'
+      });
+    }
+
+    // Vérifier que l'utilisateur est bien participant
+    const participant = ride.participants.find(
+      p => p.userId && p.userId.toString() === userId.toString()
+    );
+
+    if (!participant) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'êtes pas participant à cette balade'
+      });
+    }
+
+    // Vérifier que l'arrivée n'a pas déjà été enregistrée
+    if (participant.arrivalTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Votre arrivée a déjà été enregistrée'
+      });
+    }
+
+    // Enregistrer l'heure d'arrivée
+    participant.arrivalTime = new Date();
+    await ride.save();
+
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Votre arrivée a été enregistrée',
+      data: {
+        ride,
+        arrivalTime: participant.arrivalTime
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de balade invalide'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'enregistrement de l\'arrivée',
+      error: error.message
+    });
+  }
+};
+
+// Valider/invalider la ponctualité d'un participant (pour l'organisateur)
+exports.validatePunctuality = async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const { isOnTime } = req.body; // true = à l'heure, false = en retard
+
+    if (typeof isOnTime !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Le paramètre isOnTime doit être un booléen (true ou false)'
+      });
+    }
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Balade non trouvée'
+      });
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul l\'organisateur peut valider la ponctualité'
+      });
+    }
+
+    // Trouver le participant
+    const participant = ride.participants.find(
+      p => p.userId && p.userId.toString() === userId.toString()
+    );
+
+    if (!participant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Participant non trouvé dans cette balade'
+      });
+    }
+
+    // Si le participant n'a pas encore indiqué son arrivée, l'enregistrer automatiquement
+    // Cela permet à l'organisateur de valider la ponctualité même si le participant a oublié de marquer son arrivée
+    if (!participant.arrivalTime) {
+      // Utiliser l'heure de début de la balade comme heure d'arrivée par défaut
+      // Si le participant est dans la balade en cours, c'est qu'il était présent au départ
+      const rideDateTime = new Date(ride.date);
+      const [hours, minutes] = ride.heure.split(':').map(Number);
+      rideDateTime.setHours(hours, minutes, 0, 0);
+      
+      // Utiliser l'heure de début de la balade comme heure d'arrivée par défaut
+      participant.arrivalTime = rideDateTime;
+    }
+
+    // Valider/invalider la ponctualité
+    participant.isOnTime = isOnTime;
+    participant.validatedBy = req.user._id;
+    participant.validatedAt = new Date();
+
+    await ride.save();
+
+    // Mettre à jour le score de ponctualité du participant
+    const reputationService = require('../services/reputation.service');
+    try {
+      await reputationService.calculateReputationScore(userId);
+    } catch (error) {
+      console.warn('Erreur lors de la mise à jour du score de ponctualité:', error);
+      // Ne pas bloquer la réponse si le calcul échoue
+    }
+
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
+    await ride.populate('participants.validatedBy', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: isOnTime 
+        ? 'Le participant a été marqué comme étant à l\'heure'
+        : 'Le participant a été marqué comme étant en retard',
+      data: {
+        ride,
+        participant: {
+          userId: participant.userId,
+          arrivalTime: participant.arrivalTime,
+          isOnTime: participant.isOnTime,
+          validatedAt: participant.validatedAt
+        }
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la validation de la ponctualité',
+      error: error.message
+    });
+  }
+};

@@ -19,7 +19,7 @@ const getBaseUrl = (req = null) => {
   
   // 3. Fallback : utiliser l'IP LAN pour le développement
   // Cela permet de fonctionner depuis un iPhone sur le réseau local
-  return `http://192.168.1.70:${process.env.PORT || 5000}`;
+  return `http://localhost:${process.env.PORT || 5000}`;
 };
 
 /**
