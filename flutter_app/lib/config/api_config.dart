@@ -11,8 +11,8 @@
 class ApiConfig {
   // URL de base de l'API
   // Changez cette valeur selon votre environnement
-  static const String apiBaseUrl = 'http://localhost:5000';
-  // static const String apiBaseUrl = 'https://api.ridetogether.fr';
+  // static const String apiBaseUrl = 'http://localhost:5000';
+  static const String apiBaseUrl = 'https://api.ridetogether.fr';
   
   // URL complète pour les endpoints API
   static const String apiUrl = '$apiBaseUrl/api';
