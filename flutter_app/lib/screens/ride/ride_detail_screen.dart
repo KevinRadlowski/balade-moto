@@ -267,6 +267,160 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     }
   }
 
+  Future<void> _showParticipants() async {
+    if (_ride == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people, size: 28, color: AppTheme.primaryColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Participants',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_ride!.participants.length} participant${_ride!.participants.length > 1 ? 's' : ''}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Liste des participants
+              Expanded(
+                child: _ride!.participants.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucun participant',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _ride!.participants.length,
+                        itemBuilder: (context, index) {
+                          final participant = _ride!.participants[index];
+                          // Utiliser le pseudo pour l'anonymat
+                          final displayName = participant.pseudo ?? 'Utilisateur';
+                          // Vérifier si ce participant est l'organisateur
+                          final isOrganizer = _ride!.organisateur.id == participant.id;
+                          
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: isOrganizer 
+                                  ? AppTheme.primaryColor.withOpacity(0.2)
+                                  : AppTheme.primaryColor.withOpacity(0.1),
+                              child: Icon(
+                                Icons.person,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  displayName,
+                                  style: TextStyle(
+                                    fontWeight: isOrganizer ? FontWeight.w600 : FontWeight.w500,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                if (isOrganizer) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Organisateur',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _joinLiveRide() async {
     if (_ride == null) return;
 
@@ -798,7 +952,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           icon: Icons.person,
           iconColor: AppTheme.primaryColor,
           title: 'Organisateur',
-          value: _ride!.organisateur.displayName,
+          value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
         ),
         const SizedBox(height: 12),
         
@@ -1012,6 +1166,28 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
             ),
           ],
+          // Bouton "Voir les participants" pour l'organisateur
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showParticipants,
+              icon: const Icon(Icons.people_outline, size: 22),
+              label: Text(
+                'Voir les participants (${_ride!.participants.length})',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+              ),
+            ),
+          ),
         ] else ...[
           // Si l'utilisateur n'est pas l'organisateur
           // Bouton principal : Participer ou Naviguer/Rejoindre
@@ -1098,36 +1274,25 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            // Badge "Déjà participant" - version plus discrète
-            Container(
+            // Bouton "Voir les participants"
+            SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: AppTheme.successColor.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.successColor.withOpacity(0.2),
-                  width: 1,
+              child: ElevatedButton.icon(
+                onPressed: _showParticipants,
+                icon: const Icon(Icons.people_outline, size: 22),
+                label: Text(
+                  'Voir les participants (${_ride!.participants.length})',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    color: AppTheme.successColor.withOpacity(0.8),
-                    size: 16,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Vous participez',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.successColor.withOpacity(0.9),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+                  elevation: 4,
+                ),
               ),
             ),
           ],

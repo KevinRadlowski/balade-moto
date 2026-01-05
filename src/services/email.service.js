@@ -14,18 +14,83 @@ if (isEmailConfigured()) {
     auth: {
       user: emailConfig.user,
       pass: emailConfig.pass
-    }
+    },
+    // Options de connexion pour éviter les timeouts
+    connectionTimeout: 10000, // 10 secondes pour établir la connexion
+    greetingTimeout: 10000, // 10 secondes pour la réponse du serveur
+    socketTimeout: 10000, // 10 secondes pour les opérations socket
+    // Options TLS pour le port 587
+    requireTLS: emailConfig.port === 587,
+    tls: {
+      // Ne pas rejeter les certificats non autorisés (utile en dev)
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+      // Minimum TLS version
+      minVersion: 'TLSv1.2'
+    },
+    // Pool de connexions pour améliorer les performances
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 3
   });
 
-  // Vérifier la configuration du transporteur
-  transporter.verify((error, success) => {
-    if (error) {
+  // Vérifier la configuration du transporteur (sauf si désactivé en développement)
+  const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
+                           (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+  
+  if (skipVerification) {
+    console.log('⚠️  Vérification email désactivée (mode développement)');
+    console.log('   Les emails seront tentés mais les erreurs seront ignorées silencieusement');
+  } else {
+    transporter.verify((error, success) => {
+      if (error) {
       console.warn('⚠️  Configuration email non valide. Les emails ne pourront pas être envoyés.');
       console.warn('   Erreur:', error.message);
+      console.warn('   Code:', error.code);
+      console.warn('   Configuration actuelle:');
+      console.warn(`      Host: ${emailConfig.host}`);
+      console.warn(`      Port: ${emailConfig.port}`);
+      console.warn(`      User: ${emailConfig.user ? emailConfig.user.substring(0, 5) + '...' : 'NON DÉFINI'}`);
+      console.warn(`      Pass: ${emailConfig.pass ? '***' : 'NON DÉFINI'}`);
+      console.warn(`      From: ${emailConfig.from || 'NON DÉFINI'}`);
+      console.warn('');
+      console.warn('   Solutions possibles:');
+      
+      // Suggestions spécifiques selon le type d'erreur
+      if (error.code === 'ESOCKET' || error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+        console.warn('   ⚠️  Erreur de connexion/timeout détectée:');
+        console.warn('   1. Vérifiez que votre firewall/autorouteur autorise les connexions sortantes sur le port SMTP');
+        console.warn('   2. Essayez le port 465 (SSL) au lieu de 587 (TLS) :');
+        console.warn('      SMTP_PORT=465');
+        console.warn('   3. Vérifiez votre connexion internet');
+        console.warn('   4. Si vous êtes derrière un VPN/proxy, désactivez-le temporairement pour tester');
+        console.warn('   5. Testez la connexion manuellement :');
+        console.warn(`      telnet ${emailConfig.host} ${emailConfig.port}`);
+        console.warn('      (ou utilisez: Test-NetConnection -ComputerName smtp.gmail.com -Port 587 sur PowerShell)');
+      } else if (error.code === 'EAUTH' || error.message.includes('Invalid login') || error.message.includes('authentication')) {
+        console.warn('   ⚠️  Erreur d\'authentification détectée:');
+        console.warn('   1. Pour Gmail, utilisez un "App Password" (pas votre mot de passe normal)');
+        console.warn('      → https://myaccount.google.com/apppasswords');
+        console.warn('   2. Vérifiez que SMTP_USER et SMTP_PASS sont corrects dans .env');
+        console.warn('   3. Assurez-vous que la validation en 2 étapes est activée sur votre compte Gmail');
+      } else {
+        console.warn('   1. Vérifiez que SMTP_USER (ou EMAIL_USER) et SMTP_PASS (ou EMAIL_PASS) sont définis dans .env');
+        console.warn('   2. Pour Gmail, utilisez un "App Password" (pas votre mot de passe normal)');
+        console.warn('      → https://myaccount.google.com/apppasswords');
+        console.warn('   3. Vérifiez que le port est correct (587 pour TLS, 465 pour SSL)');
+        console.warn('   4. Vérifiez que votre firewall autorise les connexions sortantes sur le port SMTP');
+      }
+      
+      console.warn('');
+      console.warn('   💡 Astuce: Si le port 587 ne fonctionne pas, essayez 465 (SSL)');
+      console.warn('   💡 Pour le développement, vous pouvez désactiver la vérification:');
+      console.warn('      SKIP_EMAIL_VERIFICATION=true dans .env');
     } else {
       console.log('✅ Serveur email prêt à envoyer des messages');
+      console.log(`   Host: ${emailConfig.host}:${emailConfig.port}`);
+      console.log(`   From: ${emailConfig.from || emailConfig.user}`);
     }
   });
+  }
 } else {
   logEmailWarningIfNeeded();
 }
@@ -128,6 +193,15 @@ const sendVerificationEmail = async (email, token) => {
     await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
+    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
+                             (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    
+    if (skipVerification) {
+      // En mode développement avec vérification désactivée, ignorer silencieusement
+      console.warn('⚠️  Email non envoyé (mode développement, vérification désactivée)');
+      return false;
+    }
+    
     console.error('Erreur lors de l\'envoi de l\'email:', error);
     throw error;
   }
@@ -169,6 +243,15 @@ const sendUnlockEmail = async (email, token) => {
     await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
+    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
+                             (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    
+    if (skipVerification) {
+      // En mode développement avec vérification désactivée, ignorer silencieusement
+      console.warn('⚠️  Email non envoyé (mode développement, vérification désactivée)');
+      return false;
+    }
+    
     console.error('Erreur lors de l\'envoi de l\'email:', error);
     throw error;
   }

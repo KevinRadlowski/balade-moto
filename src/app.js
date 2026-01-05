@@ -64,19 +64,22 @@ const server = http.createServer(app);
 connectDB();
 
 // Middlewares de sécurité
+const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   // ⚠️ IMPORTANT : Configuration COOP pour permettre les popups OAuth (Google Sign-In)
-  // "same-origin-allow-popups" permet aux popups OAuth de fonctionner correctement
-  // tout en conservant la sécurité contre les attaques XS-Leaks
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  // En développement : "unsafe-none" pour éviter les problèmes avec les popups OAuth
+  // En production : "same-origin-allow-popups" pour la sécurité tout en permettant OAuth
+  crossOriginOpenerPolicy: { 
+    policy: isDevelopment ? "unsafe-none" : "same-origin-allow-popups" 
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://maps.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://maps.googleapis.com", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", "https://maps.googleapis.com"],
+      connectSrc: ["'self'", "https://maps.googleapis.com", "https://accounts.google.com"],
     },
   },
 }));
@@ -251,10 +254,10 @@ server.listen(PORT, HOST, () => {
   if (isDevelopment) {
     console.log(`📡 Accessible depuis le réseau local`);
     console.log(`   - Local: http://localhost:${PORT}`);
-    console.log(`   - LAN: http://192.168.1.70:${PORT}`);
+    console.log(`   - LAN: http://localhost:${PORT}`);
     console.log(`💡 Pour tester depuis iPhone:`);
-    console.log(`   - API: http://192.168.1.70:${PORT}/health`);
-    console.log(`   - Front: http://192.168.1.70:8080`);
+    console.log(`   - API: http://localhost:${PORT}/health`);
+    console.log(`   - Front: http://localhost:8080`);
   }
   
   // Logs des services

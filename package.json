@@ -19,7 +19,8 @@
     "migrate-messages": "node scripts/migrateMessages.js",
     "migrate:roles": "node scripts/migrations/001_normalize_user_roles.js",
     "generate:fr:cars": "node scripts/generate-fr-car-reference.mjs",
-    "generate:fr:motos": "node scripts/generate-fr-moto-reference.mjs"
+    "generate:fr:motos": "node scripts/generate-fr-moto-reference.mjs",
+    "test:smtp": "node scripts/test-smtp.js"
   },
   "keywords": [
     "express",

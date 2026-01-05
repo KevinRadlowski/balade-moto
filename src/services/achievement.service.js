@@ -127,13 +127,17 @@ const checkAndAwardAchievements = async (userId, event, data = {}) => {
     const achievements = [];
 
     // Compter les balades
-    const rideCount = await Ride.countDocuments({
-      $or: [
-        { organisateur: userId },
-        { participants: userId }
-      ],
+    const ridesAsOrganizer = await Ride.countDocuments({
+      organisateur: userId,
       date: { $lt: new Date() }
     });
+    
+    const ridesAsParticipant = await Ride.countDocuments({
+      'participants.userId': userId,
+      date: { $lt: new Date() }
+    });
+    
+    const rideCount = ridesAsOrganizer + ridesAsParticipant;
 
     // Compter les balades organisées
     const organizedCount = await Ride.countDocuments({
@@ -324,13 +328,17 @@ const getUserAchievements = async (userId) => {
     const VehicleDocument = require('../models/VehicleDocument');
 
     // Compter les balades (organisateur ou participant)
-    const rideCount = await Ride.countDocuments({
-      $or: [
-        { organisateur: userId },
-        { participants: userId }
-      ],
+    const ridesAsOrganizer = await Ride.countDocuments({
+      organisateur: userId,
       date: { $lt: new Date() }
     });
+    
+    const ridesAsParticipant = await Ride.countDocuments({
+      'participants.userId': userId,
+      date: { $lt: new Date() }
+    });
+    
+    const rideCount = ridesAsOrganizer + ridesAsParticipant;
 
     // Compter les balades organisées
     const organizedCount = await Ride.countDocuments({
@@ -340,7 +348,7 @@ const getUserAchievements = async (userId) => {
 
     // Compter les groupes
     const groupCount = await Group.countDocuments({
-      members: userId
+      'membres.userId': userId
     });
 
     // Récupérer la réputation
@@ -351,13 +359,17 @@ const getUserAchievements = async (userId) => {
     const daysSinceSignup = user ? Math.floor((new Date() - user.createdAt) / (1000 * 60 * 60 * 24)) : 0;
 
     // Récupérer les villes uniques visitées
-    const rides = await Ride.find({
-      $or: [
-        { organisateur: userId },
-        { participants: userId }
-      ],
+    const ridesAsOrganizerForCities = await Ride.find({
+      organisateur: userId,
       date: { $lt: new Date() }
     }).select('lieuDepart lieuArrivee');
+    
+    const ridesAsParticipantForCities = await Ride.find({
+      'participants.userId': userId,
+      date: { $lt: new Date() }
+    }).select('lieuDepart lieuArrivee');
+    
+    const rides = [...ridesAsOrganizerForCities, ...ridesAsParticipantForCities];
 
     const cities = new Set();
     rides.forEach(ride => {

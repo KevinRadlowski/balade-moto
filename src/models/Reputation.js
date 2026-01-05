@@ -10,7 +10,7 @@ const reputationSchema = new mongoose.Schema({
   },
   score: {
     type: Number,
-    default: 50,
+    default: 0,
     min: [0, 'Le score ne peut pas être négatif'],
     max: [100, 'Le score ne peut pas dépasser 100']
   },

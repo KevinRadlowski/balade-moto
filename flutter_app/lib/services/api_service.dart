@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io' if (dart.library.html) 'dart:html' as io;
@@ -331,6 +332,11 @@ class ApiService {
         Uri.parse('$baseUrl/auth/social/$provider'),
         headers: _headers,
         body: jsonEncode(body),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Le serveur ne répond pas. Vérifiez que le serveur backend est démarré et accessible à $baseUrl');
+        },
       );
 
       // 🔍 DEBUG : Logs de la réponse HTTP
@@ -376,8 +382,28 @@ class ApiService {
           rethrow;
         }
       }
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout de connexion: $e');
+      throw Exception('Le serveur ne répond pas dans les temps. Vérifiez que le serveur backend est démarré et accessible à $baseUrl');
+    } on http.ClientException catch (e) {
+      debugPrint('Erreur client HTTP: $e');
+      final errorMessage = e.message.toLowerCase();
+      if (errorMessage.contains('connection') && errorMessage.contains('timeout')) {
+        throw Exception('Le serveur ne répond pas. Vérifiez que le serveur backend est démarré et accessible à $baseUrl');
+      } else if (errorMessage.contains('failed to fetch')) {
+        throw Exception('Impossible de contacter le serveur. Vérifiez que le serveur backend est démarré et accessible à $baseUrl');
+      }
+      rethrow;
     } catch (e) {
       debugPrint('Erreur lors de la connexion OAuth: $e');
+      // Vérifier si c'est une erreur de connexion
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('connection') || 
+          errorString.contains('timeout') || 
+          errorString.contains('failed to fetch') ||
+          errorString.contains('network')) {
+        throw Exception('Impossible de se connecter au serveur. Vérifiez que le serveur backend est démarré et accessible à $baseUrl');
+      }
       rethrow;
     }
   }
@@ -1070,6 +1096,41 @@ class ApiService {
     if (response.statusCode != 200) {
       throw Exception(jsonDecode(response.body)['message'] ?? 'Erreur lors de la notation');
     }
+  }
+
+  // Indiquer son arrivée au lieu de départ (pour un participant)
+  Future<Map<String, dynamic>> markArrival(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/arrival'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'enregistrement de l\'arrivée');
+    }
+
+    return jsonDecode(response.body);
+  }
+
+  // Valider/invalider la ponctualité d'un participant (pour l'organisateur)
+  Future<Map<String, dynamic>> validatePunctuality(String rideId, String userId, bool isOnTime) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/participants/$userId/validate-punctuality'),
+        headers: _headers,
+        body: jsonEncode({'isOnTime': isOnTime}),
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la validation de la ponctualité');
+    }
+
+    return jsonDecode(response.body);
   }
 
   // Groupes

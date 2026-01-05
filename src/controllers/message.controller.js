@@ -50,7 +50,7 @@ exports.getMessages = async (req, res) => {
           message: 'Balade non trouvée'
         });
       }
-      const isParticipant = ride.participants.some(p => p.toString() === req.user._id.toString());
+      const isParticipant = ride.participants.some(p => p.userId && p.userId.toString() === req.user._id.toString());
       const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
       if (!isParticipant && !isOrganizer) {
         return res.status(403).json({
@@ -159,7 +159,7 @@ exports.sendMessage = async (req, res) => {
           message: 'Balade non trouvée'
         });
       }
-      const isParticipant = ride.participants.some(p => p.toString() === req.user._id.toString());
+      const isParticipant = ride.participants.some(p => p.userId && p.userId.toString() === req.user._id.toString());
       const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
       if (!isParticipant && !isOrganizer) {
         return res.status(403).json({

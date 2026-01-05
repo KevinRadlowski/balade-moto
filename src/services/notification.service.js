@@ -20,7 +20,7 @@ const checkAndSendNotifications = async () => {
         $lte: new Date(oneHourLater.getTime() + 5 * 60 * 1000)  // +5 minutes
       }
     }).populate('organisateur', 'firstName lastName email')
-      .populate('participants', 'firstName lastName email');
+      .populate('participants.userId', 'firstName lastName email');
 
     for (const ride of rides) {
       // Vérifier l'heure exacte
@@ -35,7 +35,7 @@ const checkAndSendNotifications = async () => {
       if (hoursUntilRide >= 0.9 && hoursUntilRide <= 1.1) {
         // Envoyer à tous les participants
         const allParticipants = [
-          ...ride.participants.map(p => p._id),
+          ...ride.participants.map(p => p.userId ? p.userId._id || p.userId : null).filter(Boolean),
           ride.organisateur._id
         ];
 

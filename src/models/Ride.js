@@ -108,8 +108,29 @@ const rideSchema = new mongoose.Schema({
     default: 'publique'
   },
   participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    // Informations de ponctualité
+    arrivalTime: {
+      type: Date,
+      default: null // Heure à laquelle le participant a indiqué son arrivée
+    },
+    isOnTime: {
+      type: Boolean,
+      default: null // null = non validé (considéré comme à l'heure par défaut), true = à l'heure, false = en retard
+    },
+    validatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null // Qui a validé/invalidé (généralement l'organisateur)
+    },
+    validatedAt: {
+      type: Date,
+      default: null // Quand la validation a eu lieu
+    }
   }],
   likes: [{
     type: mongoose.Schema.Types.ObjectId,

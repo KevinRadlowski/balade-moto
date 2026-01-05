@@ -40,13 +40,17 @@ async function migrate() {
       }
 
       // Compter les balades passées
-      const pastRides = await Ride.countDocuments({
-        $or: [
-          { organisateur: user._id },
-          { participants: user._id }
-        ],
+      const ridesAsOrganizer = await Ride.countDocuments({
+        organisateur: user._id,
         date: { $lt: new Date() }
       });
+      
+      const ridesAsParticipant = await Ride.countDocuments({
+        'participants.userId': user._id,
+        date: { $lt: new Date() }
+      });
+      
+      const pastRides = ridesAsOrganizer + ridesAsParticipant;
 
       // Compter les notes reçues
       const ratings = await Rating.find({ utilisateur: user._id });
