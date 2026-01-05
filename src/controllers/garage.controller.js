@@ -1005,7 +1005,13 @@ exports.createMaintenanceLog = async (req, res, next) => {
     // Compatibilité avec anciens champs
     const labelValue = label || req.body.description || '';
     const categoryValue = category || req.body.type;
-    const kmValue = kmAtService || req.body.km;
+    // Utiliser ?? au lieu de || pour permettre la valeur 0
+    const kmValue = kmAtService !== undefined ? kmAtService : (req.body.km !== undefined ? req.body.km : null);
+
+    // Validation : kmAtService est requis
+    if (kmValue === null || kmValue === undefined) {
+      throw new BadRequestError('Le kilométrage au moment du service est requis');
+    }
 
     // Validation : le kilométrage de l'entretien ne peut pas être supérieur au kilométrage actuel du véhicule
     if (kmValue > vehicle.odometerCurrentKm) {
@@ -1214,7 +1220,8 @@ exports.updateMaintenanceLog = async (req, res, next) => {
     // Compatibilité avec anciens champs
     const labelValue = label || req.body.description;
     const categoryValue = category || req.body.type;
-    const kmValue = kmAtService !== undefined ? (kmAtService || req.body.km) : undefined;
+    // Utiliser !== undefined pour permettre la valeur 0
+    const kmValue = kmAtService !== undefined ? kmAtService : (req.body.km !== undefined ? req.body.km : undefined);
 
     // Validation : si le kilométrage est modifié, il ne peut pas être supérieur au kilométrage actuel du véhicule
     if (kmValue !== undefined && kmValue > vehicle.odometerCurrentKm) {

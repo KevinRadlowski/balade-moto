@@ -8,6 +8,10 @@ class VehicleStats {
   final FuelConsumption? fuelConsumption;
   final List<MonthlyStat> monthlyStats;
   final MaintenancePrediction? nextMaintenance;
+  // Nouvelles statistiques
+  final int? kmSinceLastMaintenance;
+  final DateTime? lastMaintenanceDate;
+  final DateTime? lastRideDate;
 
   VehicleStats({
     required this.id,
@@ -19,6 +23,9 @@ class VehicleStats {
     this.fuelConsumption,
     required this.monthlyStats,
     this.nextMaintenance,
+    this.kmSinceLastMaintenance,
+    this.lastMaintenanceDate,
+    this.lastRideDate,
   });
 
   factory VehicleStats.fromJson(Map<String, dynamic> json) {
@@ -39,6 +46,17 @@ class VehicleStats {
       nextMaintenance: json['nextMaintenance'] != null
           ? MaintenancePrediction.fromJson(json['nextMaintenance'])
           : null,
+      kmSinceLastMaintenance: json['kmSinceLastMaintenance'] != null
+          ? (json['kmSinceLastMaintenance'] is int
+              ? json['kmSinceLastMaintenance']
+              : (json['kmSinceLastMaintenance'] as num).toInt())
+          : null,
+      lastMaintenanceDate: json['lastMaintenanceDate'] != null
+          ? DateTime.parse(json['lastMaintenanceDate'])
+          : null,
+      lastRideDate: json['lastRideDate'] != null
+          ? DateTime.parse(json['lastRideDate'])
+          : null,
     );
   }
 
@@ -53,6 +71,9 @@ class VehicleStats {
       if (fuelConsumption != null) 'fuelConsumption': fuelConsumption!.toJson(),
       'monthlyStats': monthlyStats.map((m) => m.toJson()).toList(),
       if (nextMaintenance != null) 'nextMaintenance': nextMaintenance!.toJson(),
+      if (kmSinceLastMaintenance != null) 'kmSinceLastMaintenance': kmSinceLastMaintenance,
+      if (lastMaintenanceDate != null) 'lastMaintenanceDate': lastMaintenanceDate!.toIso8601String(),
+      if (lastRideDate != null) 'lastRideDate': lastRideDate!.toIso8601String(),
     };
   }
 }

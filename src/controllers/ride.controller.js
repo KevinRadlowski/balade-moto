@@ -1134,6 +1134,7 @@ exports.deleteRide = async (req, res, next) => {
 exports.joinRide = async (req, res) => {
   try {
     const { id } = req.params;
+    const { vehicleId } = req.body; // Véhicule optionnel avec lequel participer
 
     const ride = await Ride.findById(id);
 
@@ -1180,6 +1181,33 @@ exports.joinRide = async (req, res) => {
       });
     }
 
+    // Si un vehicleId est fourni, vérifier qu'il appartient à l'utilisateur et correspond au type de véhicule
+    if (vehicleId) {
+      const Vehicle = require('../models/Vehicle');
+      const vehicle = await Vehicle.findById(vehicleId);
+      
+      if (!vehicle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Véhicule non trouvé'
+        });
+      }
+
+      if (vehicle.ownerUserId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ce véhicule ne vous appartient pas'
+        });
+      }
+
+      if (vehicle.type !== ride.typeVehicule) {
+        return res.status(400).json({
+          success: false,
+          message: `Le type de véhicule ne correspond pas (balade: ${ride.typeVehicule}, véhicule: ${vehicle.type})`
+        });
+      }
+    }
+
     // Calculer la compatibilité avec l'organisateur (optionnel, pour warning)
     let compatibility = null;
     try {
@@ -1195,7 +1223,8 @@ exports.joinRide = async (req, res) => {
 
     // Ajouter l'utilisateur aux participants avec la nouvelle structure
     ride.participants.push({
-      userId: req.user._id
+      userId: req.user._id,
+      vehicleId: vehicleId || null
     });
     
     // Ajouter un événement participant_joined
@@ -1208,6 +1237,7 @@ exports.joinRide = async (req, res) => {
     
     await ride.save();
     await ride.populate('participants.userId', 'firstName lastName pseudo');
+    await ride.populate('participants.vehicleId', 'nickname make model year');
 
     res.status(200).json({
       success: true,

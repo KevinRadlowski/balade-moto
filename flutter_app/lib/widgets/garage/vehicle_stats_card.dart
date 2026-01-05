@@ -24,10 +24,19 @@ class _VehicleStatsCardState extends State<VehicleStatsCard> {
   @override
   void initState() {
     super.initState();
-    _loadStats();
+    _loadStats(useCache: false); // Toujours recharger depuis le serveur pour avoir les données à jour
   }
 
-  Future<void> _loadStats() async {
+  @override
+  void didUpdateWidget(VehicleStatsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recharger les stats si le vehicleId change
+    if (oldWidget.vehicleId != widget.vehicleId) {
+      _loadStats(useCache: false);
+    }
+  }
+
+  Future<void> _loadStats({bool useCache = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -35,7 +44,12 @@ class _VehicleStatsCardState extends State<VehicleStatsCard> {
 
     try {
       final provider = Provider.of<VehicleStatsProvider>(context, listen: false);
-      final stats = await provider.getVehicleStats(vehicleId: widget.vehicleId);
+      // Nettoyer le cache pour forcer le rechargement
+      provider.clearCacheForVehicle(widget.vehicleId);
+      final stats = await provider.getVehicleStats(
+        vehicleId: widget.vehicleId,
+        useCache: false, // Toujours recharger depuis le serveur
+      );
       setState(() {
         _stats = stats;
         _isLoading = false;
@@ -112,7 +126,8 @@ class _VehicleStatsCardState extends State<VehicleStatsCard> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Grille de statistiques
+                // Grille de statistiques (2x3)
+                // Première ligne : Balades - Dernière balade
                 Row(
                   children: [
                     Expanded(
@@ -125,15 +140,16 @@ class _VehicleStatsCardState extends State<VehicleStatsCard> {
                     ),
                     Expanded(
                       child: _StatItem(
-                        icon: Icons.speed,
-                        label: 'Kilomètres',
-                        value: NumberFormatter.formatKm(stats.totalKm),
-                        color: Colors.green,
+                        icon: Icons.route,
+                        label: 'Dernière balade',
+                        value: NumberFormatter.formatRelativeDate(stats.lastRideDate),
+                        color: Colors.indigo,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
+                // Deuxième ligne : Entretiens - Dernier entretien
                 Row(
                   children: [
                     Expanded(
@@ -146,52 +162,36 @@ class _VehicleStatsCardState extends State<VehicleStatsCard> {
                     ),
                     Expanded(
                       child: _StatItem(
+                        icon: Icons.calendar_today,
+                        label: 'Dernier entretien',
+                        value: NumberFormatter.formatRelativeDate(stats.lastMaintenanceDate),
+                        color: Colors.teal,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Troisième ligne : Coût total - Km depuis dernier entretien
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatItem(
                         icon: Icons.euro,
                         label: 'Coût total',
                         value: '${NumberFormatter.formatCurrency(stats.totalCost)}',
                         color: Colors.purple,
                       ),
                     ),
+                    Expanded(
+                      child: _StatItem(
+                        icon: Icons.speed,
+                        label: 'Depuis dernier entretien',
+                        value: NumberFormatter.formatKmOptional(stats.kmSinceLastMaintenance),
+                        color: Colors.green,
+                      ),
+                    ),
                   ],
                 ),
-                if (stats.fuelConsumption != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.local_gas_station, color: Colors.blue.shade700),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Consommation moyenne',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
-                              Text(
-                                '${stats.fuelConsumption!.averageLitersPer100Km.toStringAsFixed(1)} L/100km',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),

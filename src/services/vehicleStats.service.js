@@ -73,27 +73,79 @@ const updateStatsOnRideCompletion = async (vehicleId, rideData) => {
  */
 const getVehicleStats = async (vehicleId) => {
   try {
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      throw new Error('Véhicule non trouvé');
+    }
+
+    // Calculer les statistiques depuis les données réelles
+    // 1. Compter les entretiens et calculer le coût total depuis MaintenanceLog
+    const maintenanceLogs = await MaintenanceLog.find({ vehicleId })
+      .sort({ date: -1 }); // Trier par date décroissante
+    const maintenanceCount = maintenanceLogs.length;
+    const totalCost = maintenanceLogs.reduce((sum, log) => sum + (log.cost || 0), 0);
+
+    // 2. Compter les balades où ce véhicule a été utilisé
+    const ridesWithVehicle = await Ride.find({
+      'participants.vehicleId': vehicleId
+    }).sort({ date: -1 }); // Trier par date décroissante
+    const rideCount = ridesWithVehicle.length;
+
+    // 3. Calculer le kilométrage total depuis les balades (si distanceKm est stockée)
+    // Pour l'instant, on utilise le kilométrage actuel du véhicule
+    const totalKm = vehicle.odometerCurrentKm || 0;
+
+    // 4. Calculer kmSinceLastMaintenance
+    let kmSinceLastMaintenance = null;
+    let lastMaintenanceDate = null;
+    if (maintenanceLogs.length > 0) {
+      const lastMaintenance = maintenanceLogs[0]; // Le plus récent (trié par date -1)
+      const lastMaintenanceKm = lastMaintenance.kmAtService || 0;
+      const currentKm = vehicle.odometerCurrentKm || 0;
+      kmSinceLastMaintenance = Math.max(0, currentKm - lastMaintenanceKm);
+      lastMaintenanceDate = lastMaintenance.date;
+    }
+
+    // 5. Calculer lastRideDate (dernière balade terminée)
+    let lastRideDate = null;
+    // Chercher la dernière balade terminée avec ce véhicule
+    const completedRides = ridesWithVehicle.filter(ride => ride.status === 'completed');
+    if (completedRides.length > 0) {
+      // Prendre la plus récente (déjà trié par date -1)
+      const lastRide = completedRides[0];
+      // Utiliser la date de la balade (date de début) comme date de référence
+      lastRideDate = lastRide.date;
+    }
+
+    // Récupérer ou créer les stats
     let stats = await VehicleStats.findOne({ vehicleId });
     
     if (!stats) {
-      // Créer des stats initiales
-      const vehicle = await Vehicle.findById(vehicleId);
-      if (!vehicle) {
-        throw new Error('Véhicule non trouvé');
-      }
-
       stats = new VehicleStats({
         vehicleId,
-        totalKm: vehicle.odometerCurrentKm || 0,
-        totalCost: 0,
-        rideCount: 0,
-        maintenanceCount: 0
+        totalKm,
+        totalCost,
+        rideCount,
+        maintenanceCount
       });
-
-      await stats.save();
+    } else {
+      // Mettre à jour les stats avec les valeurs calculées
+      stats.totalKm = totalKm;
+      stats.totalCost = totalCost;
+      stats.rideCount = rideCount;
+      stats.maintenanceCount = maintenanceCount;
     }
 
-    return stats;
+    await stats.save();
+
+    // Retourner les stats avec les nouvelles propriétés calculées
+    const statsObj = stats.toObject();
+    return {
+      ...statsObj,
+      kmSinceLastMaintenance,
+      lastMaintenanceDate: lastMaintenanceDate ? lastMaintenanceDate.toISOString() : null,
+      lastRideDate: lastRideDate ? lastRideDate.toISOString() : null
+    };
   } catch (error) {
     console.error('Erreur lors de la récupération des stats:', error);
     throw error;

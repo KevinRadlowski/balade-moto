@@ -113,6 +113,11 @@ const rideSchema = new mongoose.Schema({
       ref: 'User',
       required: true
     },
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null // Véhicule avec lequel le participant effectue la balade (optionnel)
+    },
     // Informations de ponctualité
     arrivalTime: {
       type: Date,
@@ -217,6 +222,7 @@ rideSchema.index({ date: 1 });
 rideSchema.index({ typeVehicule: 1 });
 rideSchema.index({ visibilite: 1 });
 rideSchema.index({ participants: 1 });
+rideSchema.index({ 'participants.vehicleId': 1 }); // Pour rechercher les balades par véhicule
 rideSchema.index({ status: 1, date: 1 }); // Pour les requêtes par statut
 rideSchema.index({ ridingStyle: 1 }); // Pour les filtres par style
 // Index géospatial 2dsphere pour les requêtes de proximité

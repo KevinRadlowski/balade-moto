@@ -50,6 +50,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   List<VehicleDocument> _documents = [];
   bool _isLoading = true;
   String? _errorMessage;
+  int _statsRefreshKey = 0; // Clé pour forcer le rafraîchissement des stats
 
   @override
   void initState() {
@@ -124,6 +125,10 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
 
   Future<void> _refreshData() async {
     await _loadData();
+    // Forcer le rafraîchissement des stats
+    setState(() {
+      _statsRefreshKey++;
+    });
   }
 
   Future<void> _navigateToAddOdometer() async {
@@ -447,7 +452,10 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: VehicleStatsCard(vehicleId: widget.vehicleId),
+              child: VehicleStatsCard(
+                key: ValueKey('stats_${widget.vehicleId}_$_statsRefreshKey'),
+                vehicleId: widget.vehicleId,
+              ),
             ),
           ),
           
