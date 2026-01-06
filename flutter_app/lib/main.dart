@@ -8,7 +8,9 @@ import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/navigation/step_by_step_navigation_screen.dart';
 import 'services/navigation/navigation_service.dart';
@@ -150,11 +152,30 @@ class _MyAppState extends State<MyApp> {
             );
           }
           
+          // Vérifier l'URL actuelle pour les deep links (Flutter Web)
+          String? initialRoute;
+          try {
+            // Utiliser Uri.base qui fonctionne sur toutes les plateformes
+            final uri = Uri.base;
+            final path = uri.path;
+            if (path.startsWith('/reset-password') || 
+                path.startsWith('/verify-email') || 
+                path.startsWith('/register')) {
+              initialRoute = path + (uri.query.isNotEmpty ? '?${uri.query}' : '');
+            }
+          } catch (e) {
+            // Ignorer les erreurs de parsing d'URL
+          }
+          
           // Sinon, afficher LoginScreen ou MainNavigation selon isAuthenticated
           // Ne jamais basculer d'écran avec isLoading
-          final homeWidget = authService.isAuthenticated 
-              ? const MainNavigation() 
-              : const LoginScreen();
+          // Si on a une initialRoute (deep link), on l'utilise même si l'utilisateur est authentifié
+          Widget? homeWidget;
+          if (initialRoute == null) {
+            homeWidget = authService.isAuthenticated 
+                ? const MainNavigation() 
+                : const LoginScreen();
+          }
           
           return MaterialApp(
             navigatorKey: navigatorKey,
@@ -172,7 +193,8 @@ class _MyAppState extends State<MyApp> {
             ],
             theme: AppTheme.lightTheme,
             builder: _maxWidthBuilder,
-            home: homeWidget,
+            home: initialRoute == null ? homeWidget : null,
+            initialRoute: initialRoute,
             routes: {
               '/login': (context) => const LoginScreen(),
             },
@@ -187,6 +209,26 @@ class _MyAppState extends State<MyApp> {
                   );
                 }
               }
+              // Gérer les liens de réinitialisation de mot de passe
+              if (settings.name?.startsWith('/reset-password') == true) {
+                final uri = Uri.parse(settings.name!);
+                final token = uri.queryParameters['token'];
+                final error = uri.queryParameters['error'];
+                return MaterialPageRoute(
+                  builder: (_) => ResetPasswordScreen(
+                    token: token,
+                    error: error,
+                  ),
+                );
+              }
+              // Gérer les liens d'inscription avec code de parrainage
+              if (settings.name?.startsWith('/register') == true) {
+                final uri = Uri.parse(settings.name!);
+                final ref = uri.queryParameters['ref'];
+                return MaterialPageRoute(
+                  builder: (_) => RegisterScreen(referralCode: ref),
+                );
+              }
               // Gérer la navigation par étapes
               if (settings.name == '/step-by-step-navigation') {
                 final args = settings.arguments as Map<String, dynamic>?;
@@ -199,6 +241,11 @@ class _MyAppState extends State<MyApp> {
                     ),
                   );
                 }
+              }
+              // Si aucune route n'est trouvée et qu'on a une initialRoute, retourner null
+              // Sinon, retourner la route par défaut
+              if (initialRoute == null && homeWidget != null) {
+                return MaterialPageRoute(builder: (_) => homeWidget!);
               }
               return null;
             },

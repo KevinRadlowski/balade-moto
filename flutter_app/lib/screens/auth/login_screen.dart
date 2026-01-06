@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/biometric_service.dart';
@@ -14,6 +15,7 @@ import '../../widgets/auth/social_auth_buttons.dart';
 import '../../widgets/legal/terms_consent_banner.dart';
 import 'register_screen.dart';
 import 'contact_support_screen.dart';
+import 'forgot_password_screen.dart';
 import '../main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -30,10 +32,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _totpController = TextEditingController();
+  final _phoneOtpController = TextEditingController();
   final _biometricService = BiometricService();
   final _socialAuthService = SocialAuthService();
   bool _obscurePassword = true;
   bool _requires2FA = false;
+  bool _requiresPhoneVerification = false;
+  String? _userPhoneForVerification;
   String? _errorMessage;
   bool _showResendButton = false;
   bool _showContactSupportButton = false;
@@ -48,6 +53,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoggingIn = false; // Flag pour éviter les doubles soumissions
   bool _termsAccepted = false;
   bool _isCheckingTerms = true;
+
+  String _maskPhone(String phone) {
+    if (phone.length <= 4) return phone;
+    final visible = phone.substring(phone.length - 4);
+    final masked = '*' * (phone.length - 4);
+    return '$masked$visible';
+  }
 
   @override
   void initState() {
@@ -110,10 +122,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _totpController.dispose();
-    _cooldownTimer?.cancel();
+    _phoneOtpController.dispose();
     super.dispose();
   }
 
@@ -234,10 +247,145 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _resendVerificationEmail() async {
-    if (_emailController.text.trim().isEmpty) {
+  Future<void> _sendPhoneOtp() async {
+    if (_userPhoneForVerification == null || _userPhoneForVerification!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer votre email')),
+        const SnackBar(content: Text('Numéro de téléphone non disponible')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isResending = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.sendPhoneOtp(_userPhoneForVerification!);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isResending = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Code OTP envoyé avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isResending = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _verifyPhoneOtpAndLogin() async {
+    if (!mounted) return;
+    
+    // Sauvegarder la valeur du code OTP avant toute opération asynchrone
+    final otpCode = _phoneOtpController.text;
+    final phoneForVerification = _userPhoneForVerification;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    if (otpCode.length != 6) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Veuillez entrer un code OTP à 6 chiffres';
+      });
+      return;
+    }
+
+    if (phoneForVerification == null || phoneForVerification.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Numéro de téléphone non disponible';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isLoggingIn = true;
+      _errorMessage = null;
+      // Réinitialiser le flag de vérification téléphone pour éviter les rebuilds
+      _requiresPhoneVerification = false;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      
+      // Vérifier l'OTP (utiliser les variables locales pour éviter d'accéder au controller après dispose)
+      await authService.verifyPhoneOtp(phoneForVerification, otpCode);
+
+      if (!mounted) return;
+
+      // Si l'OTP est valide, se connecter automatiquement
+      await authService.login(email, password);
+
+      if (!mounted) return;
+
+      // Succès - rediriger vers l'accueil
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigation()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // Si l'erreur est liée à l'email non vérifié, on peut quand même permettre la connexion
+      // car l'email est optionnel maintenant
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      if (errorMessage.contains('email') && errorMessage.contains('vérifié')) {
+        // L'email n'est pas vérifié mais c'est optionnel, on peut quand même se connecter
+        // Réessayer la connexion sans bloquer sur l'email
+        try {
+          final authServiceRetry = Provider.of<AuthService>(context, listen: false);
+          await authServiceRetry.login(email, password);
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainNavigation()),
+          );
+          return;
+        } catch (e2) {
+          // Si ça échoue encore, afficher l'erreur
+          if (!mounted) return;
+          setState(() {
+            _isLoggingIn = false;
+            _errorMessage = e2.toString().replaceAll('Exception: ', '');
+            _requiresPhoneVerification = true; // Réafficher le champ OTP si nécessaire
+          });
+          return;
+        }
+      }
+
+      setState(() {
+        _isLoggingIn = false;
+        _errorMessage = errorMessage;
+        _requiresPhoneVerification = true; // Réafficher le champ OTP si nécessaire
+      });
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    final identifier = _emailController.text.trim();
+    if (identifier.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez entrer votre email ou téléphone')),
+      );
+      return;
+    }
+    
+    // Si c'est un téléphone, on ne peut pas renvoyer l'email
+    if (!identifier.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez utiliser votre email pour renvoyer l\'email de vérification')),
       );
       return;
     }
@@ -252,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final apiService = ApiService();
       apiService.setToken(token);
 
-      final responseData = await apiService.resendVerificationEmail(_emailController.text.trim());
+      final responseData = await apiService.resendVerificationEmail(identifier);
 
       if (!mounted) return;
 
@@ -355,8 +503,15 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       
+      // Normaliser l'identifiant (email ou téléphone)
+      String identifier = _emailController.text.trim();
+      // Si ce n'est pas un email (pas de @), normaliser comme téléphone
+      if (!identifier.contains('@')) {
+        identifier = identifier.replaceAll(RegExp(r'[\s-]'), '');
+      }
+      
       await authService.login(
-        _emailController.text.trim(),
+        identifier,
         _passwordController.text,
         totpCode: _requires2FA ? _totpController.text : null,
         saveCredentials: enableBiometric,
@@ -422,6 +577,21 @@ class _LoginScreenState extends State<LoginScreen> {
               _errorMessage = null; // Pas d'erreur pour 2FA, juste besoin du code
               _showResendButton = false;
               _showContactSupportButton = false;
+              break;
+              
+            case AuthException.phoneVerificationRequired:
+              _requiresPhoneVerification = true;
+              _errorMessage = e.message.isNotEmpty 
+                  ? e.message 
+                  : 'Votre numéro de téléphone doit être vérifié avant de vous connecter. Veuillez entrer le code reçu par SMS.';
+              _showResendButton = false;
+              _showContactSupportButton = false;
+              // Récupérer le numéro de téléphone depuis l'exception (retourné par le backend) ou depuis l'identifiant
+              _userPhoneForVerification = e.phoneE164 ?? 
+                  (_emailController.text.contains('@') 
+                      ? null 
+                      : _emailController.text.trim());
+              // NE PAS envoyer automatiquement l'OTP - l'utilisateur doit cliquer sur "Renvoyer le code"
               break;
               
             case AuthException.invalidCredentials:
@@ -794,10 +964,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           textInputAction: TextInputAction.next,
                           style: const TextStyle(fontSize: 16),
                           decoration: InputDecoration(
-                            labelText: 'Email',
-                            hintText: 'votre@email.com',
+                            labelText: 'Email ou téléphone',
+                            hintText: 'votre@email.com ou +33612345678',
                             prefixIcon: Icon(
-                              Icons.email_outlined,
+                              Icons.person_outlined,
                               color: Theme.of(context).colorScheme.primary,
                             ),
                             border: OutlineInputBorder(
@@ -809,10 +979,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre email';
+                              return 'Veuillez entrer votre email ou téléphone';
                             }
-                            if (!value.contains('@')) {
-                              return 'Email invalide';
+                            // Si c'est un email, vérifier le format
+                            if (value.contains('@')) {
+                              if (!value.contains('.') || value.length < 5) {
+                                return 'Email invalide';
+                              }
+                            } else {
+                              // Si c'est un téléphone, vérifier qu'il contient au moins 8 chiffres
+                              final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
+                              if (digitsOnly.length < 8) {
+                                return 'Numéro de téléphone invalide';
+                              }
                             }
                             return null;
                           },
@@ -939,7 +1118,117 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ],
                                 ),
-                                if (_showResendButton) ...[
+                                // Afficher le champ OTP si vérification téléphone requise
+                                if (_requiresPhoneVerification) ...[
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    _userPhoneForVerification != null
+                                        ? 'Entrez le code de vérification reçu par SMS au ${_maskPhone(_userPhoneForVerification!)}'
+                                        : 'Entrez le code de vérification reçu par SMS',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: 14,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  if (_userPhoneForVerification == null || _userPhoneForVerification!.isEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Cliquez sur "Renvoyer le code" pour recevoir un code OTP',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade700,
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 20),
+                                  Center(
+                                    child: PinCodeTextField(
+                                        key: const ValueKey('phone_otp_field'), // Clé pour stabiliser le widget
+                                        appContext: context,
+                                        length: 6,
+                                        controller: _phoneOtpController,
+                                        onChanged: (value) {
+                                          // Ne pas faire de setState ici - cela cause des problèmes de rebuild
+                                          // L'erreur sera effacée automatiquement quand l'utilisateur tape
+                                        },
+                                        pinTheme: PinTheme(
+                                          shape: PinCodeFieldShape.box,
+                                          borderRadius: BorderRadius.circular(12),
+                                          fieldHeight: 56,
+                                          fieldWidth: 40, // Réduit pour éviter le débordement
+                                          activeFillColor: Colors.white,
+                                          inactiveFillColor: Colors.grey.shade50,
+                                          selectedFillColor: Colors.white,
+                                          activeColor: Theme.of(context).colorScheme.primary,
+                                          inactiveColor: Colors.grey.shade300,
+                                          selectedColor: Theme.of(context).colorScheme.primary,
+                                        ),
+                                        enableActiveFill: true,
+                                        keyboardType: TextInputType.number,
+                                        textStyle: const TextStyle(
+                                          fontSize: 18, // Légèrement réduit pour s'adapter
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 20),
+                                  ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: _phoneOtpController,
+                                    builder: (context, value, child) {
+                                      final otpLength = value.text.length;
+                                      return SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: (_isLoggingIn || otpLength != 6) 
+                                              ? null 
+                                              : _verifyPhoneOtpAndLogin,
+                                          style: ElevatedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(vertical: 16),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                          child: _isLoggingIn
+                                              ? const SizedBox(
+                                                  height: 20,
+                                                  width: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Valider le code',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      TextButton(
+                                        onPressed: (_isResending || _isLoggingIn) ? null : _sendPhoneOtp,
+                                        child: _isResending
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(strokeWidth: 2),
+                                              )
+                                            : const Text('Renvoyer le code'),
+                                      ),
+                                    ],
+                                  ),
+                                ] else if (_showResendButton) ...[
+                                  // Afficher le bouton "Renvoyer l'email" uniquement si ce n'est pas une vérification téléphone
                                   const SizedBox(height: 12),
                                   OutlinedButton.icon(
                                     onPressed: (_isResending || _cooldownSeconds > 0) 
@@ -1006,7 +1295,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 16),
+                        // Lien "Mot de passe oublié"
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text('Mot de passe oublié ?'),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Consumer<AuthService>(
                           builder: (context, authService, _) {
                             // Utiliser un StatefulBuilder pour éviter les rebuilds inutiles du formulaire

@@ -4,6 +4,26 @@ import '../../providers/emergency_contact_provider.dart';
 import '../../screens/profile/emergency_contact_edit_screen.dart';
 
 class EmergencyContactCard extends StatelessWidget {
+  // Détecter si la valeur est un email
+  static bool _isEmail(String value) {
+    return value.contains('@') && value.contains('.');
+  }
+
+  // Traduire la relation en français
+  static String _translateRelation(String relation) {
+    switch (relation) {
+      case 'family':
+        return 'Famille';
+      case 'friend':
+        return 'Ami(e)';
+      case 'colleague':
+        return 'Collègue';
+      case 'other':
+        return 'Autre';
+      default:
+        return relation;
+    }
+  }
   const EmergencyContactCard({super.key});
 
   @override
@@ -152,8 +172,8 @@ class EmergencyContactCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _ContactField(
-                      icon: Icons.phone,
-                      label: 'Téléphone',
+                      icon: _isEmail(contact.phone) ? Icons.email : Icons.phone,
+                      label: _isEmail(contact.phone) ? 'Email' : 'Téléphone',
                       value: contact.phone,
                     ),
                     if (contact.relation != null) ...[
@@ -161,7 +181,7 @@ class EmergencyContactCard extends StatelessWidget {
                       _ContactField(
                         icon: Icons.family_restroom,
                         label: 'Relation',
-                        value: contact.relation!,
+                        value: _translateRelation(contact.relation!),
                       ),
                     ],
                     if (contact.notes != null && contact.notes!.isNotEmpty) ...[

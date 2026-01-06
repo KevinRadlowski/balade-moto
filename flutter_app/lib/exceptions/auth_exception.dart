@@ -4,11 +4,13 @@ class AuthException implements Exception {
   final String code;
   final String message;
   final int? statusCode;
+  String? phoneE164; // Numéro de téléphone pour la vérification OTP
 
   AuthException({
     required this.code,
     required this.message,
     this.statusCode,
+    this.phoneE164,
   });
 
   @override
@@ -20,6 +22,7 @@ class AuthException implements Exception {
   static const String accountLocked = 'ACCOUNT_LOCKED';
   static const String accountBanned = 'ACCOUNT_BANNED';
   static const String twoFactorRequired = 'TWO_FACTOR_REQUIRED';
+  static const String phoneVerificationRequired = 'PHONE_VERIFICATION_REQUIRED';
   static const String tokenExpired = 'TOKEN_EXPIRED';
   static const String unauthorized = 'UNAUTHORIZED';
   static const String unknown = 'UNKNOWN';

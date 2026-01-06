@@ -896,72 +896,95 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   Widget _buildInfoCards() {
     return Column(
       children: [
-        // Card Date et heure
-        _InfoCard(
-          icon: Icons.calendar_today,
-          iconColor: AppTheme.primaryColor,
-          title: 'Date et heure',
-          value: _formatDateTime(_ride!.date, _ride!.heure),
-        ),
-        const SizedBox(height: 12),
-        
-        // Card Lieu de départ
-        _InfoCard(
-          icon: Icons.location_on,
-          iconColor: AppTheme.successColor,
-          title: 'Lieu de départ',
-          value: _ride!.lieuDepart is String
-              ? _ride!.lieuDepart as String
-              : 'Lieu de départ',
-        ),
-        const SizedBox(height: 12),
-        
-        // Card Lieu d'arrivée
-        _InfoCard(
-          icon: Icons.place,
-          iconColor: AppTheme.errorColor,
-          title: 'Lieu d\'arrivée',
-          value: _ride!.lieuArrivee is String
-              ? _ride!.lieuArrivee as String
-              : 'Lieu d\'arrivée',
-        ),
-        
-        // Distance et durée si disponibles
-        if (_totalDistance != null) ...[
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.straighten,
-            iconColor: AppTheme.infoColor,
-            title: 'Distance',
-            value: '${_totalDistance!.toStringAsFixed(1)} km',
+        // Première carte : Informations de la balade
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppTheme.cardShadow,
           ),
-        ],
-        if (_estimatedDuration != null) ...[
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.access_time,
-            iconColor: AppTheme.warningColor,
-            title: 'Temps estimé',
-            value: _estimatedDuration!,
+          child: Column(
+            children: [
+              // Date et heure
+              _InfoRow(
+                icon: Icons.calendar_today,
+                iconColor: AppTheme.primaryColor,
+                title: 'Date et heure',
+                value: _formatDateTime(_ride!.date, _ride!.heure),
+              ),
+              const Divider(height: 24),
+              // Lieu de départ
+              _InfoRow(
+                icon: Icons.location_on,
+                iconColor: AppTheme.successColor,
+                title: 'Lieu de départ',
+                value: _ride!.lieuDepart is String
+                    ? _ride!.lieuDepart as String
+                    : 'Lieu de départ',
+              ),
+              const Divider(height: 24),
+              // Lieu d'arrivée
+              _InfoRow(
+                icon: Icons.place,
+                iconColor: AppTheme.errorColor,
+                title: 'Lieu d\'arrivée',
+                value: _ride!.lieuArrivee is String
+                    ? _ride!.lieuArrivee as String
+                    : 'Lieu d\'arrivée',
+              ),
+              // Distance si disponible
+              if (_totalDistance != null) ...[
+                const Divider(height: 24),
+                _InfoRow(
+                  icon: Icons.straighten,
+                  iconColor: AppTheme.infoColor,
+                  title: 'Distance',
+                  value: '${_totalDistance!.toStringAsFixed(1)} km',
+                ),
+              ],
+              // Temps estimé si disponible
+              if (_estimatedDuration != null) ...[
+                const Divider(height: 24),
+                _InfoRow(
+                  icon: Icons.access_time,
+                  iconColor: AppTheme.warningColor,
+                  title: 'Temps estimé',
+                  value: _estimatedDuration!,
+                ),
+              ],
+            ],
           ),
-        ],
-        
-        const SizedBox(height: 12),
-        // Card Organisateur
-        _InfoCard(
-          icon: Icons.person,
-          iconColor: AppTheme.primaryColor,
-          title: 'Organisateur',
-          value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
         ),
         const SizedBox(height: 12),
         
-        // Card Participants
-        _InfoCard(
-          icon: Icons.people,
-          iconColor: AppTheme.secondaryColor,
-          title: 'Participants',
-          value: '${_ride!.participants.length} participant${_ride!.participants.length > 1 ? 's' : ''}',
+        // Deuxième carte : Organisateur et Participants
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: Column(
+            children: [
+              // Organisateur
+              _InfoRow(
+                icon: Icons.person,
+                iconColor: AppTheme.primaryColor,
+                title: 'Organisateur',
+                value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
+              ),
+              const Divider(height: 24),
+              // Participants
+              _InfoRow(
+                icon: Icons.people,
+                iconColor: AppTheme.secondaryColor,
+                title: 'Participants',
+                value: '${_ride!.participants.length} participant${_ride!.participants.length > 1 ? 's' : ''}',
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1657,14 +1680,14 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 }
 
-// Widget pour les cards d'information premium
-class _InfoCard extends StatelessWidget {
+// Widget pour une ligne d'information dans une carte groupée
+class _InfoRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String value;
 
-  const _InfoCard({
+  const _InfoRow({
     required this.icon,
     required this.iconColor,
     required this.title,
@@ -1673,52 +1696,43 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 22),
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                    letterSpacing: 0.2,
-                  ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    height: 1.3,
-                    color: Colors.grey.shade900,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey.shade900,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
+

@@ -10,7 +10,9 @@ import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/profile/reputation_card.dart';
 import '../../widgets/profile/emergency_contact_card.dart';
+import '../../widgets/profile/referral_card.dart';
 import '../../providers/emergency_contact_provider.dart';
+import '../auth/phone_verification_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -190,6 +192,301 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     }
+  }
+
+  Future<void> _showChangePasswordDialog() async {
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool obscureOldPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
+    bool isChanging = false;
+    String? errorMessage;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // En-tête
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.lock_outline,
+                            size: 28,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Text(
+                            'Modifier le mot de passe',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Message d'erreur
+                    if (errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red[700], size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    // Ancien mot de passe
+                    TextFormField(
+                      controller: oldPasswordController,
+                      obscureText: obscureOldPassword,
+                      enabled: !isChanging,
+                      decoration: InputDecoration(
+                        labelText: 'Ancien mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureOldPassword ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey[600],
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              obscureOldPassword = !obscureOldPassword;
+                            });
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer votre ancien mot de passe';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Nouveau mot de passe
+                    TextFormField(
+                      controller: newPasswordController,
+                      obscureText: obscureNewPassword,
+                      enabled: !isChanging,
+                      decoration: InputDecoration(
+                        labelText: 'Nouveau mot de passe',
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureNewPassword ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey[600],
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              obscureNewPassword = !obscureNewPassword;
+                            });
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        helperText: 'Au moins 6 caractères',
+                        helperMaxLines: 1,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer un nouveau mot de passe';
+                        }
+                        if (value.length < 6) {
+                          return 'Le mot de passe doit contenir au moins 6 caractères';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Confirmation
+                    TextFormField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirmPassword,
+                      enabled: !isChanging,
+                      decoration: InputDecoration(
+                        labelText: 'Confirmer le nouveau mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey[600],
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              obscureConfirmPassword = !obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez confirmer le mot de passe';
+                        }
+                        if (value != newPasswordController.text) {
+                          return 'Les mots de passe ne correspondent pas';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    // Boutons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: isChanging
+                              ? null
+                              : () {
+                                  oldPasswordController.dispose();
+                                  newPasswordController.dispose();
+                                  confirmPasswordController.dispose();
+                                  Navigator.of(context).pop();
+                                },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Annuler',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: isChanging
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+
+                                  setDialogState(() {
+                                    isChanging = true;
+                                    errorMessage = null;
+                                  });
+
+                                  try {
+                                    final authService =
+                                        Provider.of<AuthService>(context, listen: false);
+                                    final token =
+                                        await authService.storage.read(key: 'token');
+                                    _apiService.setToken(token);
+
+                                    await _apiService.changePassword(
+                                      oldPasswordController.text,
+                                      newPasswordController.text,
+                                    );
+
+                                    if (!mounted) return;
+
+                                    oldPasswordController.dispose();
+                                    newPasswordController.dispose();
+                                    confirmPasswordController.dispose();
+
+                                    Navigator.of(context).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Mot de passe modifié avec succès'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    if (!mounted) return;
+
+                                    setDialogState(() {
+                                      errorMessage =
+                                          e.toString().replaceAll('Exception: ', '');
+                                      isChanging = false;
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isChanging
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text(
+                                  'Modifier',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showDeleteAccountDialog() async {
@@ -563,7 +860,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.email,
                             label: 'Email',
                             value: _user!.email,
+                            trailing: _user!.emailVerified
+                                ? Icon(Icons.check_circle, color: Colors.green[700], size: 20)
+                                : Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
                           ),
+                          if (!_user!.emailVerified)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8, left: 16),
+                              child: Text(
+                                'Email non vérifié',
+                                style: TextStyle(
+                                  color: Colors.orange[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          _ProfileField(
+                            icon: Icons.phone,
+                            label: 'Téléphone',
+                            value: _user!.phoneE164 ?? _user!.phone ?? 'Non renseigné',
+                            trailing: (_user!.phoneE164 != null || _user!.phone != null)
+                                ? (_user!.phoneVerified
+                                    ? Icon(Icons.check_circle, color: Colors.green[700], size: 20)
+                                    : Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20))
+                                : null,
+                            onTap: () => _showPhoneVerificationDialog(),
+                          ),
+                          if ((_user!.phoneE164 != null || _user!.phone != null) && !_user!.phoneVerified)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8, left: 16),
+                              child: Text(
+                                'Téléphone non vérifié',
+                                style: TextStyle(
+                                  color: Colors.orange[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 12),
                           _ProfileField(
                             icon: Icons.directions_car,
@@ -574,12 +910,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ? '🚗 Voiture'
                                     : 'Les deux',
                           ),
-                                const SizedBox(height: 12),
-                                _ProfileField(
-                                  icon: Icons.verified,
-                                  label: 'Email vérifié',
-                                  value: _user!.emailVerified ? 'Oui' : 'Non',
-                                ),
                               ],
                             ),
                           ),
@@ -587,6 +917,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // Section réputation et badges
                           if (_user != null)
                             ReputationCard(userId: _user!.id),
+                          const SizedBox(height: 16),
+                          // Section parrainage
+                          const ReferralCard(),
                           const SizedBox(height: 16),
                           // Section contact d'urgence
                           const EmergencyContactCard(),
@@ -668,6 +1001,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ? Icons.face 
                                           : Icons.fingerprint,
                                     ),
+                                  ),
+                                  const Divider(),
+                                  ListTile(
+                                    leading: const Icon(Icons.lock_outline),
+                                    title: const Text('Modifier le mot de passe'),
+                                    subtitle: const Text('Changer votre mot de passe'),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => _showChangePasswordDialog(),
                                   ),
                                 ],
                               ),
@@ -760,6 +1101,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 InkWell(
+                                  onTap: () => _showChangePasswordDialog(),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.lock_outline,
+                                          size: 20,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'Modifier le mot de passe',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade800,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 20,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const Divider(height: 24),
+                                InkWell(
                                   onTap: () => _showDeleteAccountDialog(),
                                   borderRadius: BorderRadius.circular(8),
                                   child: Padding(
@@ -800,22 +1174,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  Future<void> _showPhoneVerificationDialog() async {
+    final userPhone = _user?.phoneE164 ?? _user?.phone;
+    if (userPhone == null || userPhone.isEmpty) {
+      // Si pas de téléphone, proposer d'en ajouter un
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez d\'abord ajouter un téléphone dans les paramètres'),
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PhoneVerificationScreen(
+          phone: userPhone,
+          isRegistration: false,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Rafraîchir le profil après vérification
+      await _loadProfile();
+    }
+  }
 }
 
 class _ProfileField extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
 
   const _ProfileField({
     required this.icon,
     required this.label,
     required this.value,
+    this.trailing,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    Widget content = Row(
       children: [
         Icon(icon, size: 20, color: Colors.black87),
         const SizedBox(width: 12),
@@ -842,8 +1247,21 @@ class _ProfileField extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ],
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }
 

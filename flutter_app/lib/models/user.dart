@@ -8,6 +8,9 @@ class User {
   final String role;
   final List<String> roles;
   final bool emailVerified;
+  final String? phone; // Rétrocompatibilité
+  final String? phoneE164; // Nouveau champ obligatoire
+  final bool phoneVerified;
   final bool isTwoFactorEnabled;
   final String? twoFactorMethod;
   final String? avatarUrl;
@@ -23,6 +26,9 @@ class User {
     required this.role,
     required this.roles,
     required this.emailVerified,
+    this.phone,
+    this.phoneE164,
+    this.phoneVerified = false,
     required this.isTwoFactorEnabled,
     this.twoFactorMethod,
     this.avatarUrl,
@@ -40,6 +46,9 @@ class User {
       role: json['role'] ?? 'MEMBER',
       roles: json['roles'] != null ? List<String>.from(json['roles']) : ['MEMBER'],
       emailVerified: json['emailVerified'] ?? false,
+      phone: json['phone'] ?? json['phoneE164'], // Rétrocompatibilité
+      phoneE164: json['phoneE164'] ?? json['phone'], // Utiliser phoneE164 en priorité
+      phoneVerified: json['phoneVerified'] ?? false,
       isTwoFactorEnabled: json['isTwoFactorEnabled'] ?? false,
       twoFactorMethod: json['twoFactorMethod'],
       avatarUrl: json['avatarUrl'],
