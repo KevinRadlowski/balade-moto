@@ -63,6 +63,31 @@ class BadRequestError extends AppError {
   }
 }
 
+/**
+ * Crée une erreur standardisée pour les limites de plan (quota)
+ * @param {string} limitKey - La clé de la limite (ex: 'maxVehiclesTotal')
+ * @param {number} limit - La valeur de la limite
+ * @param {number} current - La valeur actuelle
+ * @param {string} plan - Le plan de l'utilisateur ('FREE' ou 'PREMIUM')
+ * @param {string} resourceName - Le nom de la ressource (ex: 'véhicules', 'photos', 'balades privées')
+ * @returns {ForbiddenError} Une erreur avec la structure PLAN_LIMIT standardisée
+ */
+function createPlanLimitError(limitKey, limit, current, plan, resourceName) {
+  const remaining = Math.max(0, limit - current);
+  const message = `Limite atteinte : vous ne pouvez créer que ${limit} ${resourceName} avec le plan gratuit (actuellement ${current}). Passez à Premium pour créer un nombre illimité de ${resourceName}.`;
+  
+  const error = new ForbiddenError(message);
+  error.code = 'PLAN_LIMIT';
+  error.details = {
+    limit,
+    current,
+    remaining,
+    plan
+  };
+  
+  return error;
+}
+
 module.exports = {
   AppError,
   ValidationError,
@@ -71,6 +96,7 @@ module.exports = {
   NotFoundError,
   ConflictError,
   InternalServerError,
-  BadRequestError
+  BadRequestError,
+  createPlanLimitError
 };
 

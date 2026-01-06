@@ -4,7 +4,7 @@ const MaintenanceItem = require('../models/MaintenanceItem');
 const MaintenanceLog = require('../models/MaintenanceLog');
 const VehicleReminder = require('../models/VehicleReminder');
 const VehicleDocument = require('../models/VehicleDocument');
-const { NotFoundError, ForbiddenError, BadRequestError } = require('../utils/errors');
+const { NotFoundError, ForbiddenError, BadRequestError, createPlanLimitError } = require('../utils/errors');
 const { createRecommendedMaintenancePack } = require('../services/maintenancePack.service');
 const { getMaintenanceSuggestions } = require('../services/maintenanceSuggestions.service');
 
@@ -120,6 +120,25 @@ const { getMaintenanceSuggestions } = require('../services/maintenanceSuggestion
  */
 exports.createVehicle = async (req, res, next) => {
   try {
+    // Vérifier les limites du plan (FREE vs PREMIUM)
+    const premiumConfig = require('../config/premium.config');
+    const userPlan = premiumConfig.getUserPlan(req.user);
+    const limits = premiumConfig.getPlanLimits(userPlan);
+    
+    // Vérifier la limite totale de véhicules
+    if (!premiumConfig.canPerformAction(userPlan, 'maxVehiclesTotal')) {
+      const vehicleCount = await Vehicle.countDocuments({ ownerUserId: req.user._id });
+      if (vehicleCount >= limits.maxVehiclesTotal) {
+        throw createPlanLimitError(
+          'maxVehiclesTotal',
+          limits.maxVehiclesTotal,
+          vehicleCount,
+          userPlan,
+          'véhicule(s)'
+        );
+      }
+    }
+    
     const {
       nickname,
       make,
@@ -1798,6 +1817,11 @@ exports.uploadVehiclePhoto = async (req, res, next) => {
 // Ajouter plusieurs photos à la galerie d'un véhicule
 exports.addVehiclePhotos = async (req, res, next) => {
   try {
+    // Vérifier les limites du plan (FREE vs PREMIUM) pour les photos
+    const premiumConfig = require('../config/premium.config');
+    const userPlan = premiumConfig.getUserPlan(req.user);
+    const limits = premiumConfig.getPlanLimits(userPlan);
+    
     const vehicle = await Vehicle.findById(req.params.id);
 
     if (!vehicle) {
@@ -1810,6 +1834,33 @@ exports.addVehiclePhotos = async (req, res, next) => {
 
     if (!req.files || req.files.length === 0) {
       throw new BadRequestError('Aucun fichier uploadé');
+    }
+    
+    // Vérifier la limite totale de photos (FREE seulement)
+    if (!premiumConfig.isPremium(userPlan)) {
+      // Compter toutes les photos de tous les véhicules de l'utilisateur
+      const allUserVehicles = await Vehicle.find({ ownerUserId: req.user._id });
+      let totalPhotos = 0;
+      for (const v of allUserVehicles) {
+        if (v.photos && Array.isArray(v.photos)) {
+          totalPhotos += v.photos.length;
+        }
+        // Compter aussi la photo principale si elle existe
+        if (v.photoUrl) {
+          totalPhotos += 1;
+        }
+      }
+      
+      const photosToAdd = req.files.length;
+      if (totalPhotos + photosToAdd > limits.maxPhotosTotal) {
+        throw createPlanLimitError(
+          'maxPhotosTotal',
+          limits.maxPhotosTotal,
+          totalPhotos,
+          userPlan,
+          'photo(s)'
+        );
+      }
     }
 
     const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;

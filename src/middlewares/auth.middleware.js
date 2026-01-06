@@ -28,6 +28,15 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    // Vérifier si l'utilisateur est supprimé (soft delete)
+    if (user.isDeleted) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Ce compte a été supprimé',
+        deleted: true
+      });
+    }
+
     // Vérifier si l'utilisateur est banni
     if (user.banned) {
       return res.status(403).json({ 

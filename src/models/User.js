@@ -115,6 +115,52 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Téléphone (format E.164: +33612345678) - OBLIGATOIRE sauf pour OAuth
+  phoneE164: {
+    type: String,
+    required: function() {
+      // Le téléphone est obligatoire seulement si l'utilisateur n'utilise pas OAuth
+      return !this.authProvider;
+    },
+    trim: true,
+    unique: true,
+    sparse: true, // Permet plusieurs null (pour OAuth)
+    index: true,
+    validate: {
+      validator: function(value) {
+        // Si null (OAuth), c'est valide
+        if (!value) return true;
+        // Format E.164: commence par +, suivi de 1-3 chiffres (indicatif), puis 4-14 chiffres
+        return /^\+[1-9]\d{1,14}$/.test(value);
+      },
+      message: 'Le numéro de téléphone doit être au format E.164 (ex: +33612345678)'
+    }
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  // Statut du compte
+  status: {
+    type: String,
+    enum: ['pending_phone_verification', 'active'],
+    default: 'pending_phone_verification',
+    index: true
+  },
+  // Flag pour éviter d'accorder la récompense de parrainage plusieurs fois
+  referralRewardGranted: {
+    type: Boolean,
+    default: false
+  },
+  // Réinitialisation mot de passe
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  },
   // Verrouillage compte
   loginAttempts: {
     type: Number,
@@ -129,6 +175,20 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
     index: true
+  },
+  // Soft delete - Suppression de compte
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  anonymizedAt: {
+    type: Date,
+    default: null
   },
   // Authentification à deux facteurs
   twoFactorEnabled: {
@@ -204,6 +264,38 @@ const userSchema = new mongoose.Schema({
         default: null
       }
     }
+  },
+  // Parrainage
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    uppercase: true,
+    index: true
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true
+  },
+  // Abonnement Premium
+  subscription: {
+    isPremium: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    premiumExpiresAt: {
+      type: Date,
+      default: null
+    },
+    premiumSource: {
+      type: String,
+      enum: ['purchase', 'referral_reward', 'admin_grant'],
+      default: null
+    }
   }
 }, {
   timestamps: true
@@ -231,6 +323,32 @@ userSchema.pre('save', async function(next) {
   }
   if (this.isModified('isTwoFactorEnabled')) {
     this.twoFactorEnabled = this.isTwoFactorEnabled;
+  }
+  
+  // Générer un code de parrainage unique si l'utilisateur n'en a pas (nouveau ou existant)
+  if (!this.referralCode) {
+    const crypto = require('crypto');
+    let code;
+    let isUnique = false;
+    let attempts = 0;
+    const User = this.constructor;
+    
+    while (!isUnique && attempts < 10) {
+      // Générer un code de 8 caractères (lettres majuscules et chiffres)
+      code = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const existing = await User.findOne({ referralCode: code });
+      if (!existing) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+    
+    if (isUnique) {
+      this.referralCode = code;
+    } else {
+      // Fallback : utiliser l'ID avec un préfixe
+      this.referralCode = `REF${this._id.toString().slice(-8).toUpperCase()}`;
+    }
   }
   
   // Ne pas hasher le mot de passe si l'utilisateur utilise OAuth ou si le mot de passe n'est pas modifié

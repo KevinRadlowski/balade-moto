@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const vehicleCatalogController = require('../controllers/vehicle-catalog.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
+const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 
 // Toutes les routes nécessitent une authentification
 router.use(authMiddleware);
+router.use(subscriptionMiddleware);
 
 /**
  * @swagger

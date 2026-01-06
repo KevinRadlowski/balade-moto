@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const emailService = require('../services/email.service');
+const referralService = require('../services/referral.service');
 const { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } = require('../utils/errors');
 const { buildUserAvatarUrl } = require('../utils/urlHelper');
 
@@ -24,10 +25,15 @@ const generateEmailVerificationToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+// Générer un token de réinitialisation de mot de passe
+const generateResetPasswordToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
 // Inscription
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, pseudo } = req.body;
+    const { email, password, pseudo, phone, referralCode } = req.body;
 
     // Normaliser l'email (comme Mongoose le fait avec lowercase: true)
     const normalizedEmail = email.toLowerCase().trim();
@@ -43,9 +49,56 @@ exports.register = async (req, res, next) => {
       throw new ConflictError('Ce pseudo est déjà utilisé');
     }
 
-    // Vérifier si on doit ignorer la vérification email en développement
-    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' ||
-                                 (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    // Vérifier que le téléphone est fourni (OBLIGATOIRE)
+    if (!phone || (typeof phone === 'string' && phone.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le numéro de téléphone est obligatoire pour créer un compte',
+        errors: [{
+          field: 'phone',
+          message: 'Le numéro de téléphone est obligatoire. Veuillez renseigner votre numéro au format international (ex: +33612345678).'
+        }]
+      });
+    }
+
+    // Normaliser le téléphone en E.164
+    const { normalizePhoneE164 } = require('../utils/phone.utils');
+    const phoneE164 = normalizePhoneE164(phone);
+    if (!phoneE164) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format de numéro de téléphone invalide',
+        errors: [{
+          field: 'phone',
+          message: 'Le format du numéro de téléphone est invalide. Utilisez le format international avec l\'indicatif pays (ex: +33612345678 pour la France, +14155552671 pour les États-Unis).'
+        }]
+      });
+    }
+    
+    // Vérifier si le téléphone existe déjà
+    const existingUserByPhone = await User.findOne({ phoneE164 });
+    if (existingUserByPhone) {
+      throw new ConflictError('Ce numéro de téléphone est déjà utilisé');
+    }
+
+    // Vérifier et traiter le code de parrainage si fourni
+    let referrer = null;
+    let referralCodeValid = false;
+    if (referralCode) {
+      const normalizedCode = referralCode.trim().toUpperCase();
+      referrer = await User.findOne({ referralCode: normalizedCode });
+      
+      if (referrer) {
+        referralCodeValid = true;
+      }
+      // Si le code n'existe pas, on continue l'inscription sans attribuer de récompense
+      // On ne bloque pas l'inscription pour un code invalide
+    }
+
+    // Vérifier si on doit ignorer la vérification email
+    // Par défaut, la vérification est activée (même en développement)
+    // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
 
     // Générer un token de vérification email
     const emailVerificationToken = generateEmailVerificationToken();
@@ -56,14 +109,53 @@ exports.register = async (req, res, next) => {
       email: normalizedEmail, // Utiliser l'email normalisé
       password,
       pseudo: pseudo.trim(),
+      phoneE164: phoneE164,
+      phoneVerified: false, // Le téléphone nécessitera une vérification OTP via Twilio Verify
+      status: 'pending_phone_verification', // Compte en attente de vérification téléphone
       role: 'MEMBER', // Par défaut MEMBER
       emailVerified: skipEmailVerification, // Auto-vérifier en mode développement
       emailVerificationToken,
       emailVerificationExpires,
-      emailVerificationLastSent: new Date()
+      emailVerificationLastSent: new Date(),
+      referredBy: referrer ? referrer._id : null,
+      referralRewardGranted: false // Les récompenses seront accordées après vérification du téléphone
     });
 
     await user.save();
+
+    // Envoyer automatiquement l'OTP via Twilio Verify
+    let otpSent = false;
+    try {
+      const { getTwilioClient, isTwilioConfigured, getVerifyServiceSid } = require('../config/twilio');
+      
+      if (isTwilioConfigured()) {
+        const twilioClient = getTwilioClient();
+        const verifyServiceSid = getVerifyServiceSid();
+        
+        if (twilioClient && verifyServiceSid) {
+          await twilioClient.verify.v2
+            .services(verifyServiceSid)
+            .verifications
+            .create({
+              to: phoneE164,
+              channel: 'sms'
+            });
+          otpSent = true;
+        }
+      } else if (process.env.NODE_ENV === 'development' || process.env.SKIP_SMS_VERIFICATION === 'true') {
+        // En développement, simuler l'envoi
+        console.log(`📱 [DEV] OTP simulé pour ${phoneE164} (inscription)`);
+        otpSent = true;
+      }
+    } catch (otpError) {
+      console.error('Erreur lors de l\'envoi automatique de l\'OTP:', otpError.message);
+      // On continue même si l'OTP échoue, l'utilisateur peut demander un renvoi
+      otpSent = false;
+    }
+
+    // NOTE: Les récompenses de parrainage ne sont PAS accordées ici
+    // Elles seront accordées uniquement après vérification du téléphone (phoneVerified=true et status=active)
+    // Voir phoneOtp.controller.js -> verifyOtp -> _grantReferralRewardsIfNeeded
 
     // Envoyer l'email de vérification
     let emailSent = false;
@@ -77,20 +169,33 @@ exports.register = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: emailSent 
-        ? 'Utilisateur créé avec succès. Un email de vérification a été envoyé.'
-        : 'Utilisateur créé avec succès. Cependant, l\'email de vérification n\'a pas pu être envoyé. Veuillez utiliser la fonction "Renvoyer l\'email de vérification" sur la page de connexion.',
+      message: otpSent 
+        ? 'Compte créé. Un code de vérification a été envoyé à votre numéro de téléphone. Veuillez vérifier votre téléphone pour activer votre compte.'
+        : 'Compte créé. Cependant, l\'envoi du code de vérification a échoué. Veuillez utiliser la fonction "Renvoyer le code" pour recevoir votre code OTP.',
+      nextStep: 'PHONE_VERIFICATION',
+      otpSent: otpSent,
       emailSent: emailSent,
       data: {
         user: {
           id: user._id,
           email: user.email,
           role: user.role,
-          emailVerified: user.emailVerified
+          status: user.status,
+          phoneE164: user.phoneE164,
+          phoneVerified: user.phoneVerified
         }
       }
     });
   } catch (error) {
+    // Gérer les erreurs de conflit (email ou pseudo déjà utilisé)
+    if (error instanceof ConflictError) {
+      return res.status(409).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    // Gérer les erreurs de validation Mongoose
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -98,6 +203,9 @@ exports.register = async (req, res, next) => {
         errors: Object.values(error.errors).map(err => err.message)
       });
     }
+    
+    // Erreur générique
+    console.error('Erreur lors de l\'inscription:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de l\'inscription',
@@ -323,7 +431,9 @@ exports.verifyEmail = async (req, res) => {
 
     // Si c'est une requête GET (depuis le lien email), retourner une page HTML
     if (req.method === 'GET') {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      // Récupérer la première URL frontend si plusieurs sont définies
+      const frontendUrlRaw = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = frontendUrlRaw.split(',')[0].trim();
       const loginUrl = `${frontendUrl}/login`;
       
       return res.status(200).send(`
@@ -333,6 +443,7 @@ exports.verifyEmail = async (req, res) => {
           <title>Email vérifié</title>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="refresh" content="6;url=${loginUrl}">
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -369,6 +480,20 @@ exports.verifyEmail = async (req, res) => {
               font-size: 14px;
               margin-top: 20px;
             }
+            .button {
+              display: inline-block;
+              margin-top: 20px;
+              padding: 12px 24px;
+              background-color: #4CAF50;
+              color: white;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;
+              transition: background-color 0.3s;
+            }
+            .button:hover {
+              background-color: #45a049;
+            }
           </style>
         </head>
         <body>
@@ -377,12 +502,28 @@ exports.verifyEmail = async (req, res) => {
             <h1>Email vérifié avec succès !</h1>
             <p>Votre compte a été activé. Vous allez être redirigé vers la page de connexion dans <span id="countdown">5</span> secondes...</p>
             <p class="countdown">Redirection en cours...</p>
+            <a href="${loginUrl}" class="button" id="redirectButton" style="display: none;">Aller à la page de connexion</a>
           </div>
           <script>
             let seconds = 5;
             const countdownElement = document.getElementById('countdown');
+            const redirectButton = document.getElementById('redirectButton');
             const loginUrl = '${loginUrl}';
             
+            // Fonction de redirection
+            function redirect() {
+              try {
+                window.location.href = loginUrl;
+              } catch (e) {
+                console.error('Erreur de redirection:', e);
+                // Afficher le bouton si la redirection automatique échoue
+                if (redirectButton) {
+                  redirectButton.style.display = 'inline-block';
+                }
+              }
+            }
+            
+            // Compte à rebours
             const countdown = setInterval(function() {
               seconds--;
               if (countdownElement) {
@@ -390,9 +531,16 @@ exports.verifyEmail = async (req, res) => {
               }
               if (seconds <= 0) {
                 clearInterval(countdown);
-                window.location.href = loginUrl;
+                redirect();
               }
             }, 1000);
+            
+            // Redirection de secours après 6 secondes
+            setTimeout(function() {
+              if (window.location.href.indexOf('login') === -1) {
+                redirect();
+              }
+            }, 6000);
           </script>
         </body>
         </html>
@@ -417,24 +565,64 @@ exports.verifyEmail = async (req, res) => {
 // Connexion
 exports.login = async (req, res) => {
   try {
-    const { email, password, totpCode } = req.body;
+    const { identifier, email, password, totpCode } = req.body;
 
-    // Vérifier que l'email et le mot de passe sont fournis
-    if (!email || !password) {
+    // Support rétrocompatibilité: accepter 'email' ou 'identifier'
+    const loginIdentifier = identifier || email;
+
+    // Vérifier que l'identifiant et le mot de passe sont fournis
+    if (!loginIdentifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Veuillez fournir un email et un mot de passe'
+        message: 'Veuillez fournir un email/téléphone et un mot de passe'
       });
     }
 
-    // Trouver l'utilisateur par email (normaliser en minuscules pour correspondre au schéma)
-    const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    // Déterminer si c'est un email ou un téléphone
+    let user = null;
+    if (loginIdentifier.includes('@')) {
+      // C'est un email
+      const normalizedEmail = loginIdentifier.toLowerCase().trim();
+      user = await User.findOne({ email: normalizedEmail });
+    } else {
+      // C'est probablement un téléphone (normaliser en E.164)
+      const { normalizePhoneE164 } = require('../utils/phone.utils');
+      const phoneE164 = normalizePhoneE164(loginIdentifier);
+      if (phoneE164) {
+        user = await User.findOne({ phoneE164 });
+        
+        // Si téléphone non vérifié, refuser la connexion
+        if (user && !user.phoneVerified) {
+          return res.status(403).json({
+            success: false,
+            message: 'Votre numéro de téléphone n\'a pas été vérifié. Veuillez vérifier votre téléphone avant de vous connecter.'
+          });
+        }
+      }
+    }
+
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Email ou mot de passe incorrect'
+        message: 'Email/téléphone ou mot de passe incorrect'
       });
+    }
+
+    // Vérifier que le compte est actif (téléphone vérifié)
+    // Exception : les utilisateurs OAuth peuvent se connecter sans téléphone (ils devront l'ajouter plus tard)
+    if (user.status !== 'active' && !user.authProvider) {
+      return res.status(403).json({
+        success: false,
+        message: 'Votre numéro de téléphone doit être vérifié avant de vous connecter. Veuillez vérifier votre téléphone pour activer votre compte.',
+        requiresPhoneVerification: true,
+        phoneE164: user.phoneE164 || null // Retourner le numéro de téléphone pour permettre la vérification
+      });
+    }
+    
+    // Pour les utilisateurs OAuth sans téléphone, permettre la connexion mais informer qu'ils devront ajouter un téléphone
+    if (user.authProvider && (!user.phoneE164 || !user.phoneVerified)) {
+      // Permettre la connexion mais le compte reste en attente de téléphone
+      // L'utilisateur devra ajouter un téléphone depuis le profil
     }
 
     // Vérifier si le compte est verrouillé
@@ -488,20 +676,16 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Vérifier si on doit ignorer la vérification email en développement
-    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' ||
-                                 (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    // Vérifier si on doit ignorer la vérification email
+    // Par défaut, la vérification est activée (même en développement)
+    // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+    const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
 
-    // Vérifier si l'email est vérifié (sauf en mode développement avec vérification désactivée)
-    if (!user.emailVerified && !skipEmailVerification) {
-      return res.status(403).json({
-        success: false,
-        message: 'Veuillez vérifier votre email avant de vous connecter. Si vous n\'avez pas reçu l\'email, vous pouvez le renvoyer.',
-        emailVerified: false
-      });
-    }
-
-    // En mode développement, auto-vérifier l'email si ce n'est pas déjà fait
+    // L'email est maintenant optionnel - on ne bloque plus la connexion si l'email n'est pas vérifié
+    // La vérification du téléphone est obligatoire (déjà vérifiée plus haut avec status === 'active')
+    // On peut juste informer l'utilisateur que l'email n'est pas vérifié, mais on ne bloque pas la connexion
+    
+    // En mode développement, auto-vérifier l'email si ce n'est pas déjà fait (pour faciliter les tests)
     if (!user.emailVerified && skipEmailVerification) {
       user.emailVerified = true;
       await user.save();
@@ -584,6 +768,186 @@ exports.login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la connexion',
+      error: error.message
+    });
+  }
+};
+
+// Demander la réinitialisation du mot de passe
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Veuillez fournir un email'
+      });
+    }
+
+    // Normaliser l'email
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // Vérifier si l'utilisateur existe
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Aucun compte trouvé avec cet email'
+      });
+    }
+
+    // Vérifier si l'utilisateur utilise OAuth (pas de mot de passe)
+    if (user.authProvider) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ce compte utilise une connexion via ' + user.authProvider + '. Vous ne pouvez pas réinitialiser le mot de passe de cette manière.'
+      });
+    }
+
+    // Générer un token de réinitialisation
+    const resetToken = generateResetPasswordToken();
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 heure
+    await user.save();
+
+    // Envoyer l'email de réinitialisation
+    try {
+      const emailSent = await emailService.sendResetPasswordEmail(user.email, resetToken);
+      
+      // Si SKIP_EMAIL_VERIFICATION est activé, emailSent peut être false mais c'est normal
+      const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+      
+      if (!emailSent && !skipVerification) {
+        // L'email n'a pas pu être envoyé et ce n'est pas en mode développement
+        console.error('Erreur: l\'email de réinitialisation n\'a pas pu être envoyé');
+        return res.status(500).json({
+          success: false,
+          message: 'Erreur technique lors de l\'envoi de l\'email. Veuillez réessayer plus tard ou contacter le support.'
+        });
+      }
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', emailError);
+      
+      // Si SKIP_EMAIL_VERIFICATION est activé, ignorer l'erreur
+      const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+      
+      if (!skipVerification) {
+        // En production ou si la vérification n'est pas désactivée, retourner une erreur
+        return res.status(500).json({
+          success: false,
+          message: 'Erreur technique lors de l\'envoi de l\'email. Veuillez réessayer plus tard ou contacter le support.'
+        });
+      }
+      // Sinon, continuer comme si tout s'était bien passé (mode développement)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Si cet email existe dans notre système, vous recevrez un lien de réinitialisation'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la demande de réinitialisation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la demande de réinitialisation',
+      error: error.message
+    });
+  }
+};
+
+// Réinitialiser le mot de passe avec le token
+exports.resetPassword = async (req, res) => {
+  try {
+    // Si c'est une requête GET (depuis le lien email), retourner une page HTML
+    if (req.method === 'GET') {
+      const { token } = req.query;
+
+      if (!token) {
+        // Rediriger vers Flutter avec un message d'erreur
+        const frontendUrlRaw = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = frontendUrlRaw.split(',')[0].trim();
+        const errorUrl = `${frontendUrl}/reset-password?error=token_missing`;
+        return res.redirect(errorUrl);
+      }
+
+      // Vérifier que le token est valide
+      const user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() }
+      });
+
+      if (!user) {
+        // Rediriger vers Flutter avec un message d'erreur
+        const frontendUrlRaw = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = frontendUrlRaw.split(',')[0].trim();
+        const errorUrl = `${frontendUrl}/reset-password?error=token_invalid`;
+        return res.redirect(errorUrl);
+      }
+
+      // Rediriger vers le frontend Flutter
+      const frontendUrlRaw = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = frontendUrlRaw.split(',')[0].trim();
+      const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+      return res.redirect(resetUrl);
+    }
+
+    // Si c'est une requête POST (depuis l'app Flutter)
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le token et le nouveau mot de passe sont requis'
+      });
+    }
+
+    // Vérifier la longueur du mot de passe
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le mot de passe doit contenir au moins 6 caractères'
+      });
+    }
+
+    // Trouver l'utilisateur avec un token valide et non expiré
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token invalide ou expiré'
+      });
+    }
+
+    // Vérifier que le nouveau mot de passe est différent de l'ancien
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le nouveau mot de passe doit être différent de l\'ancien'
+      });
+    }
+
+    // Mettre à jour le mot de passe (sera hashé automatiquement par le pre-save hook)
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Mot de passe réinitialisé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation du mot de passe:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la réinitialisation du mot de passe',
       error: error.message
     });
   }
@@ -858,6 +1222,8 @@ exports.getMe = async (req, res) => {
           role: req.user.role,
           roles: req.user.roles,
           emailVerified: req.user.emailVerified,
+          phoneE164: req.user.phoneE164, // Numéro de téléphone au format E.164
+          phoneVerified: req.user.phoneVerified, // Statut de vérification du téléphone
           twoFactorEnabled: req.user.twoFactorEnabled || req.user.isTwoFactorEnabled,
           isTwoFactorEnabled: req.user.isTwoFactorEnabled || req.user.twoFactorEnabled,
           twoFactorMethod: req.user.twoFactorMethod,

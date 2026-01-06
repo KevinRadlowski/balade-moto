@@ -3,14 +3,36 @@ const User = require('../models/User');
 const Like = require('../models/Like');
 const icsService = require('../services/ics.service');
 const https = require('https');
-const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError } = require('../utils/errors');
+const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError, createPlanLimitError } = require('../utils/errors');
 const { routeCache, geocodeCache, reverseGeocodeCache } = require('../utils/cache');
 const compatibilityService = require('../services/compatibility.service');
 const achievementService = require('../services/achievement.service');
 const vehicleStatsService = require('../services/vehicleStats.service');
 
+// Helper pour normaliser un organisateur supprimé ou introuvable
+function normalizeOrganizer(organisateur) {
+  if (!organisateur || organisateur.isDeleted) {
+    return {
+      _id: organisateur?._id || null,
+      id: organisateur?._id?.toString() || null,
+      firstName: null,
+      lastName: null,
+      pseudo: 'Utilisateur supprimé',
+      email: null,
+      vehiclePreference: null,
+      isDeleted: true
+    };
+  }
+  return organisateur;
+}
+
 exports.createRide = async (req, res, next) => {
   try {
+    // Vérifier les limites du plan (FREE vs PREMIUM) pour les balades privées
+    const premiumConfig = require('../config/premium.config');
+    const userPlan = premiumConfig.getUserPlan(req.user);
+    const limits = premiumConfig.getPlanLimits(userPlan);
+    
     const {
       titre,
       description,
@@ -73,6 +95,29 @@ exports.createRide = async (req, res, next) => {
       finalLieuArrivee = arriveeWaypoint.address || JSON.stringify(arriveeWaypoint.coordinates);
     }
 
+    const finalVisibilite = visibilite || 'publique';
+    
+    // Vérifier la limite de balades privées par mois (FREE seulement)
+    if (finalVisibilite === 'privee' && !premiumConfig.isPremium(userPlan)) {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const privateRidesThisMonth = await Ride.countDocuments({
+        organisateur: req.user._id,
+        visibilite: 'privee',
+        date: { $gte: startOfMonth }
+      });
+      
+      if (privateRidesThisMonth >= limits.maxPrivateRidesCreatedPerMonth) {
+        throw createPlanLimitError(
+          'maxPrivateRidesCreatedPerMonth',
+          limits.maxPrivateRidesCreatedPerMonth,
+          privateRidesThisMonth,
+          userPlan,
+          'balade(s) privée(s) par mois'
+        );
+      }
+    }
+    
     const rideData = {
       titre,
       description,
@@ -83,7 +128,7 @@ exports.createRide = async (req, res, next) => {
       lieuArrivee: finalLieuArrivee,
       rayon: rayon || 0,
       organisateur: req.user._id,
-      visibilite: visibilite || 'publique',
+      visibilite: finalVisibilite,
       participants: [{ userId: req.user._id }], // L'organisateur est automatiquement participant
       localisation: rideLocalisation,
       status: 'scheduled', // Statut par défaut
@@ -937,11 +982,16 @@ exports.getRideById = async (req, res, next) => {
       throw new NotFoundError('Balade');
     }
 
+    // Normaliser l'organisateur si supprimé
+    ride.organisateur = normalizeOrganizer(ride.organisateur);
+
     // Vérifier la visibilité
     if (ride.visibilite === 'privee') {
-      const isOrganizer = ride.organisateur._id.toString() === req.user._id.toString();
+      // Vérifier si l'organisateur existe avant de comparer
+      const isOrganizer = ride.organisateur && ride.organisateur._id && 
+        ride.organisateur._id.toString() === req.user._id.toString();
       const isParticipant = ride.participants.some(
-        p => p._id.toString() === req.user._id.toString()
+        p => p.userId && (p.userId._id ? p.userId._id.toString() : p.userId.toString()) === req.user._id.toString()
       );
       
       if (!isOrganizer && !isParticipant) {
@@ -959,6 +1009,8 @@ exports.getRideById = async (req, res, next) => {
     const rideObj = ride.toObject();
     rideObj.totalLikes = totalLikes;
     rideObj.hasUserLiked = hasUserLiked;
+    // S'assurer que l'organisateur est normalisé dans l'objet
+    rideObj.organisateur = normalizeOrganizer(rideObj.organisateur);
 
     res.status(200).json({
       success: true,
@@ -1004,12 +1056,24 @@ exports.updateRide = async (req, res, next) => {
       });
     }
 
-    // Vérifier que l'utilisateur est l'organisateur
-    if (ride.organisateur.toString() !== req.user._id.toString()) {
+    // Normaliser l'organisateur si supprimé
+    ride.organisateur = normalizeOrganizer(ride.organisateur);
+
+    // Vérifier que l'utilisateur est l'organisateur (ou que l'organisateur est supprimé)
+    const isOrganizer = ride.organisateur && ride.organisateur._id && 
+      ride.organisateur._id.toString() === req.user._id.toString();
+    
+    if (!isOrganizer && !ride.organisateur.isDeleted) {
       return res.status(403).json({
         success: false,
         message: 'Vous n\'êtes pas autorisé à modifier cette balade'
       });
+    }
+    
+    // Si l'organisateur est supprimé, permettre la modification mais suggérer de reprendre l'organisation
+    if (ride.organisateur.isDeleted) {
+      // L'utilisateur peut modifier mais on suggère de reprendre l'organisation
+      // On continue sans bloquer
     }
 
     // Mettre à jour les champs fournis
@@ -1101,8 +1165,14 @@ exports.deleteRide = async (req, res, next) => {
       });
     }
 
+    // Normaliser l'organisateur si supprimé
+    ride.organisateur = normalizeOrganizer(ride.organisateur);
+
     // Vérifier que l'utilisateur est l'organisateur
-    if (ride.organisateur.toString() !== req.user._id.toString()) {
+    const isOrganizer = ride.organisateur && ride.organisateur._id && 
+      ride.organisateur._id.toString() === req.user._id.toString();
+    
+    if (!isOrganizer) {
       return res.status(403).json({
         success: false,
         message: 'Vous n\'êtes pas autorisé à supprimer cette balade'
@@ -1472,8 +1542,14 @@ exports.completeRide = async (req, res, next) => {
       throw new NotFoundError('Balade non trouvée');
     }
 
+    // Normaliser l'organisateur si supprimé
+    ride.organisateur = normalizeOrganizer(ride.organisateur);
+
     // Vérifier que l'utilisateur est l'organisateur
-    if (ride.organisateur.toString() !== userId.toString()) {
+    const isOrganizer = ride.organisateur && ride.organisateur._id && 
+      ride.organisateur._id.toString() === userId.toString();
+    
+    if (!isOrganizer) {
       throw new ForbiddenError('Seul l\'organisateur peut marquer la balade comme terminée');
     }
 
@@ -2099,8 +2175,14 @@ exports.validatePunctuality = async (req, res) => {
       });
     }
 
+    // Normaliser l'organisateur si supprimé
+    ride.organisateur = normalizeOrganizer(ride.organisateur);
+
     // Vérifier que l'utilisateur est l'organisateur
-    if (ride.organisateur.toString() !== req.user._id.toString()) {
+    const isOrganizer = ride.organisateur && ride.organisateur._id && 
+      ride.organisateur._id.toString() === req.user._id.toString();
+    
+    if (!isOrganizer) {
       return res.status(403).json({
         success: false,
         message: 'Seul l\'organisateur peut valider la ponctualité'
@@ -2176,6 +2258,104 @@ exports.validatePunctuality = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la validation de la ponctualité',
+      error: error.message
+    });
+  }
+};
+
+// Reprendre l'organisation d'une balade si l'organisateur est supprimé
+exports.claimOrganizer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Vérifier que l'utilisateur n'est pas supprimé
+    if (req.user.isDeleted) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez pas reprendre l\'organisation d\'une balade avec un compte supprimé'
+      });
+    }
+
+    // Récupérer la balade
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Balade non trouvée'
+      });
+    }
+
+    // Vérifier que l'utilisateur est participant
+    const isParticipant = ride.participants.some(
+      p => p.userId && p.userId.toString() === userId.toString()
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous devez être participant de cette balade pour reprendre l\'organisation'
+      });
+    }
+
+    // Vérifier que l'organisateur actuel est supprimé ou introuvable
+    const currentOrganizer = await User.findById(ride.organisateur);
+    const isOrganizerDeleted = !currentOrganizer || currentOrganizer.isDeleted;
+
+    if (!isOrganizerDeleted) {
+      return res.status(409).json({
+        success: false,
+        message: 'L\'organisateur actuel est toujours actif. Vous ne pouvez pas reprendre l\'organisation'
+      });
+    }
+
+    // Update atomique : transférer l'organisation
+    const updatedRide = await Ride.findOneAndUpdate(
+      {
+        _id: id,
+        // Double vérification : l'utilisateur doit être participant
+        'participants.userId': userId
+      },
+      {
+        $set: {
+          organisateur: userId
+        }
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedRide) {
+      // Cas de concurrence : la balade a changé entre temps
+      return res.status(409).json({
+        success: false,
+        message: 'La balade a été modifiée. Veuillez réessayer'
+      });
+    }
+
+    // Populate pour la réponse
+    await updatedRide.populate('organisateur', 'firstName lastName pseudo email');
+    await updatedRide.populate('participants.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Vous avez repris l\'organisation de cette balade',
+      data: {
+        ride: updatedRide
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la reprise de l\'organisation',
       error: error.message
     });
   }

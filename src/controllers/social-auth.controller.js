@@ -265,7 +265,9 @@ exports.googleAuth = async (req, res, next) => {
         pseudo: pseudo,
         avatarUrl: picture || null,
         emailVerified: true, // Google vérifie déjà l'email
-        role: 'user'
+        role: 'MEMBER', // Rôle valide selon le schéma
+        phoneE164: null, // Pas de téléphone pour OAuth - sera demandé plus tard
+        status: 'pending_phone_verification' // Statut en attente de téléphone
       });
       
       await user.save();
@@ -374,7 +376,9 @@ exports.appleAuth = async (req, res, next) => {
         lastName: lastName || null,
         pseudo: pseudo,
         emailVerified: true, // Apple vérifie déjà l'email
-        role: 'user'
+        role: 'MEMBER', // Rôle valide selon le schéma
+        phoneE164: null, // Pas de téléphone pour OAuth - sera demandé plus tard
+        status: 'pending_phone_verification' // Statut en attente de téléphone
       });
       
       await user.save();
@@ -487,7 +491,9 @@ exports.facebookAuth = async (req, res, next) => {
         pseudo: pseudo,
         avatarUrl: facebookUser.picture?.data?.url || null,
         emailVerified: true, // Facebook vérifie déjà l'email
-        role: 'user'
+        role: 'MEMBER', // Rôle valide selon le schéma
+        phoneE164: null, // Pas de téléphone pour OAuth - sera demandé plus tard
+        status: 'pending_phone_verification' // Statut en attente de téléphone
       });
       
       await user.save();
