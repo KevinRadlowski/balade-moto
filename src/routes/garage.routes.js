@@ -3,6 +3,7 @@ const router = express.Router();
 const garageController = require('../controllers/garage.controller');
 // Routes vPIC supprimées - utilisation de /api/catalog/carquery à la place
 const authMiddleware = require('../middlewares/auth.middleware');
+const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 const uploadVehiclePhoto = require('../middlewares/vehicle-upload.middleware');
 const uploadVehiclePhotos = uploadVehiclePhoto.multiple;
 const uploadVehicleDocument = require('../middlewares/vehicle-document-upload.middleware');
@@ -29,6 +30,7 @@ const {
 
 // Toutes les routes nécessitent une authentification JWT
 router.use(authMiddleware);
+router.use(subscriptionMiddleware);
 
 // Contrôleurs additionnels (définis avant leur utilisation)
 const vehicleStatsController = require('../controllers/vehicleStats.controller');

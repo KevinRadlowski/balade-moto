@@ -11,13 +11,12 @@ import '../../widgets/ride_route_preview.dart';
 import '../../utils/background_helper.dart';
 import '../../config/api_config.dart';
 import '../../constants/home_style_constants.dart';
-import '../../widgets/home/home_hero_header.dart';
-import '../../widgets/home/next_ride_card.dart';
-import '../../widgets/home/favorite_groups_card.dart';
-import '../../widgets/home/discover_preview_card.dart';
+import '../../widgets/home/home_community_header.dart';
+import '../../widgets/home/next_ride_section.dart';
+import '../../widgets/home/discover_rides_section.dart';
+import '../../widgets/home/active_groups_section.dart';
 import '../../widgets/home/quick_actions_fab.dart';
 import '../ride/ride_detail_screen.dart';
-import '../groups/groups_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,6 +45,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   Position? _userPosition;
+  
+  // Statistiques communautaires
+  int _ridesThisMonth = 0;
+  int _activeGroups = 0;
   
   // Map pour stocker l'état des likes par balade
   final Map<String, bool> _likesState = {};
@@ -103,6 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadSuggestedRides(user),
         _loadAllRides(),
       ]);
+
+      // Calculer les statistiques après avoir chargé les données
+      _calculateCommunityStats();
 
       if (mounted) {
         setState(() {
@@ -195,30 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Position GPS';
   }
 
-  // Obtenir le message secondaire dynamique
-  String _getSecondaryMessage() {
-    if (_nextRide == null) {
-      return 'Aucune balade prévue pour le moment';
-    }
-    
-    final rideDateTime = DateTime(
-      _nextRide!.date.year,
-      _nextRide!.date.month,
-      _nextRide!.date.day,
-      int.parse(_nextRide!.heure.split(':')[0]),
-      int.parse(_nextRide!.heure.split(':')[1]),
-    );
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final rideDate = DateTime(rideDateTime.year, rideDateTime.month, rideDateTime.day);
-    
-    if (rideDate == today) {
-      return 'Une balade est prévue aujourd\'hui';
-    } else {
-      return 'Ta prochaine sortie approche';
-    }
-  }
 
   Future<void> _loadNextRide(String? userId) async {
     if (userId == null) return;
@@ -261,13 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Compte le nombre de balades à venir pour le micro-signal
-  int? _getUpcomingRidesCount() {
-    // On pourrait charger toutes les balades à venir, mais pour l'instant
-    // on retourne null si on n'a pas cette info chargée
-    // TODO: Charger le count depuis l'API si nécessaire
-    return null;
-  }
 
   Future<void> _loadMyGroups() async {
     try {
@@ -383,6 +358,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Calcule les statistiques communautaires à partir des données disponibles
+  Future<void> _calculateCommunityStats() async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      
+      // Compter les balades de ce mois
+      final ridesThisMonth = _allRides.where((ride) {
+        return ride.date.isAfter(startOfMonth) || ride.date.isAtSameMomentAs(startOfMonth);
+      }).length;
+      
+      // Compter les groupes actifs (groupes dont l'utilisateur est membre)
+      final activeGroups = _myGroups.length;
+      
+      if (mounted) {
+        setState(() {
+          _ridesThisMonth = ridesThisMonth;
+          _activeGroups = activeGroups;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du calcul des statistiques: $e');
+    }
+  }
+
   Future<void> _toggleLike(String rideId, bool newLikeState) async {
     if (!mounted) return;
     
@@ -489,20 +489,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CustomScrollView(
                       controller: _scrollController,
                       slivers: [
-                        // Hero Header (25-30% de l'écran, réduit sur petits écrans)
+                        // Community Hero Header (agrandi d'au moins 300px)
                         SliverAppBar(
                           expandedHeight: () {
                             final screenHeight = MediaQuery.of(context).size.height;
-                            if (screenHeight < 650) {
-                              return screenHeight * 0.18; // 18% sur très petits écrans (Xiaomi) - encore plus réduit
-                            } else if (screenHeight < 700) {
-                              return screenHeight * 0.23; // 23% sur petits écrans
-                            } else {
-                              return screenHeight * 0.28; // 28% sur grands écrans
-                            }
+                            final baseHeight = screenHeight < 650
+                                ? screenHeight * 0.22
+                                : screenHeight < 700
+                                    ? screenHeight * 0.26
+                                    : screenHeight * 0.30;
+                            // Ajouter au moins 300px
+                            return baseHeight + 300;
                           }(),
                           floating: false,
-                          pinned: false, // Ne pas épingler pour un effet plus immersif
+                          pinned: false,
                           snap: false,
                           backgroundColor: Colors.transparent,
                           flexibleSpace: FlexibleSpaceBar(
@@ -510,12 +510,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               StretchMode.zoomBackground,
                               StretchMode.blurBackground,
                             ],
-                            background: HomeHeroHeader(
+                            background: HomeCommunityHeader(
                               user: user,
-                              secondaryMessage: _getSecondaryMessage(),
-                              nextRide: _nextRide,
-                              groups: _myGroups,
-                              upcomingRidesCount: _getUpcomingRidesCount(),
+                              ridesThisMonth: _ridesThisMonth,
+                              activeGroups: _activeGroups,
                             ),
                           ),
                         ),
@@ -526,18 +524,39 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Espacement clair après le hero header
-                                const SizedBox(height: 24),
+                                // Espacement après le header
+                                const SizedBox(height: 8),
+                                
                                 // Section: Ma prochaine balade
-                                _buildNextRideSection(),
+                                NextRideSection(
+                                  nextRide: _nextRide,
+                                  getLocationText: _getLocationText,
+                                  onDataReload: _loadData,
+                                ),
                                 const SizedBox(height: 16),
                                 
-                                // Section: Mes groupes
-                                _buildMyGroupsSection(),
+                                // Section: Groupes actifs
+                                ActiveGroupsSection(
+                                  groups: _myGroups,
+                                  onDataReload: _loadData,
+                                ),
                                 const SizedBox(height: 16),
                                 
-                                // Section: Découvrir
-                                _buildDiscoverSection(),
+                                // Section: Découvrir (améliorée)
+                                DiscoverRidesSection(
+                                  rides: _suggestedRides,
+                                  getLocationText: _getLocationText,
+                                  onDataReload: _loadData,
+                                  onSeeMore: () {
+                                    if (_scrollController.hasClients) {
+                                      _scrollController.animateTo(
+                                        _scrollController.position.maxScrollExtent,
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  },
+                                ),
                                 const SizedBox(height: 16),
                                 
                                 // Section: Toutes les balades
@@ -559,179 +578,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Widget _buildNextRideSection() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: HomeStyleConstants.cardPadding,
-      decoration: HomeStyleConstants.glassCardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.event, color: Colors.blue.shade700),
-              const SizedBox(width: 8),
-              const Text(
-                'Ma prochaine balade',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_nextRide != null)
-            NextRideCard(
-              ride: _nextRide!,
-              locationText: _getLocationText(_nextRide!),
-              onDataReload: _loadData,
-            )
-          else
-            _buildNoNextRideCard(),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildNoNextRideCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.shade300.withOpacity(0.5),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.event_busy,
-            size: 48,
-            color: Colors.grey.shade600,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Aucune balade prévue pour le moment',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMyGroupsSection() {
-    if (_myGroups.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: HomeStyleConstants.cardPadding,
-      decoration: HomeStyleConstants.glassCardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.group, color: Colors.purple.shade700),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Mes groupes',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const GroupsScreen(),
-                    ),
-                  );
-                },
-                child: const Text('Voir tout'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ..._myGroups.map((group) => FavoriteGroupsCard(
-                group: group,
-                onDataReload: _loadData,
-              )),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildDiscoverSection() {
-    if (_suggestedRides.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: HomeStyleConstants.cardPadding,
-      decoration: HomeStyleConstants.glassCardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.explore, color: Colors.green.shade700),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Découvrir',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () {
-                  // Scroll vers la section "Toutes les balades"
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                },
-                child: const Text('Voir plus'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ..._suggestedRides.map((ride) => DiscoverPreviewCard(
-                ride: ride,
-                locationText: _getLocationText(ride),
-                onDataReload: _loadData,
-              )),
-        ],
-      ),
-    );
-  }
 
 
   Widget _buildAllRidesSection() {

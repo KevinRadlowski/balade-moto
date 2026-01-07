@@ -7,9 +7,11 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/ride.dart';
+import '../models/plan/user_plan.dart';
 import '../config/api_config.dart';
 import '../exceptions/auth_exception.dart';
 import '../exceptions/resend_email_exception.dart';
+import '../exceptions/plan_limit_exception.dart';
 
 class ApiService {
   static const String baseUrl = ApiConfig.apiUrl;
@@ -148,6 +150,25 @@ class ApiService {
           }
         }
       }
+
+      // Si erreur 403, vérifier si c'est une erreur de limite de plan
+      if (response.statusCode == 403) {
+        try {
+          final json = jsonDecode(response.body);
+          final code = json['code'] as String?;
+          
+          if (code == 'PLAN_LIMIT') {
+            throw PlanLimitException.fromJson(json);
+          }
+        } catch (e) {
+          // Si c'est déjà une PlanLimitException, la relancer
+          if (e is PlanLimitException) {
+            rethrow;
+          }
+          // Si le parsing échoue, continuer normalement (les autres erreurs 403 restent inchangées)
+          debugPrint('Erreur lors du parsing de la réponse 403: $e');
+        }
+      }
       
       return response;
     } catch (e) {
@@ -156,15 +177,25 @@ class ApiService {
   }
 
   // Authentification
-  Future<Map<String, dynamic>> register(String email, String password, String pseudo) async {
+  Future<Map<String, dynamic>> register(String email, String password, String pseudo, {String? phone, String? referralCode}) async {
+    final body = {
+      'email': email,
+      'password': password,
+      'pseudo': pseudo,
+    };
+    
+    if (phone != null && phone.isNotEmpty) {
+      body['phone'] = phone;
+    }
+    
+    if (referralCode != null && referralCode.isNotEmpty) {
+      body['referralCode'] = referralCode;
+    }
+    
     final response = await http.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: _headers,
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        'pseudo': pseudo,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 201) {
@@ -176,13 +207,13 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> login(String email, String password, {String? totpCode}) async {
+  Future<Map<String, dynamic>> login(String identifier, String password, {String? totpCode}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: _headers,
         body: jsonEncode({
-          'email': email,
+          'identifier': identifier,
           'password': password,
           if (totpCode != null) 'totpCode': totpCode,
         }),
@@ -206,7 +237,7 @@ class ApiService {
         
         final message = responseData['message'] ?? 'Erreur de connexion';
         
-        // Gérer spécifiquement les erreurs 403 (email non vérifié ou compte banni)
+        // Gérer spécifiquement les erreurs 403 (email non vérifié, téléphone non vérifié ou compte banni)
         if (response.statusCode == 403) {
           // Vérifier si c'est un compte banni
           final isBanned = responseData['banned'] == true || 
@@ -218,6 +249,22 @@ class ApiService {
               code: AuthException.accountBanned,
               message: message,
               statusCode: 403,
+            );
+          }
+          
+          // Vérifier si c'est une vérification téléphone requise
+          final requiresPhoneVerification = responseData['requiresPhoneVerification'] == true ||
+                                            message.toLowerCase().contains('téléphone') ||
+                                            message.toLowerCase().contains('telephone') ||
+                                            message.toLowerCase().contains('phone');
+          
+          if (requiresPhoneVerification) {
+            final phoneE164 = responseData['phoneE164'] as String?;
+            throw AuthException(
+              code: AuthException.phoneVerificationRequired,
+              message: message,
+              statusCode: 403,
+              phoneE164: phoneE164, // Stocker le numéro de téléphone dans l'exception
             );
           }
           
@@ -469,6 +516,70 @@ class ApiService {
     }
   }
 
+  // Demander la réinitialisation du mot de passe
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    // Endpoint public, ne pas utiliser le token
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/forgot-password'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && responseData['success'] == true) {
+      return responseData;
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors de la demande de réinitialisation');
+    }
+  }
+
+  // Réinitialiser le mot de passe avec le token
+  Future<Map<String, dynamic>> resetPassword(String token, String newPassword) async {
+    // Endpoint public, ne pas utiliser le token
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/reset-password'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'token': token,
+        'newPassword': newPassword,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return responseData;
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors de la réinitialisation du mot de passe');
+    }
+  }
+
+  // Changer le mot de passe (utilisateur connecté)
+  Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
+    final response = await post(
+      Uri.parse('$baseUrl/user/change-password'),
+      body: jsonEncode({
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return responseData;
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors du changement de mot de passe');
+    }
+  }
+
   /// Envoyer un email de contact au support
   Future<Map<String, dynamic>> sendContactEmail({
     required String email,
@@ -511,6 +622,28 @@ class ApiService {
       return User.fromJson(data['data']['user']);
     } else {
       throw Exception('Erreur lors de la récupération du profil');
+    }
+  }
+
+  /// Récupère le plan de l'utilisateur connecté
+  Future<UserPlan> getMyPlan() async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/users/me/plan'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // Si la réponse est { success:true, data:{...} }, utiliser data['data']
+      // Si la réponse est directement { plan:..., limits:..., usage:... }, utiliser l'objet root
+      // Ne jamais parser data['data']['plan'] (string) comme objet
+      final planData = data['data'] ?? data;
+      return UserPlan.fromJson(planData);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération du plan');
     }
   }
 
@@ -729,6 +862,13 @@ class ApiService {
       if (participant != null) 'participant': participant,
       if (organisateur != null) 'organisateur': organisateur,
     };
+    
+    // Ajouter les paramètres géographiques si rayon > 0
+    if (rayon != null && rayon > 0 && latitude != null && longitude != null) {
+      queryParams['lat'] = latitude.toString();
+      queryParams['lng'] = longitude.toString();
+      queryParams['rayon'] = rayon.toString();
+    }
 
     final uri = Uri.parse('$baseUrl/rides').replace(queryParameters: queryParams);
     final response = await _makeRequest(() async {
@@ -973,6 +1113,51 @@ class ApiService {
     }
   }
 
+  Future<void> inviteUsersToRide(String rideId, List<String> userIds) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invite'),
+        headers: _headers,
+        body: jsonEncode({
+          'userIds': userIds,
+        }),
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'envoi des invitations');
+    }
+  }
+
+  Future<void> acceptRideInvitation(String rideId) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invitations/accept'),
+        headers: _headers,
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'acceptation de l\'invitation');
+    }
+  }
+
+  Future<void> declineRideInvitation(String rideId) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invitations/decline'),
+        headers: _headers,
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du refus de l\'invitation');
+    }
+  }
+
   Future<void> joinRide(String id) async {
     final response = await _makeRequest(() async {
       return await http.post(
@@ -1174,6 +1359,14 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       final errorData = jsonDecode(response.body);
+      
+      // Si c'est une erreur PLAN_LIMIT, elle a déjà été interceptée dans _makeRequest
+      // et convertie en PlanLimitException, donc on ne devrait pas arriver ici
+      // Mais pour être sûr, vérifier à nouveau
+      if (errorData['code'] == 'PLAN_LIMIT') {
+        throw PlanLimitException.fromJson(errorData);
+      }
+      
       throw Exception(errorData['message'] ?? 'Erreur lors de la création du groupe');
     }
   }
@@ -1258,9 +1451,9 @@ class ApiService {
   Future<List<Map<String, dynamic>>> searchUsers(String query, {int limit = 10}) async {
     final response = await _makeRequest(() async {
       return await http.get(
-        Uri.parse('$baseUrl/user/search').replace(queryParameters: {
-          'query': query,
-          'limit': limit.toString(),
+        Uri.parse('$baseUrl/users/search').replace(queryParameters: {
+          'q': query,
+          if (limit != 10) 'limit': limit.toString(),
         }),
         headers: _headers,
       );
@@ -1512,6 +1705,80 @@ class ApiService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors du calcul de l\'itinéraire');
+    }
+  }
+
+  // ==================== PARRAINAGE ====================
+
+  // Obtenir les informations de parrainage de l'utilisateur connecté
+  Future<Map<String, dynamic>> getMyReferralInfo() async {
+    final response = await get(
+      Uri.parse('$baseUrl/referral/my-info'),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && responseData['success'] == true) {
+      return responseData['data'];
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors de la récupération des informations de parrainage');
+    }
+  }
+
+  // Valider un code de parrainage
+  Future<Map<String, dynamic>> validateReferralCode(String code) async {
+    final response = await post(
+      Uri.parse('$baseUrl/referral/validate'),
+      body: jsonEncode({
+        'code': code,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return responseData;
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors de la validation du code');
+    }
+  }
+
+  // ==================== OTP TÉLÉPHONE ====================
+
+  // Envoyer un code OTP par SMS
+  Future<void> sendPhoneOtp(String phone) async {
+    final response = await post(
+      Uri.parse('$baseUrl/auth/phone/send-otp'),
+      body: jsonEncode({
+        'phone': phone,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && responseData['success'] == true) {
+      return;
+    } else {
+      throw Exception(responseData['message'] ?? 'Erreur lors de l\'envoi du code OTP');
+    }
+  }
+
+  // Vérifier un code OTP
+  Future<void> verifyPhoneOtp(String phone, String code) async {
+    final response = await post(
+      Uri.parse('$baseUrl/auth/phone/verify-otp'),
+      body: jsonEncode({
+        'phone': phone,
+        'code': code,
+      }),
+    );
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && responseData['success'] == true) {
+      return;
+    } else {
+      throw Exception(responseData['message'] ?? 'Code OTP invalide');
     }
   }
 }

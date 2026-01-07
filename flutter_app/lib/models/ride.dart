@@ -14,6 +14,7 @@ class Ride {
   final UserOrganisateur organisateur;
   final String visibilite;
   final List<UserParticipant> participants;
+  final List<RideInvitation>? invitations;
   final List<String> likes;
   final double noteMoyenne;
   final String? url;
@@ -37,6 +38,7 @@ class Ride {
     required this.organisateur,
     required this.visibilite,
     required this.participants,
+    this.invitations,
     required this.likes,
     required this.noteMoyenne,
     this.url,
@@ -97,6 +99,11 @@ class Ride {
               })
               .toList()
           : [],
+      invitations: json['invitations'] != null
+          ? (json['invitations'] as List)
+              .map((inv) => RideInvitation.fromJson(inv))
+              .toList()
+          : null,
       likes: json['likes'] != null 
           ? List<String>.from(json['likes'].map((l) => l.toString()))
           : [],
@@ -168,6 +175,63 @@ class UserParticipant {
       firstName: json['firstName'],
       lastName: json['lastName'],
       pseudo: json['pseudo'],
+    );
+  }
+
+  String get displayName {
+    if (firstName != null && lastName != null) {
+      return '$firstName $lastName';
+    } else if (pseudo != null) {
+      return pseudo!;
+    }
+    return 'Utilisateur';
+  }
+}
+
+class RideInvitation {
+  final String userId;
+  final String? firstName;
+  final String? lastName;
+  final String? pseudo;
+  final String status; // 'pending', 'accepted', 'declined'
+  final DateTime? invitedAt;
+  final DateTime? respondedAt;
+
+  RideInvitation({
+    required this.userId,
+    this.firstName,
+    this.lastName,
+    this.pseudo,
+    required this.status,
+    this.invitedAt,
+    this.respondedAt,
+  });
+
+  factory RideInvitation.fromJson(Map<String, dynamic> json) {
+    // Gérer le cas où userId est un objet (populé)
+    String userIdStr;
+    String? firstName;
+    String? lastName;
+    String? pseudo;
+
+    if (json['userId'] is Map) {
+      final user = json['userId'];
+      userIdStr = user['_id'] ?? user['id'] ?? '';
+      firstName = user['firstName'];
+      lastName = user['lastName'];
+      pseudo = user['pseudo'];
+    } else {
+      userIdStr = json['userId']?.toString() ?? '';
+    }
+
+    return RideInvitation(
+      userId: userIdStr,
+      firstName: firstName ?? json['firstName'],
+      lastName: lastName ?? json['lastName'],
+      pseudo: pseudo ?? json['pseudo'],
+      status: json['status'] ?? 'pending',
+      invitedAt: json['invitedAt'] != null ? DateTime.parse(json['invitedAt']) : null,
+      respondedAt: json['respondedAt'] != null ? DateTime.parse(json['respondedAt']) : null,
     );
   }
 

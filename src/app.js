@@ -52,6 +52,9 @@ const compatibilityRoutes = require('./routes/compatibility.routes');
 const liveRideRoutes = require('./routes/liveRide.routes');
 const checkInRoutes = require('./routes/checkIn.routes');
 const contactRoutes = require('./routes/contact.routes');
+const referralRoutes = require('./routes/referral.routes');
+const phoneRoutes = require('./routes/phone.routes');
+const phoneOtpRoutes = require('./routes/phoneOtp.routes');
 const initializeSocket = require('./services/socket.service');
 
 // Initialiser Express
@@ -160,6 +163,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/users', userRoutes); // Alias pour compatibilité
 app.use('/api/rides', rideRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/reviews', reviewRoutes);
@@ -178,6 +182,8 @@ app.use('/api/reputation', reputationRoutes);
 app.use('/api/compatibility', compatibilityRoutes);
 app.use('/api/live-rides', liveRideRoutes);
 app.use('/api/check-in', checkInRoutes);
+app.use('/api/referral', referralRoutes);
+app.use('/api/auth/phone', phoneOtpRoutes); // Routes OTP avec Twilio Verify
 app.use('/contact', contactRoutes);
 
 // Route de test

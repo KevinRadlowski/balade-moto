@@ -63,6 +63,52 @@ class BadRequestError extends AppError {
   }
 }
 
+/**
+ * Crée une erreur standardisée pour les limites de plan (quota)
+ * @param {string} limitKey - La clé de la limite (ex: 'maxVehiclesTotal')
+ * @param {number} limit - La valeur de la limite
+ * @param {number} current - La valeur actuelle
+ * @param {string} plan - Le plan de l'utilisateur ('FREE' ou 'PREMIUM')
+ * @param {string} resourceName - Le nom de la ressource (ex: 'véhicules', 'photos', 'balades privées')
+ * @returns {ForbiddenError} Une erreur avec la structure PLAN_LIMIT standardisée
+ */
+function createPlanLimitError(limitKey, limit, current, plan, resourceName) {
+  const remaining = Math.max(0, limit - current);
+  
+  // Messages plus explicites selon le type de limite
+  let message;
+  if (limitKey.startsWith('maxVehiclesByType.')) {
+    // Limite par type de véhicule (moto/voiture)
+    const vehicleType = limitKey.split('.')[1]; // 'moto' ou 'voiture'
+    const vehicleTypeLabel = vehicleType === 'moto' ? 'moto' : 'voiture';
+    
+    if (current >= limit) {
+      message = `Vous avez atteint votre limite de ${limit} ${vehicleTypeLabel} avec le plan Standard. ${limit === 1 ? 'Supprimez votre ' + vehicleTypeLabel + ' existante' : 'Supprimez une ' + vehicleTypeLabel + ' existante'} ou passez en Premium pour ajouter un nombre illimité de véhicules.`;
+    } else {
+      message = `Limite de ${limit} ${vehicleTypeLabel} atteinte avec le plan Standard. Passez en Premium pour ajouter un nombre illimité de véhicules.`;
+    }
+  } else {
+    // Autres limites (total véhicules, photos, etc.)
+    if (current >= limit) {
+      message = `Vous avez atteint votre limite de ${limit} ${resourceName} avec le plan Standard. Supprimez des ${resourceName} existants ou passez en Premium pour créer un nombre illimité de ${resourceName}.`;
+    } else {
+      message = `Limite de ${limit} ${resourceName} atteinte avec le plan Standard. Passez en Premium pour créer un nombre illimité de ${resourceName}.`;
+    }
+  }
+  
+  const error = new ForbiddenError(message);
+  error.code = 'PLAN_LIMIT';
+  error.details = {
+    limit,
+    current,
+    remaining,
+    plan,
+    limitKey
+  };
+  
+  return error;
+}
+
 module.exports = {
   AppError,
   ValidationError,
@@ -71,6 +117,7 @@ module.exports = {
   NotFoundError,
   ConflictError,
   InternalServerError,
-  BadRequestError
+  BadRequestError,
+  createPlanLimitError
 };
 

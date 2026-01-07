@@ -1,5 +1,23 @@
 const Group = require('../models/Group');
 const User = require('../models/User');
+const { createPlanLimitError } = require('../utils/errors');
+
+// Helper pour normaliser un créateur supprimé ou introuvable
+function normalizeCreator(createur) {
+  if (!createur || createur.isDeleted) {
+    return {
+      _id: createur?._id || null,
+      id: createur?._id?.toString() || null,
+      firstName: null,
+      lastName: null,
+      pseudo: 'Utilisateur supprimé',
+      email: null,
+      avatarUrl: null,
+      isDeleted: true
+    };
+  }
+  return createur;
+}
 
 // Helper pour construire les URLs complètes des avatars
 const buildAvatarUrls = (data) => {
@@ -21,8 +39,13 @@ const buildAvatarUrls = (data) => {
 };
 
 // Créer un groupe
-exports.createGroup = async (req, res) => {
+exports.createGroup = async (req, res, next) => {
   try {
+    // Vérifier les limites du plan (FREE vs PREMIUM) pour les groupes privés
+    const premiumConfig = require('../config/premium.config');
+    const userPlan = premiumConfig.getUserPlan(req.user);
+    const limits = premiumConfig.getPlanLimits(userPlan);
+    
     const { nom, description, visibilite } = req.body;
 
     if (!nom) {
@@ -31,11 +54,33 @@ exports.createGroup = async (req, res) => {
         message: 'Le nom du groupe est requis'
       });
     }
+    
+    const finalVisibilite = visibilite || 'publique';
+    
+    // Vérifier la limite de groupes privés créés (Standard seulement)
+    if (finalVisibilite === 'privee' && !premiumConfig.isPremium(userPlan)) {
+      // Compter les groupes privés dont l'utilisateur est propriétaire (createur)
+      const privateGroupsOwnedCount = await Group.countDocuments({
+        createur: req.user._id,
+        visibilite: 'privee'
+      });
+      
+      // Vérifier la limite (Standard = 1 groupe privé max)
+      if (limits.maxPrivateGroupsCreated !== null && privateGroupsOwnedCount >= limits.maxPrivateGroupsCreated) {
+        throw createPlanLimitError(
+          'maxPrivateGroupsCreated',
+          limits.maxPrivateGroupsCreated,
+          privateGroupsOwnedCount,
+          userPlan,
+          'groupe(s) privé(s)'
+        );
+      }
+    }
 
     const group = new Group({
       nom,
       description,
-      visibilite: visibilite || 'publique',
+      visibilite: finalVisibilite,
       createur: req.user._id
     });
 
@@ -62,6 +107,12 @@ exports.createGroup = async (req, res) => {
       data: { group }
     });
   } catch (error) {
+    // Laisser passer les erreurs AppError (comme ForbiddenError avec PLAN_LIMIT) au middleware global
+    const { AppError } = require('../utils/errors');
+    if (error instanceof AppError) {
+      return next(error); // Passer au middleware d'erreur global
+    }
+    
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -69,11 +120,9 @@ exports.createGroup = async (req, res) => {
         errors: Object.values(error.errors).map(err => err.message)
       });
     }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la création du groupe',
-      error: error.message
-    });
+    
+    // Pour les autres erreurs, passer au middleware global aussi
+    return next(error);
   }
 };
 
@@ -153,8 +202,8 @@ exports.getGroupById = async (req, res) => {
     const { id } = req.params;
 
     const group = await Group.findById(id)
-      .populate('createur', 'pseudo email avatarUrl')
-      .populate('membres.userId', 'pseudo email avatarUrl')
+      .populate('createur', 'pseudo email avatarUrl isDeleted')
+      .populate('membres.userId', 'pseudo email avatarUrl isDeleted')
       .populate('bannedUsers.userId', 'pseudo email avatarUrl')
       .populate('bannedUsers.bannedBy', 'pseudo email');
 
@@ -165,13 +214,16 @@ exports.getGroupById = async (req, res) => {
       });
     }
 
+    // Normaliser le créateur si supprimé
+    group.createur = normalizeCreator(group.createur);
+
     // Construire les URLs complètes des avatars
     buildAvatarUrls(group);
 
     // Vérifier la visibilité (les groupes publics sont accessibles même sans être membre)
     // Pour les groupes privés, vérifier si l'utilisateur est membre OU créateur
     // Le createur peut être un ObjectId ou un objet peuplé, donc on vérifie les deux cas
-    const createurId = group.createur._id ? group.createur._id.toString() : group.createur.toString();
+    const createurId = group.createur && group.createur._id ? group.createur._id.toString() : (group.createur ? group.createur.toString() : null);
     const userId = req.user._id.toString();
     const isCreator = createurId === userId;
     const isMember = group.isMember(req.user._id);
@@ -327,8 +379,15 @@ exports.deleteGroup = async (req, res) => {
       });
     }
 
+    await group.populate('createur', 'pseudo email avatarUrl isDeleted');
+    // Normaliser le créateur si supprimé
+    group.createur = normalizeCreator(group.createur);
+
     // Vérifier que l'utilisateur est le créateur
-    if (group.createur.toString() !== req.user._id.toString()) {
+    const isCreator = group.createur && group.createur._id && 
+      group.createur._id.toString() === req.user._id.toString();
+    
+    if (!isCreator) {
       return res.status(403).json({
         success: false,
         message: 'Seul le créateur peut supprimer ce groupe'
@@ -931,6 +990,132 @@ exports.getGroupMessages = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des messages',
+      error: error.message
+    });
+  }
+};
+
+// Reprendre l'administration d'un groupe si le créateur est supprimé ou s'il n'y a plus d'admin actif
+exports.claimAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Vérifier que l'utilisateur n'est pas supprimé
+    if (req.user.isDeleted) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez pas reprendre l\'administration d\'un groupe avec un compte supprimé'
+      });
+    }
+
+    // Récupérer le groupe
+    const group = await Group.findById(id);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+
+    // Vérifier que l'utilisateur est membre
+    const isMember = group.isMember(userId);
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous devez être membre de ce groupe pour reprendre l\'administration'
+      });
+    }
+
+    // Vérifier le créateur
+    const creator = await User.findById(group.createur);
+    const isCreatorDeleted = !creator || creator.isDeleted;
+
+    // Vérifier s'il existe des admins actifs dans les membres
+    let hasActiveAdmin = false;
+    if (group.membres && group.membres.length > 0) {
+      // Récupérer tous les userId des membres avec rôle admin
+      const adminUserIds = group.membres
+        .filter(m => m.role === 'admin')
+        .map(m => m.userId._id ? m.userId._id : m.userId);
+
+      // Vérifier si au moins un admin existe et n'est pas supprimé
+      if (adminUserIds.length > 0) {
+        const adminUsers = await User.find({
+          _id: { $in: adminUserIds },
+          isDeleted: false
+        });
+        hasActiveAdmin = adminUsers.length > 0;
+      }
+    }
+
+    // Condition d'éligibilité : créateur supprimé OU aucun admin actif
+    const canClaim = isCreatorDeleted || !hasActiveAdmin;
+
+    if (!canClaim) {
+      return res.status(409).json({
+        success: false,
+        message: 'Il existe encore des administrateurs actifs. Vous ne pouvez pas reprendre l\'administration'
+      });
+    }
+
+    // Update atomique : promouvoir l'utilisateur en admin et optionnellement remplacer le créateur
+    const updateData = {
+      $set: {
+        'membres.$[elem].role': 'admin'
+      }
+    };
+
+    // Si le créateur est supprimé, le remplacer aussi
+    if (isCreatorDeleted) {
+      updateData.$set.createur = userId;
+    }
+
+    const updatedGroup = await Group.findOneAndUpdate(
+      {
+        _id: id,
+        // Double vérification : l'utilisateur doit être membre
+        'membres.userId': userId
+      },
+      updateData,
+      {
+        arrayFilters: [{ 'elem.userId': userId }],
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedGroup) {
+      // Cas de concurrence : le groupe a changé entre temps
+      return res.status(409).json({
+        success: false,
+        message: 'Le groupe a été modifié. Veuillez réessayer'
+      });
+    }
+
+    // Populate pour la réponse
+    await updatedGroup.populate('createur', 'firstName lastName pseudo email');
+    await updatedGroup.populate('membres.userId', 'firstName lastName pseudo email');
+
+    res.status(200).json({
+      success: true,
+      message: isCreatorDeleted 
+        ? 'Vous avez repris l\'administration de ce groupe'
+        : 'Vous avez été promu administrateur de ce groupe',
+      data: {
+        group: updatedGroup
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la reprise de l\'administration',
       error: error.message
     });
   }

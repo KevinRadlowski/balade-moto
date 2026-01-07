@@ -7,15 +7,29 @@ const { AppError } = require('../utils/errors');
 const errorHandler = (err, req, res, next) => {
   // Si l'erreur est déjà une AppError, utiliser ses propriétés
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+    const response = {
       success: false,
-      message: err.message,
-      ...(err.errors && { errors: err.errors }),
-      ...(process.env.NODE_ENV === 'development' && {
-        stack: err.stack,
-        name: err.name
-      })
-    });
+      message: err.message
+    };
+    
+    // Si c'est une erreur PLAN_LIMIT, inclure le code et les détails
+    if (err.code === 'PLAN_LIMIT' && err.details) {
+      response.code = 'PLAN_LIMIT';
+      response.details = err.details;
+    }
+    
+    // Ajouter les erreurs de validation si présentes
+    if (err.errors) {
+      response.errors = err.errors;
+    }
+    
+    // Ajouter les détails de debug en développement
+    if (process.env.NODE_ENV === 'development') {
+      response.stack = err.stack;
+      response.name = err.name;
+    }
+    
+    return res.status(err.statusCode).json(response);
   }
 
   // Erreurs de validation express-validator

@@ -38,6 +38,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool _isSubmittingRating = false;
   String? _errorMessage;
   Map<String, dynamic>? _ratingsData;
+  RideInvitation? _userInvitation; // Invitation pending de l'utilisateur
   
   // Pour la carte
   GoogleMapController? _mapController;
@@ -108,6 +109,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         setState(() {
           _ride = ride;
           _isParticipant = ride.participants.any((p) => p.id == authService.user?.id);
+          
+          // Vérifier si l'utilisateur a une invitation pending
+          _userInvitation = ride.invitations?.where(
+            (inv) => inv.userId == authService.user?.id && inv.status == 'pending',
+          ).firstOrNull;
           _isLiked = ride.hasUserLiked ?? ride.likes.contains(authService.user?.id);
           _totalLikes = ride.totalLikes ?? ride.likes.length;
           _hasRated = hasRated;
@@ -826,6 +832,36 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Badge visibilité
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _ride!.visibilite == 'privee'
+                        ? Colors.grey.shade800.withOpacity(0.9)
+                        : Colors.blue.shade700.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppTheme.cardShadow,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _ride!.visibilite == 'privee' ? '🔒' : '🌍',
+                        style: const TextStyle(fontSize: 14, height: 1.0),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _ride!.visibilite == 'privee' ? 'Privée' : 'Publique',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 // Titre
                 Text(
@@ -896,72 +932,95 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   Widget _buildInfoCards() {
     return Column(
       children: [
-        // Card Date et heure
-        _InfoCard(
-          icon: Icons.calendar_today,
-          iconColor: AppTheme.primaryColor,
-          title: 'Date et heure',
-          value: _formatDateTime(_ride!.date, _ride!.heure),
-        ),
-        const SizedBox(height: 12),
-        
-        // Card Lieu de départ
-        _InfoCard(
-          icon: Icons.location_on,
-          iconColor: AppTheme.successColor,
-          title: 'Lieu de départ',
-          value: _ride!.lieuDepart is String
-              ? _ride!.lieuDepart as String
-              : 'Lieu de départ',
-        ),
-        const SizedBox(height: 12),
-        
-        // Card Lieu d'arrivée
-        _InfoCard(
-          icon: Icons.place,
-          iconColor: AppTheme.errorColor,
-          title: 'Lieu d\'arrivée',
-          value: _ride!.lieuArrivee is String
-              ? _ride!.lieuArrivee as String
-              : 'Lieu d\'arrivée',
-        ),
-        
-        // Distance et durée si disponibles
-        if (_totalDistance != null) ...[
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.straighten,
-            iconColor: AppTheme.infoColor,
-            title: 'Distance',
-            value: '${_totalDistance!.toStringAsFixed(1)} km',
+        // Première carte : Informations de la balade
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppTheme.cardShadow,
           ),
-        ],
-        if (_estimatedDuration != null) ...[
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.access_time,
-            iconColor: AppTheme.warningColor,
-            title: 'Temps estimé',
-            value: _estimatedDuration!,
+          child: Column(
+            children: [
+              // Date et heure
+              _InfoRow(
+                icon: Icons.calendar_today,
+                iconColor: AppTheme.primaryColor,
+                title: 'Date et heure',
+                value: _formatDateTime(_ride!.date, _ride!.heure),
+              ),
+              const Divider(height: 24),
+              // Lieu de départ
+              _InfoRow(
+                icon: Icons.location_on,
+                iconColor: AppTheme.successColor,
+                title: 'Lieu de départ',
+                value: _ride!.lieuDepart is String
+                    ? _ride!.lieuDepart as String
+                    : 'Lieu de départ',
+              ),
+              const Divider(height: 24),
+              // Lieu d'arrivée
+              _InfoRow(
+                icon: Icons.place,
+                iconColor: AppTheme.errorColor,
+                title: 'Lieu d\'arrivée',
+                value: _ride!.lieuArrivee is String
+                    ? _ride!.lieuArrivee as String
+                    : 'Lieu d\'arrivée',
+              ),
+              // Distance si disponible
+              if (_totalDistance != null) ...[
+                const Divider(height: 24),
+                _InfoRow(
+                  icon: Icons.straighten,
+                  iconColor: AppTheme.infoColor,
+                  title: 'Distance',
+                  value: '${_totalDistance!.toStringAsFixed(1)} km',
+                ),
+              ],
+              // Temps estimé si disponible
+              if (_estimatedDuration != null) ...[
+                const Divider(height: 24),
+                _InfoRow(
+                  icon: Icons.access_time,
+                  iconColor: AppTheme.warningColor,
+                  title: 'Temps estimé',
+                  value: _estimatedDuration!,
+                ),
+              ],
+            ],
           ),
-        ],
-        
-        const SizedBox(height: 12),
-        // Card Organisateur
-        _InfoCard(
-          icon: Icons.person,
-          iconColor: AppTheme.primaryColor,
-          title: 'Organisateur',
-          value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
         ),
         const SizedBox(height: 12),
         
-        // Card Participants
-        _InfoCard(
-          icon: Icons.people,
-          iconColor: AppTheme.secondaryColor,
-          title: 'Participants',
-          value: '${_ride!.participants.length} participant${_ride!.participants.length > 1 ? 's' : ''}',
+        // Deuxième carte : Organisateur et Participants
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: Column(
+            children: [
+              // Organisateur
+              _InfoRow(
+                icon: Icons.person,
+                iconColor: AppTheme.primaryColor,
+                title: 'Organisateur',
+                value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
+              ),
+              const Divider(height: 24),
+              // Participants
+              _InfoRow(
+                icon: Icons.people,
+                iconColor: AppTheme.secondaryColor,
+                title: 'Participants',
+                value: '${_ride!.participants.length} participant${_ride!.participants.length > 1 ? 's' : ''}',
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1166,6 +1225,30 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
             ),
           ],
+          // Bouton "Inviter des participants" si balade privée
+          if (_ride!.visibilite == 'privee') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _inviteParticipants,
+                icon: const Icon(Icons.person_add, size: 22),
+                label: const Text(
+                  'Inviter des participants',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
+              ),
+            ),
+          ],
           // Bouton "Voir les participants" pour l'organisateur
           const SizedBox(height: 12),
           SizedBox(
@@ -1190,8 +1273,54 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           ),
         ] else ...[
           // Si l'utilisateur n'est pas l'organisateur
-          // Bouton principal : Participer ou Naviguer/Rejoindre
-          if (!_isParticipant) ...[
+          // Vérifier si l'utilisateur a une invitation pending
+          if (_userInvitation != null && !_isParticipant) ...[
+            // Boutons Accepter/Refuser l'invitation
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _acceptInvitation,
+                    icon: const Icon(Icons.check, size: 22),
+                    label: const Text(
+                      'Accepter',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.successColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _declineInvitation,
+                    icon: const Icon(Icons.close, size: 22),
+                    label: const Text(
+                      'Refuser',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (!_isParticipant) ...[
+            // Bouton principal : Participer ou Naviguer/Rejoindre
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -1421,6 +1550,271 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         ],
       ],
     );
+  }
+
+  Future<void> _inviteParticipants() async {
+    final List<Map<String, dynamic>> selectedUsers = [];
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Inviter des participants'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Autocomplete<Map<String, dynamic>>(
+                  optionsBuilder: (textEditingValue) async {
+                    final query = textEditingValue.text.trim();
+                    if (query.length < 2) {
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
+
+                    try {
+                      setDialogState(() {
+                        isLoading = true;
+                      });
+
+                      final authService = Provider.of<AuthService>(context, listen: false);
+                      final token = await authService.storage.read(key: 'token');
+                      _apiService.setToken(token);
+
+                      final results = await _apiService.searchUsers(query, limit: 10);
+                      
+                      setDialogState(() {
+                        isLoading = false;
+                      });
+
+                      // Filtrer les utilisateurs déjà sélectionnés
+                      final selectedIds = selectedUsers.map((u) => u['id']).toSet();
+                      return results.where((user) => !selectedIds.contains(user['id']));
+                    } catch (e) {
+                      setDialogState(() {
+                        isLoading = false;
+                      });
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
+                  },
+                  displayStringForOption: (option) {
+                    final pseudo = option['pseudo'] ?? '';
+                    final email = option['email'] ?? '';
+                    return '$pseudo ($email)';
+                  },
+                  onSelected: (option) {
+                    setDialogState(() {
+                      // Vérifier si l'utilisateur n'est pas déjà sélectionné
+                      if (!selectedUsers.any((u) => u['id'] == option['id'])) {
+                        selectedUsers.add(option);
+                      }
+                    });
+                    // Le champ sera automatiquement vidé par Autocomplete après sélection
+                  },
+                  fieldViewBuilder: (
+                    context,
+                    textEditingController,
+                    focusNode,
+                    onFieldSubmitted,
+                  ) {
+                    return TextField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Pseudo ou email',
+                        hintText: 'Tapez au moins 2 caractères...',
+                        suffixIcon: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
+                      onSubmitted: (value) {
+                        onFieldSubmitted();
+                        // Vider le champ après soumission
+                        textEditingController.clear();
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final option = options.elementAt(index);
+                              final pseudo = option['pseudo'] ?? '';
+                              final email = option['email'] ?? '';
+                              final avatarUrl = option['avatarUrl'] ?? option['avatar'];
+
+                              return ListTile(
+                                leading: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                                    ? CircleAvatar(
+                                        backgroundImage: NetworkImage(
+                                          avatarUrl.toString().startsWith('http')
+                                              ? avatarUrl.toString()
+                                              : ApiConfig.getFileUrl(avatarUrl.toString())
+                                        ),
+                                        radius: 20,
+                                      )
+                                    : const CircleAvatar(
+                                        radius: 20,
+                                        child: Icon(Icons.person),
+                                      ),
+                                title: Text(pseudo),
+                                subtitle: Text(email),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Vous pouvez rechercher par pseudo ou email',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                if (selectedUsers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Utilisateurs sélectionnés:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...selectedUsers.map((user) {
+                    final pseudo = user['pseudo'] ?? '';
+                    final email = user['email'] ?? '';
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.person, size: 20),
+                      title: Text(pseudo),
+                      subtitle: Text(email),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedUsers.removeWhere((u) => u['id'] == user['id']);
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: selectedUsers.isEmpty
+                  ? null
+                  : () async {
+                      final userIds = selectedUsers.map((u) => u['id'].toString()).toList();
+                      Navigator.pop(context);
+                      
+                      try {
+                        await _apiService.inviteUsersToRide(_ride!.id, userIds);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${selectedUsers.length} invitation(s) envoyée(s)'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          await _loadRide(); // Recharger pour voir les invitations
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: Text('Inviter (${selectedUsers.length})'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _acceptInvitation() async {
+    try {
+      await _apiService.acceptRideInvitation(_ride!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invitation acceptée'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadRide(); // Recharger pour mettre à jour l'état
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _declineInvitation() async {
+    try {
+      await _apiService.declineRideInvitation(_ride!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invitation refusée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        await _loadRide(); // Recharger pour mettre à jour l'état
+        // Optionnel : sortir de l'écran si l'invitation est refusée
+        // Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _formatDateTime(DateTime date, String heure) {
@@ -1657,14 +2051,14 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 }
 
-// Widget pour les cards d'information premium
-class _InfoCard extends StatelessWidget {
+// Widget pour une ligne d'information dans une carte groupée
+class _InfoRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String value;
 
-  const _InfoCard({
+  const _InfoRow({
     required this.icon,
     required this.iconColor,
     required this.title,
@@ -1673,52 +2067,43 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 22),
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                    letterSpacing: 0.2,
-                  ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    height: 1.3,
-                    color: Colors.grey.shade900,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey.shade900,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
+

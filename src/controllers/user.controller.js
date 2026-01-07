@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { getBaseUrl, buildFileUrl } = require('../utils/urlHelper');
+const subscriptionService = require('../services/subscription.service');
+const premiumConfig = require('../config/premium.config');
+const planQuotaService = require('../services/planQuota.service');
 
 // Mettre à jour le profil utilisateur
 exports.updateProfile = async (req, res) => {
@@ -213,7 +216,7 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// Supprimer le compte utilisateur
+// Supprimer le compte utilisateur (soft delete)
 exports.deleteAccount = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -227,8 +230,56 @@ exports.deleteAccount = async (req, res) => {
       });
     }
 
-    // Supprimer l'utilisateur et toutes ses données
-    await User.findByIdAndDelete(userId);
+    // Vérifier si déjà supprimé
+    if (user.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ce compte est déjà supprimé'
+      });
+    }
+
+    // Soft delete : anonymiser et marquer comme supprimé
+    const now = new Date();
+    const deletedEmail = `deleted+${userId.toString()}@invalid.local`;
+    
+    // Anonymiser les données sensibles
+    user.isDeleted = true;
+    user.deletedAt = now;
+    user.anonymizedAt = now;
+    
+    // Anonymiser les informations personnelles
+    user.email = deletedEmail;
+    user.pseudo = 'Utilisateur supprimé';
+    user.firstName = null;
+    user.lastName = null;
+    user.phoneE164 = null;
+    user.avatarUrl = null;
+    
+    // Invalider les tokens et sessions
+    user.refreshToken = null;
+    user.emailVerificationToken = null;
+    user.resetPasswordToken = null;
+    
+    // Anonymiser le contact d'urgence
+    if (user.emergencyContact) {
+      user.emergencyContact.name = null;
+      user.emergencyContact.phone = null;
+      user.emergencyContact.notes = null;
+    }
+    
+    // Désactiver l'authentification à deux facteurs
+    user.twoFactorEnabled = false;
+    user.isTwoFactorEnabled = false;
+    user.twoFactorSecret = null;
+    
+    // Réinitialiser le statut de check-in
+    if (user.checkInStatus) {
+      user.checkInStatus.isActive = false;
+      user.checkInStatus.lastHeartbeat = null;
+      user.checkInStatus.lastLocation = null;
+    }
+
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -445,35 +496,42 @@ exports.uploadAvatar = async (req, res) => {
 // Rechercher des utilisateurs par pseudo ou email (pour autocomplétion)
 exports.searchUsers = async (req, res) => {
   try {
-    const { query, limit = 10 } = req.query;
+    const q = (req.query.q || '').trim();
+    const limit = Math.min(parseInt(req.query.limit) || 10, 10); // Max 10 résultats
 
-    if (!query || query.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'La requête doit contenir au moins 2 caractères'
+    // Si q < 2 caractères, retourner un tableau vide
+    if (q.length < 2) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          users: []
+        }
       });
     }
 
     // Rechercher par pseudo ou email (insensible à la casse)
-    const searchRegex = new RegExp(query, 'i');
+    const searchRegex = new RegExp(q, 'i');
     const users = await User.find({
       $or: [
         { pseudo: searchRegex },
         { email: searchRegex }
-      ]
+      ],
+      isDeleted: { $ne: true } // Exclure les utilisateurs supprimés
     })
-    .select('pseudo email avatarUrl firstName lastName')
-    .limit(parseInt(limit))
+    .select('_id pseudo email avatarUrl firstName lastName')
+    .limit(limit)
     .lean();
 
-    // Construire les URLs complètes des avatars
+    // Construire les URLs complètes des avatars et formater la réponse
     const usersWithAvatars = users.map(user => ({
-      id: user._id.toString(),
+      _id: user._id.toString(),
+      id: user._id.toString(), // Alias pour compatibilité
       pseudo: user.pseudo,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      avatarUrl: buildFileUrl(user.avatarUrl, req)
+      avatar: user.avatarUrl ? buildFileUrl(user.avatarUrl, req) : null,
+      avatarUrl: user.avatarUrl ? buildFileUrl(user.avatarUrl, req) : null // Alias pour compatibilité
     }));
 
     res.status(200).json({
@@ -491,3 +549,57 @@ exports.searchUsers = async (req, res) => {
   }
 };
 
+// Obtenir les informations du plan de l'utilisateur
+exports.getMyPlan = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Obtenir le plan de l'utilisateur (déjà normalisé par subscriptionMiddleware)
+    const userPlan = req.userPlan || premiumConfig.getUserPlan(req.user);
+    const isPremium = subscriptionService.isPremiumActive(req.user);
+    const limits = premiumConfig.getPlanLimits(userPlan);
+
+    // Obtenir les quotas d'utilisation
+    const vehicleQuotas = await planQuotaService.countVehiclesByUser(userId);
+    const privateGroupsCount = await planQuotaService.countPrivateGroupsCreated(userId);
+    const privateRidesCount = await planQuotaService.countPrivateRidesCreatedThisMonth(userId);
+
+    // Renvoyer les limites au format backend (le frontend Flutter utilise maintenant les mêmes noms)
+    let formattedLimits;
+    if (limits.unlimited) {
+      formattedLimits = { unlimited: true };
+    } else {
+      formattedLimits = {
+        unlimited: false,
+        maxVehiclesTotal: limits.maxVehiclesTotal ?? null,
+        maxVehiclesByType: limits.maxVehiclesByType ?? null,
+        maxPhotosTotal: limits.maxPhotosTotal ?? null,
+        maxPrivateGroupsCreated: limits.maxPrivateGroupsCreated ?? null,
+        maxPrivateRidesCreatedPerMonth: limits.maxPrivateRidesCreatedPerMonth ?? null,
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        plan: userPlan,
+        isPremium: isPremium,
+        premiumExpiresAt: req.user.subscription?.premiumExpiresAt || null,
+        limits: formattedLimits,
+        usage: {
+          vehiclesTotal: vehicleQuotas.total,
+          vehiclesByType: vehicleQuotas.byType,
+          photosTotal: vehicleQuotas.photosTotal,
+          privateGroupsCreated: privateGroupsCount,
+          privateRidesCreatedThisMonth: privateRidesCount
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des informations du plan',
+      error: error.message
+    });
+  }
+};

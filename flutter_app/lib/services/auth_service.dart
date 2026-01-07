@@ -49,15 +49,17 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> register(String email, String password, String pseudo) async {
+  Future<Map<String, dynamic>> register(String email, String password, String pseudo, {String? phone, String? referralCode}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await apiService.register(email, password, pseudo);
-      // Retourner les informations sur l'envoi d'email
+      final response = await apiService.register(email, password, pseudo, phone: phone, referralCode: referralCode);
+      // Retourner les informations sur l'envoi d'email et le parrainage
       return {
         'emailSent': response['emailSent'] ?? true,
+        'referralRewardGranted': response['referralRewardGranted'] ?? false,
+        'phoneRequiresVerification': response['phoneRequiresVerification'] ?? false,
         'message': response['message'] ?? 'Inscription réussie',
       };
     } catch (e) {
@@ -126,12 +128,12 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> login(String email, String password, {String? totpCode, bool saveCredentials = false}) async {
+  Future<void> login(String identifier, String password, {String? totpCode, bool saveCredentials = false}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await apiService.login(email, password, totpCode: totpCode);
+      final response = await apiService.login(identifier, password, totpCode: totpCode);
       
       if (response['data'] != null) {
         final token = response['data']['token'];
@@ -142,7 +144,7 @@ class AuthService extends ChangeNotifier {
         
         // Sauvegarder les identifiants si demandé (pour la biométrie)
         if (saveCredentials) {
-          await storage.write(key: 'saved_email', value: email);
+          await storage.write(key: 'saved_email', value: identifier);
           await storage.write(key: 'saved_password', value: password);
           await storage.write(key: 'biometric_enabled', value: 'true');
         }
@@ -296,6 +298,42 @@ class AuthService extends ChangeNotifier {
   void updateUser(User updatedUser) {
     _user = updatedUser;
     notifyListeners();
+  }
+
+  // ==================== OTP TÉLÉPHONE ====================
+
+  /// Envoyer un code OTP par SMS
+  Future<void> sendPhoneOtp(String phone) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await apiService.sendPhoneOtp(phone);
+    } catch (e) {
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Vérifier un code OTP
+  Future<void> verifyPhoneOtp(String phone, String code) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await apiService.verifyPhoneOtp(phone, code);
+      // Rafraîchir les données utilisateur après vérification
+      if (_isAuthenticated) {
+        await loadUser();
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }
 

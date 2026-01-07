@@ -4,12 +4,15 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../providers/plan_provider.dart';
+import '../../exceptions/plan_limit_exception.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
 import '../../models/waypoint.dart';
 import '../../models/ride.dart';
 import '../../widgets/rides/riding_style_chips.dart';
+import '../home/home_screen.dart';
 
 class CreateRideWithMapScreen extends StatefulWidget {
   final Ride? duplicateRide;
@@ -27,7 +30,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   // Contrôleurs
   final _titreController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _addressController = TextEditingController();
   
   // État
   String _typeVehicule = 'moto';
@@ -49,8 +51,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   LatLng? _currentLocation;
   int _nextOrder = 0;
   
-  // Mode de saisie (carte ou adresse)
-  bool _isAddressMode = false;
 
   @override
   void initState() {
@@ -111,7 +111,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
     _routeUpdateTimer?.cancel();
     _titreController.dispose();
     _descriptionController.dispose();
-    _addressController.dispose();
     // Ne pas disposer manuellement le contrôleur Google Maps sur web
     // Flutter le fait automatiquement et cela peut causer des erreurs
     // si la vue n'est pas encore construite
@@ -246,69 +245,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
             content: Text('Erreur lors de l\'ajout du point: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
-        );
-      }
-    }
-  }
-
-  Future<void> _addWaypointFromAddress() async {
-    if (_addressController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez saisir une adresse')),
-      );
-      return;
-    }
-
-    try {
-      // Géocodage de l'adresse
-      List<Location> locations = await locationFromAddress(_addressController.text.trim());
-
-      if (locations.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Adresse non trouvée')),
-        );
-        return;
-      }
-
-      final location = locations.first;
-      final position = LatLng(location.latitude, location.longitude);
-
-      // Déterminer le type (même logique que pour _addWaypointFromMap)
-      String type;
-      if (_waypoints.isEmpty) {
-        type = 'depart';
-      } else if (_waypoints.length == 1) {
-        type = 'arrivee';
-      } else {
-        type = 'checkpoint';
-      }
-
-      final waypoint = Waypoint(
-        type: type,
-        address: _addressController.text.trim(),
-        latitude: location.latitude,
-        longitude: location.longitude,
-        order: _nextOrder++,
-      );
-
-      setState(() {
-        _waypoints.add(waypoint);
-        _reorganizeWaypointTypes();
-        _addressController.clear();
-        _isAddressMode = false;
-        _updateMarkersAndPolylines();
-      });
-
-      // Centrer la carte sur le nouveau point
-      if (_mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(position, 14.0),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la recherche: $e')),
         );
       }
     }
@@ -876,7 +812,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
       final depart = _waypoints.first;
       final arrivee = _waypoints.last;
 
-      final createdRide = await _apiService.createRide(
+      await _apiService.createRide(
         titre: _titreController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
             ? null
@@ -903,16 +839,27 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop(createdRide);
+        // Rafraîchir l'écran d'accueil avant de revenir
+        HomeScreen.refresh(context);
+        Navigator.of(context).pop(true); // Retour avec succès pour déclencher le refresh
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Intercepter PlanLimitException et ouvrir la modale premium
+        if (e is PlanLimitException) {
+          showPremiumUpsellModal(
+            context,
+            reason: e.message,
+            details: e.details,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -962,9 +909,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                   markers: _markers,
                   polylines: _polylines,
                   onTap: (LatLng position) {
-                    if (!_isAddressMode) {
-                      _addWaypointFromMap(position);
-                    }
+                    _addWaypointFromMap(position);
                   },
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,
@@ -985,7 +930,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Appuyez sur la carte pour ajouter des points ou utilisez la saisie d\'adresse',
+                                'Appuyez sur la carte pour ajouter des points de passage',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                               ),
                             ),
@@ -1057,46 +1002,6 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                       }),
                       const SizedBox(height: 16),
                     ],
-                    // Saisie d'adresse
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _addressController,
-                            decoration: InputDecoration(
-                              labelText: 'Ajouter une adresse',
-                              border: const OutlineInputBorder(),
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: _isAddressMode
-                                  ? IconButton(
-                                      icon: const Icon(Icons.close),
-                                      onPressed: () {
-                                        setState(() {
-                                          _isAddressMode = false;
-                                          _addressController.clear();
-                                        });
-                                      },
-                                    )
-                                  : null,
-                            ),
-                            onSubmitted: (_) => _addWaypointFromAddress(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: _isAddressMode
-                              ? _addWaypointFromAddress
-                              : () {
-                                  setState(() {
-                                    _isAddressMode = true;
-                                  });
-                                },
-                          icon: Icon(_isAddressMode ? Icons.add : Icons.edit_location),
-                          label: Text(_isAddressMode ? 'Ajouter' : 'Adresse'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
                     // Formulaire principal
                     TextFormField(
                       controller: _titreController,
@@ -1232,21 +1137,46 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _visibilite,
-                      decoration: const InputDecoration(
-                        labelText: 'Visibilité',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.visibility),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'publique', child: Text('🌐 Publique')),
-                        DropdownMenuItem(value: 'privee', child: Text('🔒 Privée')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _visibilite = value!;
-                        });
+                    Consumer<PlanProvider>(
+                      builder: (context, planProvider, _) {
+                        return DropdownButtonFormField<String>(
+                          value: _visibilite,
+                          decoration: const InputDecoration(
+                            labelText: 'Visibilité',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.visibility),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'publique', child: Text('🌐 Publique')),
+                            DropdownMenuItem(value: 'privee', child: Text('🔒 Privée')),
+                          ],
+                          onChanged: (value) {
+                            // Si l'utilisateur choisit "privée" mais n'a pas les droits
+                            if (value == 'privee' && !planProvider.canCreatePrivateRide) {
+                              // Forcer à "publique"
+                              setState(() {
+                                _visibilite = 'publique';
+                              });
+                              // Afficher un SnackBar
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Les balades privées sont réservées aux membres Premium'),
+                                  backgroundColor: Colors.orange,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                              // Ouvrir la modale premium
+                              showPremiumUpsellModal(
+                                context,
+                                reason: 'Les balades privées sont réservées aux membres Premium. Passez en Premium pour créer des balades privées illimitées.',
+                              );
+                            } else {
+                              setState(() {
+                                _visibilite = value!;
+                              });
+                            }
+                          },
+                        );
                       },
                     ),
                     const SizedBox(height: 24),

@@ -33,9 +33,10 @@ if (isEmailConfigured()) {
     maxMessages: 3
   });
 
-  // Vérifier la configuration du transporteur (sauf si désactivé en développement)
-  const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
-                           (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+  // Vérifier la configuration du transporteur (sauf si explicitement désactivé)
+  // Par défaut, les emails sont envoyés normalement (même en développement)
+  // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+  const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
   
   if (skipVerification) {
     console.log('⚠️  Vérification email désactivée (mode développement)');
@@ -96,6 +97,25 @@ if (isEmailConfigured()) {
 }
 
 // Fonctions d'envoi d'email
+// Fonction helper pour construire l'en-tête "from"
+const buildFromHeader = (displayName = 'Ride Together') => {
+  // Si emailConfig.from contient déjà le format complet (avec chevrons), remplacer juste le nom
+  if (emailConfig.from && (emailConfig.from.includes('<') && emailConfig.from.includes('>'))) {
+    // Extraire l'email entre les chevrons
+    const emailMatch = emailConfig.from.match(/<([^>]+)>/);
+    if (emailMatch) {
+      return `"${displayName}" <${emailMatch[1]}>`;
+    }
+    // Si pas de match, utiliser tel quel (format déjà correct)
+    return emailConfig.from;
+  }
+  // Sinon, construire le format
+  if (emailConfig.from) {
+    return `"${displayName}" <${emailConfig.from}>`;
+  }
+  return `"${displayName}" <${emailConfig.user}>`;
+};
+
 const sendVerificationEmail = async (email, token) => {
   if (!transporter) {
     console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
@@ -112,7 +132,7 @@ const sendVerificationEmail = async (email, token) => {
   const backgroundUrl = `https://www.ridetogether.fr/bg-home2.png`;
   
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: 'Bienvenue sur Ride Together - Vérifiez votre compte',
     html: `
@@ -193,8 +213,9 @@ const sendVerificationEmail = async (email, token) => {
     await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
-    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
-                             (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    // Par défaut, les emails sont envoyés normalement
+    // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
     
     if (skipVerification) {
       // En mode développement avec vérification désactivée, ignorer silencieusement
@@ -216,7 +237,7 @@ const sendUnlockEmail = async (email, token) => {
   const unlockUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/unlock-account?token=${token}`;
   
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: 'Déverrouillage de votre compte Ride Together',
     html: `
@@ -243,8 +264,9 @@ const sendUnlockEmail = async (email, token) => {
     await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
-    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true' || 
-                             (process.env.NODE_ENV === 'development' && process.env.SKIP_EMAIL_VERIFICATION !== 'false');
+    // Par défaut, les emails sont envoyés normalement
+    // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
     
     if (skipVerification) {
       // En mode développement avec vérification désactivée, ignorer silencieusement
@@ -253,6 +275,123 @@ const sendUnlockEmail = async (email, token) => {
     }
     
     console.error('Erreur lors de l\'envoi de l\'email:', error);
+    throw error;
+  }
+};
+
+const sendResetPasswordEmail = async (email, token) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  // Utiliser l'URL du frontend Flutter pour le lien de réinitialisation
+  // Le frontend Flutter gérera l'affichage et la validation
+  const frontendUrlRaw = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = frontendUrlRaw.split(',')[0].trim();
+  const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+  const mailOptions = {
+    from: buildFromHeader(),
+    to: email,
+    subject: 'Ride Together - Réinitialisation de votre mot de passe',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+          <tr>
+            <td align="center" style="padding: 40px 20px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 40px 30px 40px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+                      Réinitialisation de mot de passe
+                    </h1>
+                  </td>
+                </tr>
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                      Bonjour,
+                    </p>
+                    <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                      Vous avez demandé à réinitialiser votre mot de passe pour votre compte Ride Together.
+                    </p>
+                    <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                      Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :
+                    </p>
+                    <!-- Bouton CTA -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td align="center" style="padding: 0 0 30px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td bgcolor="#3F51B5" align="center" style="background-color: #3F51B5; border-radius: 12px; padding: 16px 40px;">
+                                <a href="${resetUrl}" 
+                                   style="color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">
+                                  Réinitialiser mon mot de passe
+                                </a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                    <!-- Lien alternatif -->
+                    <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; text-align: center;">
+                      Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :<br>
+                      <a href="${resetUrl}" style="color: #3F51B5; word-break: break-all; text-decoration: underline;">${resetUrl}</a>
+                    </p>
+                    <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #eeeeee;">
+                      <strong>⚠️ Important :</strong> Si vous n'avez pas demandé cette réinitialisation, ignorez cet email. Votre mot de passe ne sera pas modifié.
+                    </p>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="background-color: #10181F; padding: 30px 40px; text-align: center;">
+                    <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">
+                      <strong>Ride Together</strong> - Organisez et participez à des balades moto
+                    </p>
+                    <p style="color: #ffffff; font-size: 12px; margin: 0; opacity: 0.7;">
+                      Ce lien expirera dans <strong>1 heure</strong>.
+                    </p>
+                    <p style="color: #ffffff; font-size: 12px; margin: 15px 0 0 0; opacity: 0.6;">
+                      Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email en toute sécurité.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    // Par défaut, les emails sont envoyés normalement
+    // Pour désactiver : SKIP_EMAIL_VERIFICATION=true dans .env
+    const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+    
+    if (skipVerification) {
+      // En mode développement avec vérification désactivée, ignorer silencieusement
+      console.warn('⚠️  Email non envoyé (mode développement, vérification désactivée)');
+      return false;
+    }
+    
+    console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
     throw error;
   }
 };
@@ -279,7 +418,7 @@ const sendRideReminderEmail = async (email, ride, userName) => {
   const formattedTime = ride.heure;
   
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: `Ride Together - Rappel: ${ride.titre} dans 1 heure`,
     html: `
@@ -332,7 +471,7 @@ const sendMaintenanceReminderEmail = async (email, reminder, vehicle, user) => {
   const vehicleName = vehicle.nickname || `${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Véhicule';
 
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: `Ride Together - Rappel d'entretien: ${reminder.description || reminder.type}`,
     html: `
@@ -373,7 +512,7 @@ const sendEmergencyAlertEmail = async (email, user, reason) => {
     : user.email;
 
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: `Ride Together - ALERTE URGENCE: ${userName}`,
     html: `
@@ -412,7 +551,7 @@ const sendInactivityAlertEmail = async (email, user) => {
     : user.email;
 
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together" <${emailConfig.from}>` : `"Ride Together" <${emailConfig.user}>`,
+    from: buildFromHeader(),
     to: email,
     subject: `Ride Together - Alerte d'inactivité: ${userName}`,
     html: `
@@ -447,7 +586,7 @@ const sendContactEmail = async ({ fromEmail, subject, message }) => {
   const supportEmail = 'kevin.radlowski@gmail.com';
   
   const mailOptions = {
-    from: emailConfig.from ? `"Ride Together Contact" <${emailConfig.from}>` : `"Ride Together Contact" <${emailConfig.user}>`,
+    from: buildFromHeader('Ride Together Contact'),
     to: supportEmail,
     replyTo: fromEmail,
     subject: `[Contact Support] ${subject}`,
@@ -520,6 +659,7 @@ const sendContactEmail = async ({ fromEmail, subject, message }) => {
 module.exports = {
   sendVerificationEmail,
   sendUnlockEmail,
+  sendResetPasswordEmail,
   sendRideReminderEmail,
   sendMaintenanceReminderEmail,
   sendEmergencyAlertEmail,
