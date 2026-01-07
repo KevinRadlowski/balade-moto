@@ -9,6 +9,8 @@ import '../../services/catalog/catalog_router_service.dart';
 import '../../services/catalog_proposal_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../exceptions/plan_limit_exception.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 class AddVehicleWizardScreen extends StatefulWidget {
@@ -498,10 +500,19 @@ class _AddVehicleWizardScreenState extends State<AddVehicleWizardScreen> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          'Erreur lors de la création du véhicule',
-        );
+        // Intercepter PlanLimitException et ouvrir la modale premium
+        if (e is PlanLimitException) {
+          showPremiumUpsellModal(
+            context,
+            reason: e.message,
+            details: e.details,
+          );
+        } else {
+          SnackBarHelper.showError(
+            context,
+            'Erreur lors de la création du véhicule',
+          );
+        }
       }
       debugPrint('Erreur createVehicle: $e');
     } finally {

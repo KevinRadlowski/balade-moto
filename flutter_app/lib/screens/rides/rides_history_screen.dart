@@ -355,7 +355,8 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
               builder: (context) => const CreateRideWithMapScreen(),
             ),
           ).then((result) {
-            if (result == true) {
+            // Rafraîchir si une balade a été créée (result == true ou result est un objet Ride)
+            if (result == true || result != null) {
               _loadRides();
             }
           });
@@ -831,6 +832,26 @@ class _RideCard extends StatelessWidget {
                         color: ride.typeVehicule == 'moto'
                             ? Colors.orange.shade900
                             : Colors.blue.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: ride.visibilite == 'privee'
+                          ? Colors.grey.shade200
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      ride.visibilite == 'privee' ? '🔒 Privée' : '🌍 Publique',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ride.visibilite == 'privee'
+                            ? Colors.grey.shade800
+                            : Colors.blue.shade800,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

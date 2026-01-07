@@ -47,7 +47,8 @@ describe('Plan Quota Service', () => {
       expect(Vehicle.aggregate).toHaveBeenCalledWith([
         {
           $match: {
-            ownerUserId: expect.anything()
+            ownerUserId: expect.anything(),
+            active: true
           }
         },
         {

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/vehicle.dart';
 import '../../services/garage_service.dart';
 import '../../widgets/garage/vehicle_card.dart';
 import '../../widgets/garage/empty_state.dart';
+import '../../providers/plan_provider.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
 import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
 
@@ -137,6 +140,9 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
 
     if (result == true) {
       _refreshVehicles();
+      // Rafraîchir le plan pour mettre à jour les quotas
+      final planProvider = Provider.of<PlanProvider>(context, listen: false);
+      planProvider.loadPlan(silent: true);
     }
   }
 
@@ -157,10 +163,30 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _navigateToAddVehicle,
-        icon: const Icon(Icons.add),
-        label: const Text('Ajouter un véhicule'),
+      floatingActionButton: Consumer<PlanProvider>(
+        builder: (context, planProvider, _) {
+          final isPremium = planProvider.isPremium;
+          final plan = planProvider.plan;
+          
+          // Si premium, toujours autoriser
+          // Si plan pas encore chargé, autoriser (on vérifiera côté backend)
+          // Si plan chargé et FREE, vérifier les limites
+          final canAddVehicle = isPremium || 
+              plan == null || 
+              plan.remainingVehiclesTotal > 0;
+          
+          return FloatingActionButton.extended(
+            onPressed: canAddVehicle ? _navigateToAddVehicle : () {
+              showPremiumUpsellModal(
+                context,
+                reason: 'Limite de véhicules atteinte. Passez en Premium pour ajouter un nombre illimité de véhicules.',
+              );
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Ajouter un véhicule'),
+            tooltip: canAddVehicle ? null : 'Limite de véhicules atteinte',
+          );
+        },
       ),
     );
   }
@@ -254,6 +280,9 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
         ).then((result) {
           if (result == true) {
             _refreshVehicles();
+            // Rafraîchir le plan pour mettre à jour les quotas
+            final planProvider = Provider.of<PlanProvider>(context, listen: false);
+            planProvider.loadPlan(silent: true);
           }
         });
       },

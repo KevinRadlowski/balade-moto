@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../providers/plan_provider.dart';
+import '../../exceptions/plan_limit_exception.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -30,6 +33,25 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       return;
     }
 
+    // Vérification de sécurité : bloquer la création si limite atteinte
+    final planProvider = Provider.of<PlanProvider>(context, listen: false);
+    if (_visibilite == 'privee' && !planProvider.canCreatePrivateGroup) {
+      // Forcer la visibilité à "publique" pour empêcher la soumission
+      setState(() {
+        _visibilite = 'publique';
+      });
+      
+      // Afficher la modale
+      showPremiumUpsellModal(
+        context,
+        reason: planProvider.isPremium
+            ? 'Erreur inattendue'
+            : 'Vous avez atteint votre limite de groupes privés avec le plan Standard (1 groupe maximum). Passez en Premium pour créer un nombre illimité de groupes privés.',
+      );
+      
+      return; // Empêcher la soumission
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -48,6 +70,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       );
 
       if (mounted) {
+        // Rafraîchir le plan pour mettre à jour les quotas
+        final planProvider = Provider.of<PlanProvider>(context, listen: false);
+        await planProvider.loadPlan(silent: true);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Groupe créé avec succès !'),
@@ -58,12 +84,21 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Intercepter PlanLimitException et ouvrir la modale premium
+        if (e is PlanLimitException) {
+          showPremiumUpsellModal(
+            context,
+            reason: e.message,
+            details: e.details,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -113,27 +148,65 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 maxLength: 500,
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _visibilite,
-                decoration: const InputDecoration(
-                  labelText: 'Visibilité *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.visibility),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'publique',
-                    child: Text('🌐 Publique'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'privee',
-                    child: Text('🔒 Privée'),
-                  ),
-                ],
-                onChanged: (value) {
+              Builder(
+                builder: (context) {
+                  final planProvider = context.read<PlanProvider>();
+                  final canCreatePrivate = planProvider.canCreatePrivateGroup;
+                  
+                  return DropdownButtonFormField<String>(
+                    value: _visibilite,
+                    decoration: const InputDecoration(
+                      labelText: 'Visibilité *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.visibility),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'publique',
+                        child: Text('🌐 Publique'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'privee',
+                        enabled: canCreatePrivate,
+                        child: Text(
+                          '🔒 Privée${canCreatePrivate ? '' : ' (Premium)'}',
+                          style: TextStyle(
+                            color: canCreatePrivate ? null : Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ],
+                onChanged: (value) async {
+                  if (value == null) return;
+
+                  final planProvider = context.read<PlanProvider>();
+
+                  // Cas 1: l'utilisateur choisit "Privée" mais n'a pas le droit
+                  if (value == 'privee' && !planProvider.canCreatePrivateGroup) {
+                    // Rollback immédiat (FORCE l'UI à rester sur publique)
+                    if (mounted) {
+                      setState(() {
+                        _visibilite = 'publique';
+                      });
+                    }
+
+                    // Ouvrir la modale Premium (ne change PAS _visibilite dans onDismiss)
+                    showPremiumUpsellModal(
+                      context,
+                      reason: planProvider.isPremium
+                          ? 'Erreur inattendue'
+                          : 'Vous avez atteint votre limite de groupes privés avec le plan Standard (1 groupe maximum). Passez en Premium pour créer un nombre illimité de groupes privés.',
+                    );
+
+                    return;
+                  }
+
+                  // Cas 2: sélection autorisée
                   setState(() {
-                    _visibilite = value!;
+                    _visibilite = value;
                   });
+                },
+                  );
                 },
               ),
               const SizedBox(height: 24),

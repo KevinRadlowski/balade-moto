@@ -7,9 +7,11 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/ride.dart';
+import '../models/plan/user_plan.dart';
 import '../config/api_config.dart';
 import '../exceptions/auth_exception.dart';
 import '../exceptions/resend_email_exception.dart';
+import '../exceptions/plan_limit_exception.dart';
 
 class ApiService {
   static const String baseUrl = ApiConfig.apiUrl;
@@ -146,6 +148,25 @@ class ApiService {
           if (_onTokenExpired != null) {
             _onTokenExpired!();
           }
+        }
+      }
+
+      // Si erreur 403, vérifier si c'est une erreur de limite de plan
+      if (response.statusCode == 403) {
+        try {
+          final json = jsonDecode(response.body);
+          final code = json['code'] as String?;
+          
+          if (code == 'PLAN_LIMIT') {
+            throw PlanLimitException.fromJson(json);
+          }
+        } catch (e) {
+          // Si c'est déjà une PlanLimitException, la relancer
+          if (e is PlanLimitException) {
+            rethrow;
+          }
+          // Si le parsing échoue, continuer normalement (les autres erreurs 403 restent inchangées)
+          debugPrint('Erreur lors du parsing de la réponse 403: $e');
         }
       }
       
@@ -604,6 +625,28 @@ class ApiService {
     }
   }
 
+  /// Récupère le plan de l'utilisateur connecté
+  Future<UserPlan> getMyPlan() async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/users/me/plan'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // Si la réponse est { success:true, data:{...} }, utiliser data['data']
+      // Si la réponse est directement { plan:..., limits:..., usage:... }, utiliser l'objet root
+      // Ne jamais parser data['data']['plan'] (string) comme objet
+      final planData = data['data'] ?? data;
+      return UserPlan.fromJson(planData);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération du plan');
+    }
+  }
+
   Future<User> updateProfile({
     String? firstName,
     String? lastName,
@@ -819,6 +862,13 @@ class ApiService {
       if (participant != null) 'participant': participant,
       if (organisateur != null) 'organisateur': organisateur,
     };
+    
+    // Ajouter les paramètres géographiques si rayon > 0
+    if (rayon != null && rayon > 0 && latitude != null && longitude != null) {
+      queryParams['lat'] = latitude.toString();
+      queryParams['lng'] = longitude.toString();
+      queryParams['rayon'] = rayon.toString();
+    }
 
     final uri = Uri.parse('$baseUrl/rides').replace(queryParameters: queryParams);
     final response = await _makeRequest(() async {
@@ -1063,6 +1113,51 @@ class ApiService {
     }
   }
 
+  Future<void> inviteUsersToRide(String rideId, List<String> userIds) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invite'),
+        headers: _headers,
+        body: jsonEncode({
+          'userIds': userIds,
+        }),
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'envoi des invitations');
+    }
+  }
+
+  Future<void> acceptRideInvitation(String rideId) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invitations/accept'),
+        headers: _headers,
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'acceptation de l\'invitation');
+    }
+  }
+
+  Future<void> declineRideInvitation(String rideId) async {
+    final response = await _makeRequest(
+      () => http.post(
+        Uri.parse('$baseUrl/rides/$rideId/invitations/decline'),
+        headers: _headers,
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du refus de l\'invitation');
+    }
+  }
+
   Future<void> joinRide(String id) async {
     final response = await _makeRequest(() async {
       return await http.post(
@@ -1264,6 +1359,14 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       final errorData = jsonDecode(response.body);
+      
+      // Si c'est une erreur PLAN_LIMIT, elle a déjà été interceptée dans _makeRequest
+      // et convertie en PlanLimitException, donc on ne devrait pas arriver ici
+      // Mais pour être sûr, vérifier à nouveau
+      if (errorData['code'] == 'PLAN_LIMIT') {
+        throw PlanLimitException.fromJson(errorData);
+      }
+      
       throw Exception(errorData['message'] ?? 'Erreur lors de la création du groupe');
     }
   }
@@ -1348,9 +1451,9 @@ class ApiService {
   Future<List<Map<String, dynamic>>> searchUsers(String query, {int limit = 10}) async {
     final response = await _makeRequest(() async {
       return await http.get(
-        Uri.parse('$baseUrl/user/search').replace(queryParameters: {
-          'query': query,
-          'limit': limit.toString(),
+        Uri.parse('$baseUrl/users/search').replace(queryParameters: {
+          'q': query,
+          if (limit != 10) 'limit': limit.toString(),
         }),
         headers: _headers,
       );

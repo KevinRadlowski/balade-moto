@@ -22,16 +22,17 @@ import 'providers/vehicle_stats_provider.dart';
 import 'providers/maintenance_reminder_provider.dart';
 import 'providers/emergency_contact_provider.dart';
 import 'providers/check_in_provider.dart';
+import 'providers/plan_provider.dart';
 
-/// Widget qui limite la largeur maximale de l'application à 400px sur desktop
+/// Widget qui limite la largeur maximale de l'application à 1024px sur desktop
 /// et centre le contenu horizontalement
 Widget _maxWidthBuilder(BuildContext context, Widget? child) {
   return LayoutBuilder(
     builder: (context, constraints) {
-      if (constraints.maxWidth > 400) {
+      if (constraints.maxWidth > 1024) {
         return Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 1024),
             child: child,
           ),
         );
@@ -128,11 +129,15 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (_) => CheckInProvider(apiService: apiService),
         ),
+        ChangeNotifierProvider(
+          create: (_) => PlanProvider(apiService: apiService),
+        ),
       ],
-      child: Consumer<AuthService>(
-        builder: (context, authService, _) {
-          // Afficher SplashScreen uniquement si isInitializing
-          if (authService.isInitializing) {
+      child: _AuthPlanSync(
+        child: Consumer<AuthService>(
+          builder: (context, authService, _) {
+            // Afficher SplashScreen uniquement si isInitializing
+            if (authService.isInitializing) {
             return MaterialApp(
               title: 'RideTogether',
               debugShowCheckedModeBanner: false,
@@ -250,8 +255,99 @@ class _MyAppState extends State<MyApp> {
               return null;
             },
           );
-        },
+          },
+        ),
       ),
+    );
+  }
+}
+
+/// Widget qui synchronise AuthService et PlanProvider
+/// - Charge le plan automatiquement après authentification
+/// - Vide le plan lors du logout
+class _AuthPlanSync extends StatefulWidget {
+  final Widget child;
+
+  const _AuthPlanSync({required this.child});
+
+  @override
+  State<_AuthPlanSync> createState() => _AuthPlanSyncState();
+}
+
+class _AuthPlanSyncState extends State<_AuthPlanSync> {
+  bool _wasAuthenticated = false;
+  bool _hasScheduledLoad = false;
+  bool _listenerAdded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Écouter les changements d'authentification (une seule fois)
+    if (!_listenerAdded) {
+      final authService = context.read<AuthService>();
+      _wasAuthenticated = authService.isAuthenticated;
+      authService.addListener(_onAuthStateChanged);
+      _listenerAdded = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    final authService = context.read<AuthService>();
+    authService.removeListener(_onAuthStateChanged);
+    super.dispose();
+  }
+
+  void _onAuthStateChanged() {
+    if (!mounted) return;
+    
+    final authService = context.read<AuthService>();
+    final planProvider = context.read<PlanProvider>();
+    final isAuthenticated = authService.isAuthenticated;
+
+    // Si l'utilisateur vient de se déconnecter (isAuthenticated passe de true à false)
+    if (_wasAuthenticated && !isAuthenticated) {
+      planProvider.clear();
+      _hasScheduledLoad = false;
+    }
+
+    _wasAuthenticated = isAuthenticated;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, authService, _) {
+        // Charger le plan automatiquement après authentification
+        // Utiliser postFrameCallback pour éviter les rebuilds pendant le build
+        if (authService.isAuthenticated && 
+            !authService.isInitializing && 
+            !_hasScheduledLoad) {
+          _hasScheduledLoad = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            
+            final planProvider = context.read<PlanProvider>();
+            // Charger seulement si le plan n'est pas déjà chargé et qu'on n'est pas en train de charger
+            if (planProvider.plan == null && !planProvider.isLoading) {
+              planProvider.loadPlan(silent: true).then((_) {
+                if (mounted) {
+                  _hasScheduledLoad = false;
+                }
+              }).catchError((_) {
+                if (mounted) {
+                  _hasScheduledLoad = false;
+                }
+              });
+            } else {
+              // Si le plan est déjà chargé ou en cours de chargement, réinitialiser le flag
+              _hasScheduledLoad = false;
+            }
+          });
+        }
+
+        return widget.child;
+      },
     );
   }
 }

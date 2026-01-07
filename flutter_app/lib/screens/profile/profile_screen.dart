@@ -12,7 +12,10 @@ import '../../widgets/profile/reputation_card.dart';
 import '../../widgets/profile/emergency_contact_card.dart';
 import '../../widgets/profile/referral_card.dart';
 import '../../providers/emergency_contact_provider.dart';
+import '../../providers/plan_provider.dart';
 import '../auth/phone_verification_screen.dart';
+import '../premium/premium_screen.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -914,6 +917,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
+                          // Section Premium
+                          const _PremiumCard(),
+                          const SizedBox(height: 16),
                           // Section réputation et badges
                           if (_user != null)
                             ReputationCard(userId: _user!.id),
@@ -1262,6 +1268,179 @@ class _ProfileField extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+/// Carte Premium affichant le statut du plan
+class _PremiumCard extends StatelessWidget {
+  const _PremiumCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<PlanProvider>(
+      builder: (context, planProvider, _) {
+        final plan = planProvider.plan;
+        final isPremium = planProvider.isPremium;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isPremium
+                ? Theme.of(context).primaryColor.withOpacity(0.1)
+                : Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isPremium
+                  ? Theme.of(context).primaryColor
+                  : Colors.grey.shade300,
+              width: isPremium ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isPremium ? Icons.workspace_premium : Icons.account_circle,
+                    color: isPremium
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade600,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPremium ? 'Compte Premium' : 'Compte Standard',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isPremium
+                                ? Theme.of(context).primaryColor
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                        if (isPremium && plan?.premiumExpiresAt != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Expire le ${DateFormat('dd/MM/yyyy', 'fr_FR').format(plan!.premiumExpiresAt!)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (isPremium) ...[
+                // Contenu pour Premium
+                const SizedBox(height: 16),
+                _buildBenefit(context, Icons.directions_car, 'Garage illimité'),
+                const SizedBox(height: 6),
+                _buildBenefit(context, Icons.group, 'Groupes privés illimités'),
+                const SizedBox(height: 6),
+                _buildBenefit(context, Icons.directions_bike, 'Balades privées illimitées'),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PremiumScreen(),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).primaryColor,
+                      side: BorderSide(color: Theme.of(context).primaryColor),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Gérer Premium',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Contenu pour Standard
+                const SizedBox(height: 16),
+                Text(
+                  'Débloque avec Premium :',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildBenefit(context, Icons.directions_car, 'Garage illimité (Premium)'),
+                const SizedBox(height: 6),
+                _buildBenefit(context, Icons.group, 'Groupes privés illimités (Premium)'),
+                const SizedBox(height: 6),
+                _buildBenefit(context, Icons.directions_bike, 'Balades privées illimitées (Premium)'),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PremiumScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Voir Premium',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBenefit(BuildContext context, IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).primaryColor),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -219,7 +219,8 @@ exports.getRides = async (req, res) => {
             filter.$or = [
               { visibilite: 'publique' },
               { organisateur: req.user._id },
-              { 'participants.userId': req.user._id }
+              { 'participants.userId': req.user._id },
+              { 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } }
             ];
           }
         }
@@ -363,11 +364,12 @@ exports.getRides = async (req, res) => {
       if (visibilite && ['privee', 'publique'].includes(visibilite)) {
         filter.visibilite = visibilite;
       } else {
-        // Montrer les publiques et les privées où l'utilisateur est participant/organisateur
+        // Montrer les publiques et les privées où l'utilisateur est participant/organisateur/invité
         filter.$or = [
           { visibilite: 'publique' },
           { organisateur: req.user._id },
-          { 'participants.userId': req.user._id }
+          { 'participants.userId': req.user._id },
+          { 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } }
         ];
       }
     }
@@ -838,7 +840,8 @@ exports.getRidesNearby = async (req, res) => {
       $or: [
         { visibilite: 'publique' },
         { organisateur: req.user._id },
-        { 'participants.userId': req.user._id }
+        { 'participants.userId': req.user._id },
+        { 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } }
       ]
     };
 
@@ -976,6 +979,7 @@ exports.getRideById = async (req, res, next) => {
     const ride = await Ride.findById(id)
       .populate('organisateur', 'firstName lastName pseudo email vehiclePreference')
       .populate('participants.userId', 'firstName lastName pseudo')
+      .populate('invitations.userId', 'firstName lastName pseudo')
       .populate('likes', 'firstName lastName pseudo');
 
     if (!ride) {
@@ -993,8 +997,12 @@ exports.getRideById = async (req, res, next) => {
       const isParticipant = ride.participants.some(
         p => p.userId && (p.userId._id ? p.userId._id.toString() : p.userId.toString()) === req.user._id.toString()
       );
+      const isInvited = ride.invitations && ride.invitations.some(
+        inv => inv.userId && (inv.userId._id ? inv.userId._id.toString() : inv.userId.toString()) === req.user._id.toString() &&
+        (inv.status === 'pending' || inv.status === 'accepted')
+      );
       
-      if (!isOrganizer && !isParticipant) {
+      if (!isOrganizer && !isParticipant && !isInvited) {
         return res.status(403).json({
           success: false,
           message: 'Vous n\'avez pas accès à cette balade privée'
@@ -1228,10 +1236,14 @@ exports.joinRide = async (req, res) => {
     if (ride.visibilite === 'privee') {
       const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
       const isParticipant = ride.participants.some(
-        p => p.toString() === req.user._id.toString()
+        p => p.userId && p.userId.toString() === req.user._id.toString()
+      );
+      const isInvited = ride.invitations && ride.invitations.some(
+        inv => inv.userId && inv.userId.toString() === req.user._id.toString() && 
+        (inv.status === 'pending' || inv.status === 'accepted')
       );
       
-      if (!isOrganizer && !isParticipant) {
+      if (!isOrganizer && !isParticipant && !isInvited) {
         return res.status(403).json({
           success: false,
           message: 'Cette balade est privée'
@@ -2356,6 +2368,250 @@ exports.claimOrganizer = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la reprise de l\'organisation',
+      error: error.message
+    });
+  }
+};
+
+// Inviter des utilisateurs à une balade privée
+exports.inviteUsersToRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { userIds } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vous devez fournir au moins un utilisateur à inviter'
+      });
+    }
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul l\'organisateur peut inviter des participants'
+      });
+    }
+
+    // Vérifier que la balade est privée (optionnel mais logique)
+    if (ride.visibilite !== 'privee') {
+      return res.status(400).json({
+        success: false,
+        message: 'Les invitations ne sont disponibles que pour les balades privées'
+      });
+    }
+
+    // Vérifier que les utilisateurs existent
+    const users = await User.find({ _id: { $in: userIds } });
+    if (users.length !== userIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Un ou plusieurs utilisateurs n\'existent pas'
+      });
+    }
+
+    // Ajouter les invitations (ne pas dupliquer)
+    const newInvitations = [];
+    for (const userId of userIds) {
+      // Vérifier si l'utilisateur n'est pas déjà invité
+      const existingInvitation = ride.invitations.find(
+        inv => inv.userId && inv.userId.toString() === userId.toString()
+      );
+
+      // Vérifier si l'utilisateur n'est pas déjà participant
+      const isAlreadyParticipant = ride.participants.some(
+        p => p.userId && p.userId.toString() === userId.toString()
+      );
+
+      // Vérifier que ce n'est pas l'organisateur
+      if (userId.toString() === ride.organisateur.toString()) {
+        continue; // Skip l'organisateur
+      }
+
+      if (!existingInvitation && !isAlreadyParticipant) {
+        ride.invitations.push({
+          userId: userId,
+          status: 'pending',
+          invitedAt: new Date()
+        });
+        newInvitations.push(userId);
+      }
+    }
+
+    await ride.save();
+
+    // Populer les données pour la réponse
+    const updatedRide = await Ride.findById(id)
+      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('participants.userId', 'firstName lastName pseudo')
+      .populate('invitations.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: `${newInvitations.length} invitation(s) envoyée(s)`,
+      data: {
+        ride: updatedRide,
+        invitedCount: newInvitations.length
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'envoi des invitations',
+      error: error.message
+    });
+  }
+};
+
+// Accepter une invitation à une balade
+exports.acceptRideInvitation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Trouver l'invitation pending pour cet utilisateur
+    const invitation = ride.invitations.find(
+      inv => inv.userId && inv.userId.toString() === req.user._id.toString() && inv.status === 'pending'
+    );
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Aucune invitation en attente trouvée'
+      });
+    }
+
+    // Mettre à jour l'invitation
+    invitation.status = 'accepted';
+    invitation.respondedAt = new Date();
+
+    // Ajouter l'utilisateur aux participants s'il n'est pas déjà présent
+    const isAlreadyParticipant = ride.participants.some(
+      p => p.userId && p.userId.toString() === req.user._id.toString()
+    );
+
+    if (!isAlreadyParticipant) {
+      ride.participants.push({
+        userId: req.user._id
+      });
+
+      // Ajouter un événement participant_joined
+      ride.rideEvents.push({
+        type: 'participant_joined',
+        timestamp: new Date(),
+        userId: req.user._id
+      });
+    }
+
+    await ride.save();
+
+    // Populer les données pour la réponse
+    const updatedRide = await Ride.findById(id)
+      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('participants.userId', 'firstName lastName pseudo')
+      .populate('invitations.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Invitation acceptée',
+      data: {
+        ride: updatedRide
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'acceptation de l\'invitation',
+      error: error.message
+    });
+  }
+};
+
+// Refuser une invitation à une balade
+exports.declineRideInvitation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Trouver l'invitation pending pour cet utilisateur
+    const invitation = ride.invitations.find(
+      inv => inv.userId && inv.userId.toString() === req.user._id.toString() && inv.status === 'pending'
+    );
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Aucune invitation en attente trouvée'
+      });
+    }
+
+    // Mettre à jour l'invitation
+    invitation.status = 'declined';
+    invitation.respondedAt = new Date();
+
+    await ride.save();
+
+    // Populer les données pour la réponse
+    const updatedRide = await Ride.findById(id)
+      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('participants.userId', 'firstName lastName pseudo')
+      .populate('invitations.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Invitation refusée',
+      data: {
+        ride: updatedRide
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID invalide'
+      });
+    }
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du refus de l\'invitation',
       error: error.message
     });
   }

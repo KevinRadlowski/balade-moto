@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../providers/plan_provider.dart';
+import '../../exceptions/plan_limit_exception.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../home/home_screen.dart';
@@ -217,12 +220,21 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Intercepter PlanLimitException et ouvrir la modale premium
+        if (e is PlanLimitException) {
+          showPremiumUpsellModal(
+            context,
+            reason: e.message,
+            details: e.details,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -370,27 +382,52 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _visibilite,
-                decoration: const InputDecoration(
-                  labelText: 'Visibilité *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.visibility),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'publique',
-                    child: Text('🌐 Publique'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'privee',
-                    child: Text('🔒 Privée'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _visibilite = value!;
-                  });
+              Consumer<PlanProvider>(
+                builder: (context, planProvider, _) {
+                  return DropdownButtonFormField<String>(
+                    value: _visibilite,
+                    decoration: const InputDecoration(
+                      labelText: 'Visibilité *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.visibility),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'publique',
+                        child: Text('🌐 Publique'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'privee',
+                        child: Text('🔒 Privée'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      // Si l'utilisateur choisit "privée" mais n'a pas les droits
+                      if (value == 'privee' && !planProvider.canCreatePrivateRide) {
+                        // Forcer à "publique"
+                        setState(() {
+                          _visibilite = 'publique';
+                        });
+                        // Afficher un SnackBar
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Les balades privées sont réservées aux membres Premium'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        // Ouvrir la modale premium
+                        showPremiumUpsellModal(
+                          context,
+                          reason: 'Les balades privées sont réservées aux membres Premium. Passez en Premium pour créer des balades privées illimitées.',
+                        );
+                      } else {
+                        setState(() {
+                          _visibilite = value!;
+                        });
+                      }
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 24),

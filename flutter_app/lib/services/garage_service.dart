@@ -10,6 +10,7 @@ import '../models/maintenance_item.dart';
 import '../models/maintenance_log.dart';
 import '../models/vehicle_document.dart';
 import '../config/api_config.dart';
+import '../exceptions/plan_limit_exception.dart';
 
 class GarageService {
   final FlutterSecureStorage _storage;
@@ -111,6 +112,11 @@ class GarageService {
       } else {
         final errorData = jsonDecode(response.body);
         debugPrint('[GarageService] createVehicle errorData: ${jsonEncode(errorData)}');
+        
+        // Vérifier si c'est une erreur de limite de plan
+        if (response.statusCode == 403 && errorData['code'] == 'PLAN_LIMIT') {
+          throw PlanLimitException.fromJson(errorData);
+        }
         
         // Gérer les erreurs de validation avec détails
         if (errorData['errors'] != null && errorData['errors'] is List) {

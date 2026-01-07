@@ -60,7 +60,8 @@ describe('GET /api/users/me/plan', () => {
       maxVehiclesByType: { moto: 1, voiture: 1 },
       maxPrivateGroupsCreated: 1,
       maxPrivateRidesCreatedPerMonth: 2,
-      maxPhotosTotal: 12
+      maxPhotosTotal: 12,
+      unlimited: false
     });
   });
 
@@ -87,12 +88,14 @@ describe('GET /api/users/me/plan', () => {
     expect(data.isPremium).toBe(false);
     expect(data.premiumExpiresAt).toBeNull();
 
-    // Vérifier les limites
-    expect(data.limits).toHaveProperty('maxVehiclesTotal');
-    expect(data.limits).toHaveProperty('maxVehiclesByType');
-    expect(data.limits).toHaveProperty('maxPrivateGroupsCreated');
-    expect(data.limits).toHaveProperty('maxPrivateRidesCreatedPerMonth');
-    expect(data.limits).toHaveProperty('maxPhotosTotal');
+    // Vérifier les limites (format attendu par Flutter)
+    expect(data.limits).toHaveProperty('unlimited', false);
+    expect(data.limits).toHaveProperty('vehiclesTotal');
+    expect(data.limits).toHaveProperty('vehiclesMoto');
+    expect(data.limits).toHaveProperty('vehiclesVoiture');
+    expect(data.limits).toHaveProperty('photosPerVehicle');
+    expect(data.limits).toHaveProperty('privateGroupsTotal');
+    expect(data.limits).toHaveProperty('privateRidesPerMonth');
 
     // Vérifier l'usage
     expect(data.usage).toHaveProperty('vehiclesTotal');
@@ -150,18 +153,38 @@ describe('GET /api/users/me/plan', () => {
     expect(planQuotaService.countPrivateRidesCreatedThisMonth).toHaveBeenCalledWith(user._id);
   });
 
-  it('devrait retourner les limites FREE correctes', async () => {
+  it('devrait retourner les limites FREE correctes avec les valeurs exactes du produit', async () => {
+    // Les valeurs mockées doivent correspondre aux vraies valeurs de premium.config.js
+    // maxPrivateGroupsCreated: 1 et maxPrivateRidesCreatedPerMonth: 2 (règles produit)
+    premiumConfig.getPlanLimits.mockReturnValue({
+      maxVehiclesTotal: 2,
+      maxVehiclesByType: { moto: 1, voiture: 1 },
+      maxPrivateGroupsCreated: 1, // Règle produit : 1 groupe privé max
+      maxPrivateRidesCreatedPerMonth: 2, // Règle produit : 2 balades privées par mois max
+      maxPhotosTotal: 12,
+      unlimited: false
+    });
+
     const response = await request(app)
       .get('/api/users/me/plan')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
     const { limits } = response.body.data;
-    expect(limits.maxVehiclesTotal).toBe(2);
-    expect(limits.maxVehiclesByType).toEqual({ moto: 1, voiture: 1 });
-    expect(limits.maxPrivateGroupsCreated).toBe(1);
-    expect(limits.maxPrivateRidesCreatedPerMonth).toBe(2);
-    expect(limits.maxPhotosTotal).toBe(12);
+    
+    // Vérifier le format (unlimited: false pour FREE)
+    expect(limits.unlimited).toBe(false);
+    
+    // Vérifier les valeurs exactes des limites FREE selon les règles produit
+    expect(limits.vehiclesTotal).toBe(2);
+    expect(limits.vehiclesMoto).toBe(1);
+    expect(limits.vehiclesVoiture).toBe(1);
+    expect(limits.photosPerVehicle).toBe(12);
+    
+    // Vérifier les limites spécifiques demandées par l'utilisateur
+    // Ces valeurs doivent correspondre exactement à celles dans premium.config.js
+    expect(limits.privateGroupsTotal).toBe(1); // maxPrivateGroupsCreated: 1 (règle produit)
+    expect(limits.privateRidesPerMonth).toBe(2); // maxPrivateRidesCreatedPerMonth: 2 (règle produit)
   });
 
   it('devrait gérer les erreurs de service correctement', async () => {

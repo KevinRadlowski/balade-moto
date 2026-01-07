@@ -29,7 +29,7 @@ const FREE_LIMITS = {
     voiture: 1,
   },
   
-  // Nombre maximum de groupes privés créés
+  // Nombre maximum de groupes privés créés (Standard peut créer 1 groupe privé)
   maxPrivateGroupsCreated: 1,
   
   // Nombre maximum de balades privées créées par mois

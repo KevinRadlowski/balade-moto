@@ -74,7 +74,27 @@ class BadRequestError extends AppError {
  */
 function createPlanLimitError(limitKey, limit, current, plan, resourceName) {
   const remaining = Math.max(0, limit - current);
-  const message = `Limite atteinte : vous ne pouvez créer que ${limit} ${resourceName} avec le plan gratuit (actuellement ${current}). Passez à Premium pour créer un nombre illimité de ${resourceName}.`;
+  
+  // Messages plus explicites selon le type de limite
+  let message;
+  if (limitKey.startsWith('maxVehiclesByType.')) {
+    // Limite par type de véhicule (moto/voiture)
+    const vehicleType = limitKey.split('.')[1]; // 'moto' ou 'voiture'
+    const vehicleTypeLabel = vehicleType === 'moto' ? 'moto' : 'voiture';
+    
+    if (current >= limit) {
+      message = `Vous avez atteint votre limite de ${limit} ${vehicleTypeLabel} avec le plan Standard. ${limit === 1 ? 'Supprimez votre ' + vehicleTypeLabel + ' existante' : 'Supprimez une ' + vehicleTypeLabel + ' existante'} ou passez en Premium pour ajouter un nombre illimité de véhicules.`;
+    } else {
+      message = `Limite de ${limit} ${vehicleTypeLabel} atteinte avec le plan Standard. Passez en Premium pour ajouter un nombre illimité de véhicules.`;
+    }
+  } else {
+    // Autres limites (total véhicules, photos, etc.)
+    if (current >= limit) {
+      message = `Vous avez atteint votre limite de ${limit} ${resourceName} avec le plan Standard. Supprimez des ${resourceName} existants ou passez en Premium pour créer un nombre illimité de ${resourceName}.`;
+    } else {
+      message = `Limite de ${limit} ${resourceName} atteinte avec le plan Standard. Passez en Premium pour créer un nombre illimité de ${resourceName}.`;
+    }
+  }
   
   const error = new ForbiddenError(message);
   error.code = 'PLAN_LIMIT';
@@ -82,7 +102,8 @@ function createPlanLimitError(limitKey, limit, current, plan, resourceName) {
     limit,
     current,
     remaining,
-    plan
+    plan,
+    limitKey
   };
   
   return error;

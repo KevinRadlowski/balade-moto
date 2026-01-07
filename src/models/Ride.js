@@ -137,6 +137,26 @@ const rideSchema = new mongoose.Schema({
       default: null // Quand la validation a eu lieu
     }
   }],
+  invitations: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'declined'],
+      default: 'pending'
+    },
+    invitedAt: {
+      type: Date,
+      default: Date.now
+    },
+    respondedAt: {
+      type: Date,
+      default: null
+    }
+  }],
   likes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -225,6 +245,8 @@ rideSchema.index({ participants: 1 });
 rideSchema.index({ 'participants.vehicleId': 1 }); // Pour rechercher les balades par véhicule
 rideSchema.index({ status: 1, date: 1 }); // Pour les requêtes par statut
 rideSchema.index({ ridingStyle: 1 }); // Pour les filtres par style
+rideSchema.index({ 'invitations.userId': 1 }); // Pour rechercher les invitations par utilisateur
+rideSchema.index({ 'invitations.status': 1 }); // Pour filtrer par statut d'invitation
 // Index géospatial 2dsphere pour les requêtes de proximité
 rideSchema.index({ localisation: '2dsphere' });
 

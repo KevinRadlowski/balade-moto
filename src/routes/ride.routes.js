@@ -62,6 +62,9 @@ router.put('/:id', authMiddleware, subscriptionMiddleware, validateRideId, valid
 router.delete('/:id', authMiddleware, subscriptionMiddleware, validateRideId, rideController.deleteRide);
 router.post('/:id/join', authMiddleware, subscriptionMiddleware, validateRideId, rideController.joinRide);
 router.delete('/:id/join', authMiddleware, subscriptionMiddleware, validateRideId, rideController.leaveRide);
+router.post('/:id/invite', authMiddleware, subscriptionMiddleware, validateRideId, rideController.inviteUsersToRide);
+router.post('/:id/invitations/accept', authMiddleware, subscriptionMiddleware, validateRideId, rideController.acceptRideInvitation);
+router.post('/:id/invitations/decline', authMiddleware, subscriptionMiddleware, validateRideId, rideController.declineRideInvitation);
 router.post('/:id/like', authMiddleware, subscriptionMiddleware, validateRideId, rideController.likeRide);
 router.post('/:id/note', authMiddleware, subscriptionMiddleware, validateRideId, rideController.rateRide);
 router.post('/:id/complete', authMiddleware, subscriptionMiddleware, validateRideId, rideController.completeRide);

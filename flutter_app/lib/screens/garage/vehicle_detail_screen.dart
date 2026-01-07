@@ -25,6 +25,7 @@ import 'add_vehicle_screen.dart';
 import 'add_document_screen.dart';
 import '../../widgets/garage/vehicle_stats_card.dart';
 import '../../widgets/garage/maintenance_reminders_card.dart';
+import '../../providers/plan_provider.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
   final String vehicleId;
@@ -347,6 +348,10 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
       try {
         await _garageService.deleteVehicle(widget.vehicleId);
         if (mounted) {
+          // Rafraîchir le plan pour mettre à jour les quotas
+          final planProvider = Provider.of<PlanProvider>(context, listen: false);
+          await planProvider.loadPlan(silent: true);
+          
           Navigator.pop(context, true);
           SnackBarHelper.showSuccess(context, 'Véhicule supprimé avec succès');
         }

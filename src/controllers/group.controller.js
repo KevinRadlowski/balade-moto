@@ -39,7 +39,7 @@ const buildAvatarUrls = (data) => {
 };
 
 // Créer un groupe
-exports.createGroup = async (req, res) => {
+exports.createGroup = async (req, res, next) => {
   try {
     // Vérifier les limites du plan (FREE vs PREMIUM) pour les groupes privés
     const premiumConfig = require('../config/premium.config');
@@ -57,18 +57,20 @@ exports.createGroup = async (req, res) => {
     
     const finalVisibilite = visibilite || 'publique';
     
-    // Vérifier la limite de groupes privés créés (FREE seulement)
+    // Vérifier la limite de groupes privés créés (Standard seulement)
     if (finalVisibilite === 'privee' && !premiumConfig.isPremium(userPlan)) {
-      const privateGroupsCount = await Group.countDocuments({
+      // Compter les groupes privés dont l'utilisateur est propriétaire (createur)
+      const privateGroupsOwnedCount = await Group.countDocuments({
         createur: req.user._id,
         visibilite: 'privee'
       });
       
-      if (privateGroupsCount >= limits.maxPrivateGroupsCreated) {
+      // Vérifier la limite (Standard = 1 groupe privé max)
+      if (limits.maxPrivateGroupsCreated !== null && privateGroupsOwnedCount >= limits.maxPrivateGroupsCreated) {
         throw createPlanLimitError(
           'maxPrivateGroupsCreated',
           limits.maxPrivateGroupsCreated,
-          privateGroupsCount,
+          privateGroupsOwnedCount,
           userPlan,
           'groupe(s) privé(s)'
         );
@@ -105,6 +107,12 @@ exports.createGroup = async (req, res) => {
       data: { group }
     });
   } catch (error) {
+    // Laisser passer les erreurs AppError (comme ForbiddenError avec PLAN_LIMIT) au middleware global
+    const { AppError } = require('../utils/errors');
+    if (error instanceof AppError) {
+      return next(error); // Passer au middleware d'erreur global
+    }
+    
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -112,11 +120,9 @@ exports.createGroup = async (req, res) => {
         errors: Object.values(error.errors).map(err => err.message)
       });
     }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la création du groupe',
-      error: error.message
-    });
+    
+    // Pour les autres erreurs, passer au middleware global aussi
+    return next(error);
   }
 };
 

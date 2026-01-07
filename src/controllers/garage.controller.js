@@ -125,20 +125,6 @@ exports.createVehicle = async (req, res, next) => {
     const userPlan = premiumConfig.getUserPlan(req.user);
     const limits = premiumConfig.getPlanLimits(userPlan);
     
-    // Vérifier la limite totale de véhicules
-    if (!premiumConfig.canPerformAction(userPlan, 'maxVehiclesTotal')) {
-      const vehicleCount = await Vehicle.countDocuments({ ownerUserId: req.user._id });
-      if (vehicleCount >= limits.maxVehiclesTotal) {
-        throw createPlanLimitError(
-          'maxVehiclesTotal',
-          limits.maxVehiclesTotal,
-          vehicleCount,
-          userPlan,
-          'véhicule(s)'
-        );
-      }
-    }
-    
     const {
       nickname,
       make,
@@ -155,6 +141,67 @@ exports.createVehicle = async (req, res, next) => {
       selectionSource = 'MANUAL',
       externalCatalog // Nouveau format unifié
     } = req.body;
+
+    // Normaliser le type de véhicule (lowercase, mapping)
+    let normalizedType = type ? String(type).toLowerCase().trim() : null;
+    
+    // Mapping des valeurs possibles vers les valeurs standardisées
+    const typeMapping = {
+      'motorcycle': 'moto',
+      'moto': 'moto',
+      'car': 'voiture',
+      'voiture': 'voiture',
+      'auto': 'voiture',
+      'automobile': 'voiture'
+    };
+    
+    if (normalizedType && typeMapping[normalizedType]) {
+      normalizedType = typeMapping[normalizedType];
+    }
+    
+    // Valider que le type est valide
+    if (!normalizedType || !['moto', 'voiture'].includes(normalizedType)) {
+      throw new BadRequestError('Le type de véhicule doit être "moto" ou "voiture"');
+    }
+    
+    // Vérifier les limites par type (Standard seulement)
+    if (!premiumConfig.isPremium(userPlan) && limits.maxVehiclesByType) {
+      const maxForType = limits.maxVehiclesByType[normalizedType];
+      if (maxForType !== undefined && maxForType !== null) {
+        // Compter les véhicules actifs du même type
+        const vehiclesOfTypeCount = await Vehicle.countDocuments({ 
+          ownerUserId: req.user._id, 
+          active: true,
+          type: normalizedType
+        });
+        
+        if (vehiclesOfTypeCount >= maxForType) {
+          const typeLabel = normalizedType === 'moto' ? 'moto(s)' : 'voiture(s)';
+          throw createPlanLimitError(
+            `maxVehiclesByType.${normalizedType}`,
+            maxForType,
+            vehiclesOfTypeCount,
+            userPlan,
+            typeLabel
+          );
+        }
+      }
+    }
+    
+    // Vérifier la limite totale de véhicules (Standard seulement)
+    if (!premiumConfig.isPremium(userPlan)) {
+      // IMPORTANT: Ne compter que les véhicules actifs (active=true)
+      const vehicleCount = await Vehicle.countDocuments({ ownerUserId: req.user._id, active: true });
+      if (limits.maxVehiclesTotal && vehicleCount >= limits.maxVehiclesTotal) {
+        throw createPlanLimitError(
+          'maxVehiclesTotal',
+          limits.maxVehiclesTotal,
+          vehicleCount,
+          userPlan,
+          'véhicule(s)'
+        );
+      }
+    }
 
     // Compatibilité avec anciens champs
     const nicknameValue = nickname || req.body.name;
@@ -230,7 +277,7 @@ exports.createVehicle = async (req, res, next) => {
 
     const vehicle = new Vehicle({
       ownerUserId: req.user._id,
-      type,
+      type: normalizedType, // Utiliser le type normalisé
       nickname: nicknameValue,
       make: makeValue,
       model,
@@ -457,6 +504,59 @@ exports.deleteVehicle = async (req, res, next) => {
       throw new ForbiddenError('Vous n\'êtes pas propriétaire de ce véhicule');
     }
 
+    const fs = require('fs');
+    const path = require('path');
+
+    // Supprimer la photo principale si elle existe et est locale
+    if (vehicle.photoUrl) {
+      try {
+        // Extraire le chemin du fichier depuis l'URL
+        let filePath = null;
+        if (vehicle.photoUrl.includes('/uploads/vehicles/')) {
+          const filename = vehicle.photoUrl.split('/').pop();
+          filePath = path.join(__dirname, '..', 'uploads', 'vehicles', filename);
+        } else if (vehicle.photoUrl.startsWith('/uploads/')) {
+          filePath = path.join(__dirname, '..', vehicle.photoUrl);
+        }
+        
+        if (filePath && fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileError) {
+        // Ne pas faire échouer la suppression si le fichier n'existe pas ou erreur
+        console.warn('Erreur lors de la suppression de la photo principale:', fileError.message);
+      }
+    }
+
+    // Supprimer les photos de la galerie si elles existent et sont locales
+    if (vehicle.photos && Array.isArray(vehicle.photos) && vehicle.photos.length > 0) {
+      for (const photo of vehicle.photos) {
+        if (photo.url) {
+          try {
+            let filePath = null;
+            if (photo.url.includes('/uploads/vehicles/')) {
+              const filename = photo.url.split('/').pop();
+              filePath = path.join(__dirname, '..', 'uploads', 'vehicles', filename);
+            } else if (photo.url.startsWith('/uploads/')) {
+              filePath = path.join(__dirname, '..', photo.url);
+            }
+            
+            if (filePath && fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          } catch (fileError) {
+            // Ne pas faire échouer la suppression si le fichier n'existe pas ou erreur
+            console.warn('Erreur lors de la suppression d\'une photo de galerie:', fileError.message);
+          }
+        }
+      }
+    }
+
+    // Nettoyer le document : supprimer les références aux photos
+    vehicle.photoUrl = null;
+    vehicle.photos = [];
+
+    // Soft-delete : marquer comme inactif
     vehicle.active = false;
     await vehicle.save();
 
@@ -1838,8 +1938,8 @@ exports.addVehiclePhotos = async (req, res, next) => {
     
     // Vérifier la limite totale de photos (FREE seulement)
     if (!premiumConfig.isPremium(userPlan)) {
-      // Compter toutes les photos de tous les véhicules de l'utilisateur
-      const allUserVehicles = await Vehicle.find({ ownerUserId: req.user._id });
+      // IMPORTANT: Ne compter que les photos des véhicules actifs (active=true)
+      const allUserVehicles = await Vehicle.find({ ownerUserId: req.user._id, active: true });
       let totalPhotos = 0;
       for (const v of allUserVehicles) {
         if (v.photos && Array.isArray(v.photos)) {

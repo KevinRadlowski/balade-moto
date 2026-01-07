@@ -371,10 +371,11 @@ class HomeCommunityHeader extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context, bool isVerySmall) {
-    return Row(
+    return Column(
       children: [
         // Bouton primaire : Créer une balade
-        Expanded(
+        SizedBox(
+          width: double.infinity,
           child: _ActionButton(
             icon: Icons.add_circle_outline,
             label: 'Créer une balade',
@@ -389,9 +390,10 @@ class HomeCommunityHeader extends StatelessWidget {
             isSmall: isVerySmall,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(height: 12),
         // Bouton secondaire : Rejoindre un groupe
-        Expanded(
+        SizedBox(
+          width: double.infinity,
           child: _ActionButton(
             icon: Icons.group_add,
             label: 'Rejoindre un groupe',

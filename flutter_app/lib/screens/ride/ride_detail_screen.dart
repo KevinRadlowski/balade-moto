@@ -38,6 +38,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool _isSubmittingRating = false;
   String? _errorMessage;
   Map<String, dynamic>? _ratingsData;
+  RideInvitation? _userInvitation; // Invitation pending de l'utilisateur
   
   // Pour la carte
   GoogleMapController? _mapController;
@@ -108,6 +109,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         setState(() {
           _ride = ride;
           _isParticipant = ride.participants.any((p) => p.id == authService.user?.id);
+          
+          // Vérifier si l'utilisateur a une invitation pending
+          _userInvitation = ride.invitations?.where(
+            (inv) => inv.userId == authService.user?.id && inv.status == 'pending',
+          ).firstOrNull;
           _isLiked = ride.hasUserLiked ?? ride.likes.contains(authService.user?.id);
           _totalLikes = ride.totalLikes ?? ride.likes.length;
           _hasRated = hasRated;
@@ -826,6 +832,36 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Badge visibilité
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _ride!.visibilite == 'privee'
+                        ? Colors.grey.shade800.withOpacity(0.9)
+                        : Colors.blue.shade700.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppTheme.cardShadow,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _ride!.visibilite == 'privee' ? '🔒' : '🌍',
+                        style: const TextStyle(fontSize: 14, height: 1.0),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _ride!.visibilite == 'privee' ? 'Privée' : 'Publique',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 // Titre
                 Text(
@@ -1189,6 +1225,30 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
             ),
           ],
+          // Bouton "Inviter des participants" si balade privée
+          if (_ride!.visibilite == 'privee') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _inviteParticipants,
+                icon: const Icon(Icons.person_add, size: 22),
+                label: const Text(
+                  'Inviter des participants',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
+              ),
+            ),
+          ],
           // Bouton "Voir les participants" pour l'organisateur
           const SizedBox(height: 12),
           SizedBox(
@@ -1213,8 +1273,54 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           ),
         ] else ...[
           // Si l'utilisateur n'est pas l'organisateur
-          // Bouton principal : Participer ou Naviguer/Rejoindre
-          if (!_isParticipant) ...[
+          // Vérifier si l'utilisateur a une invitation pending
+          if (_userInvitation != null && !_isParticipant) ...[
+            // Boutons Accepter/Refuser l'invitation
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _acceptInvitation,
+                    icon: const Icon(Icons.check, size: 22),
+                    label: const Text(
+                      'Accepter',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.successColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _declineInvitation,
+                    icon: const Icon(Icons.close, size: 22),
+                    label: const Text(
+                      'Refuser',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (!_isParticipant) ...[
+            // Bouton principal : Participer ou Naviguer/Rejoindre
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -1444,6 +1550,271 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         ],
       ],
     );
+  }
+
+  Future<void> _inviteParticipants() async {
+    final List<Map<String, dynamic>> selectedUsers = [];
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Inviter des participants'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Autocomplete<Map<String, dynamic>>(
+                  optionsBuilder: (textEditingValue) async {
+                    final query = textEditingValue.text.trim();
+                    if (query.length < 2) {
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
+
+                    try {
+                      setDialogState(() {
+                        isLoading = true;
+                      });
+
+                      final authService = Provider.of<AuthService>(context, listen: false);
+                      final token = await authService.storage.read(key: 'token');
+                      _apiService.setToken(token);
+
+                      final results = await _apiService.searchUsers(query, limit: 10);
+                      
+                      setDialogState(() {
+                        isLoading = false;
+                      });
+
+                      // Filtrer les utilisateurs déjà sélectionnés
+                      final selectedIds = selectedUsers.map((u) => u['id']).toSet();
+                      return results.where((user) => !selectedIds.contains(user['id']));
+                    } catch (e) {
+                      setDialogState(() {
+                        isLoading = false;
+                      });
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
+                  },
+                  displayStringForOption: (option) {
+                    final pseudo = option['pseudo'] ?? '';
+                    final email = option['email'] ?? '';
+                    return '$pseudo ($email)';
+                  },
+                  onSelected: (option) {
+                    setDialogState(() {
+                      // Vérifier si l'utilisateur n'est pas déjà sélectionné
+                      if (!selectedUsers.any((u) => u['id'] == option['id'])) {
+                        selectedUsers.add(option);
+                      }
+                    });
+                    // Le champ sera automatiquement vidé par Autocomplete après sélection
+                  },
+                  fieldViewBuilder: (
+                    context,
+                    textEditingController,
+                    focusNode,
+                    onFieldSubmitted,
+                  ) {
+                    return TextField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Pseudo ou email',
+                        hintText: 'Tapez au moins 2 caractères...',
+                        suffixIcon: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
+                      onSubmitted: (value) {
+                        onFieldSubmitted();
+                        // Vider le champ après soumission
+                        textEditingController.clear();
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final option = options.elementAt(index);
+                              final pseudo = option['pseudo'] ?? '';
+                              final email = option['email'] ?? '';
+                              final avatarUrl = option['avatarUrl'] ?? option['avatar'];
+
+                              return ListTile(
+                                leading: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                                    ? CircleAvatar(
+                                        backgroundImage: NetworkImage(
+                                          avatarUrl.toString().startsWith('http')
+                                              ? avatarUrl.toString()
+                                              : ApiConfig.getFileUrl(avatarUrl.toString())
+                                        ),
+                                        radius: 20,
+                                      )
+                                    : const CircleAvatar(
+                                        radius: 20,
+                                        child: Icon(Icons.person),
+                                      ),
+                                title: Text(pseudo),
+                                subtitle: Text(email),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Vous pouvez rechercher par pseudo ou email',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                if (selectedUsers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Utilisateurs sélectionnés:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...selectedUsers.map((user) {
+                    final pseudo = user['pseudo'] ?? '';
+                    final email = user['email'] ?? '';
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.person, size: 20),
+                      title: Text(pseudo),
+                      subtitle: Text(email),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedUsers.removeWhere((u) => u['id'] == user['id']);
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: selectedUsers.isEmpty
+                  ? null
+                  : () async {
+                      final userIds = selectedUsers.map((u) => u['id'].toString()).toList();
+                      Navigator.pop(context);
+                      
+                      try {
+                        await _apiService.inviteUsersToRide(_ride!.id, userIds);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${selectedUsers.length} invitation(s) envoyée(s)'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          await _loadRide(); // Recharger pour voir les invitations
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: Text('Inviter (${selectedUsers.length})'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _acceptInvitation() async {
+    try {
+      await _apiService.acceptRideInvitation(_ride!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invitation acceptée'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadRide(); // Recharger pour mettre à jour l'état
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _declineInvitation() async {
+    try {
+      await _apiService.declineRideInvitation(_ride!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invitation refusée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        await _loadRide(); // Recharger pour mettre à jour l'état
+        // Optionnel : sortir de l'écran si l'invitation est refusée
+        // Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _formatDateTime(DateTime date, String heure) {

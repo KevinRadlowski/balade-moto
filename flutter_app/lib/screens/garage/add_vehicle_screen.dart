@@ -11,6 +11,9 @@ import '../../services/catalog_proposal_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/garage/searchable_select.dart';
+import '../../exceptions/plan_limit_exception.dart';
+import '../../widgets/premium/premium_upsell_modal.dart';
+import '../../providers/plan_provider.dart';
 
 class AddVehicleScreen extends StatefulWidget {
   final Vehicle? vehicle;
@@ -23,6 +26,7 @@ class AddVehicleScreen extends StatefulWidget {
 
 class _AddVehicleScreenState extends State<AddVehicleScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _typeSegmentedKey = GlobalKey(); // Clé pour forcer la reconstruction du SegmentedButton
   final GarageService _garageService = GarageService();
   late final CatalogRouterService _catalogRouter;
   late final CatalogProposalService _proposalService;
@@ -364,18 +368,54 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         // Création
         await _garageService.createVehicle(payload);
         if (mounted) {
+          // Rafraîchir le plan pour mettre à jour les quotas
+          final planProvider = Provider.of<PlanProvider>(context, listen: false);
+          await planProvider.loadPlan(silent: true);
+          
           SnackBarHelper.showSuccess(context, 'Véhicule créé avec succès');
           Navigator.of(context).pop(true);
         }
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          widget.vehicle != null
-              ? 'Erreur lors de la modification du véhicule'
-              : 'Erreur lors de la création du véhicule',
-        );
+        // Intercepter PlanLimitException et ouvrir la modale premium
+        if (e is PlanLimitException) {
+          // Construire un message plus explicite selon le type de limite
+          String reasonMessage = e.message;
+          
+          // Si c'est une limite de véhicule par type, personnaliser le message
+          if (e.details != null && e.details!['limitKey'] != null) {
+            final limitKey = e.details!['limitKey'] as String?;
+            if (limitKey != null && limitKey.startsWith('maxVehiclesByType.')) {
+              final vehicleType = limitKey.split('.').last; // 'moto' ou 'voiture'
+              final vehicleTypeLabel = vehicleType == 'moto' ? 'moto' : 'voiture';
+              final current = e.details!['current'] as int? ?? 0;
+              final limit = e.details!['limit'] as int? ?? 1;
+              
+              reasonMessage = 'Limite de véhicules atteinte. '
+                  'Vous avez déjà $current $vehicleTypeLabel${current > 1 ? 's' : ''} '
+                  'avec le plan Standard (limite : $limit). '
+                  'Passez en Premium pour ajouter un nombre illimité de véhicules.';
+            }
+          }
+          
+          showPremiumUpsellModal(
+            context,
+            reason: reasonMessage,
+            details: e.details,
+          );
+        } else {
+          // Pour les autres erreurs, afficher le message d'erreur complet si disponible
+          final errorMessage = e.toString().replaceAll('Exception: ', '');
+          SnackBarHelper.showError(
+            context,
+            errorMessage.contains('Erreur') 
+                ? errorMessage 
+                : (widget.vehicle != null
+                    ? 'Erreur lors de la modification du véhicule : $errorMessage'
+                    : 'Erreur lors de la création du véhicule : $errorMessage'),
+          );
+        }
       }
       debugPrint('Erreur submitForm: $e');
     } finally {
@@ -769,6 +809,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
             _buildSectionTitle('Type de véhicule *'),
             const SizedBox(height: 8),
             SegmentedButton<String>(
+              key: _typeSegmentedKey,
               segments: const [
                 ButtonSegment(
                   value: 'moto',
@@ -786,6 +827,44 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
               onSelectionChanged: (Set<String> newSelection) {
                 final newType = newSelection.firstOrNull;
                 debugPrint('[AddVehicle] Type changé: $_type -> $newType');
+                
+                // Vérifier immédiatement si l'utilisateur peut ajouter ce type de véhicule
+                if (newType != null) {
+                  final planProvider = Provider.of<PlanProvider>(context, listen: false);
+                  
+                  // Vérifier la limite avant de permettre la sélection
+                  if (!planProvider.canAddVehicle(newType)) {
+                    // Construire un message explicite selon le type
+                    final vehicleTypeLabel = newType == 'moto' ? 'moto' : 'voiture';
+                    final currentCount = planProvider.plan?.usage.getVehiclesByType(newType) ?? 0;
+                    final limit = planProvider.plan?.limits?.maxVehiclesByType?[newType] ?? 0;
+                    
+                    // Afficher la modale Premium
+                    showPremiumUpsellModal(
+                      context,
+                      reason: 'Vous avez atteint votre limite de $limit $vehicleTypeLabel${limit > 1 ? 's' : ''} avec le plan Standard (actuellement $currentCount). Passez en Premium pour ajouter un nombre illimité de véhicules.',
+                      details: {
+                        'limitKey': 'maxVehiclesByType.$newType',
+                        'limit': limit,
+                        'current': currentCount,
+                        'plan': 'FREE'
+                      },
+                    );
+                    
+                    // Forcer la sélection à revenir à l'ancien type
+                    // En ne mettant pas à jour _type et en forçant un rebuild, le SegmentedButton reviendra à l'ancienne sélection
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          // Ne pas mettre à jour _type, il reste sur l'ancienne valeur
+                          // Le SegmentedButton utilisera cette valeur via selected et reviendra à l'ancienne sélection
+                        });
+                      }
+                    });
+                    return; // Sortir sans continuer
+                  }
+                }
+                
                 setState(() {
                   // Si le type change, réinitialiser les sélections
                   if (newType != _type) {

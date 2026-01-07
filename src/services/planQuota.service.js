@@ -26,10 +26,12 @@ async function countVehiclesByUser(userId) {
     : userId;
 
   // Utiliser une aggregation pour optimiser les requêtes
+  // IMPORTANT: Ne compter que les véhicules actifs (active=true)
   const result = await Vehicle.aggregate([
     {
       $match: {
-        ownerUserId: userIdObjectId
+        ownerUserId: userIdObjectId,
+        active: true
       }
     },
     {

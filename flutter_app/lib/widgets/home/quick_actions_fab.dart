@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../screens/ride/create_ride_with_map_screen.dart';
 import '../../screens/groups/create_group_screen.dart';
+import '../../screens/home/home_screen.dart';
 
 /// Widget pour le bouton FAB "Actions rapides"
 /// 
@@ -57,7 +58,12 @@ class QuickActionsFab extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => const CreateRideWithMapScreen(),
                   ),
-                );
+                ).then((result) {
+                  // Rafraîchir l'écran d'accueil si une balade a été créée
+                  if (result == true) {
+                    HomeScreen.refresh(context);
+                  }
+                });
               },
             ),
             const SizedBox(height: 12),
@@ -72,7 +78,12 @@ class QuickActionsFab extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => const CreateGroupScreen(),
                   ),
-                );
+                ).then((result) {
+                  // Rafraîchir l'écran d'accueil si un groupe a été créé
+                  if (result == true) {
+                    HomeScreen.refresh(context);
+                  }
+                });
               },
             ),
             const SizedBox(height: 24),
