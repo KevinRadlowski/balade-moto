@@ -54,11 +54,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 _buildCurrentPlanCard(plan, isPremium),
                 const SizedBox(height: 24),
 
-                // Jauges (uniquement si FREE)
-                if (isFree) ...[
-                  _buildUsageGauges(plan, planProvider),
-                  const SizedBox(height: 24),
-                ],
+                // Jauges (toujours affichées, avec "Illimité" pour Premium)
+                _buildUsageGauges(plan, planProvider),
+                const SizedBox(height: 24),
 
                 // Tableau comparatif
                 _buildComparisonTable(context, plan),
@@ -141,14 +139,15 @@ class _PremiumScreenState extends State<PremiumScreen> {
     );
   }
 
-  /// Jauges d'utilisation (uniquement pour FREE)
+  /// Jauges d'utilisation (affichées pour tous les plans, avec "Illimité" pour Premium)
   Widget _buildUsageGauges(UserPlan? plan, PlanProvider planProvider) {
-    if (plan == null || plan.limits == null) {
+    if (plan == null) {
       return const SizedBox.shrink();
     }
 
     final usage = plan.usage;
-    final limits = plan.limits!;
+    final limits = plan.limits;
+    final isUnlimited = plan.unlimited;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,46 +162,42 @@ class _PremiumScreenState extends State<PremiumScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Véhicules (total) - Ne pas afficher si limite null
-        if (limits.maxVehiclesTotal != null)
-          _buildGauge(
-            label: 'Véhicules',
-            current: usage.vehiclesTotal,
-            limit: limits.maxVehiclesTotal!,
-            unlimited: plan.unlimited,
-            subtitle: '${usage.vehiclesByType['moto'] ?? 0} moto(s), ${usage.vehiclesByType['voiture'] ?? 0} voiture(s)',
-          ),
-        if (limits.maxVehiclesTotal != null) const SizedBox(height: 16),
+        // Véhicules (total) - Toujours afficher
+        _buildGauge(
+          label: 'Véhicules',
+          current: usage.vehiclesTotal,
+          limit: limits?.maxVehiclesTotal,
+          unlimited: isUnlimited,
+          subtitle: '${usage.vehiclesByType['moto'] ?? 0} moto(s), ${usage.vehiclesByType['voiture'] ?? 0} voiture(s)',
+        ),
+        const SizedBox(height: 16),
 
-        // Photos - Ne pas afficher si limite null
-        if (limits.maxPhotosTotal != null)
-          _buildGauge(
-            label: 'Photos',
-            current: usage.photosTotal,
-            limit: limits.maxPhotosTotal!,
-            unlimited: plan.unlimited,
-            subtitle: 'Total',
-          ),
-        if (limits.maxPhotosTotal != null) const SizedBox(height: 16),
+        // Photos - Toujours afficher
+        _buildGauge(
+          label: 'Photos',
+          current: usage.photosTotal,
+          limit: limits?.maxPhotosTotal,
+          unlimited: isUnlimited,
+          subtitle: 'Total',
+        ),
+        const SizedBox(height: 16),
 
-        // Groupes privés - Ne pas afficher si limite null
-        if (limits.maxPrivateGroupsCreated != null)
-          _buildGauge(
-            label: 'Groupes privés créés',
-            current: usage.privateGroupsCreated,
-            limit: limits.maxPrivateGroupsCreated!,
-            unlimited: plan.unlimited,
-          ),
-        if (limits.maxPrivateGroupsCreated != null) const SizedBox(height: 16),
+        // Groupes privés - Toujours afficher
+        _buildGauge(
+          label: 'Groupes privés créés',
+          current: usage.privateGroupsCreated,
+          limit: limits?.maxPrivateGroupsCreated,
+          unlimited: isUnlimited,
+        ),
+        const SizedBox(height: 16),
 
-        // Balades privées ce mois - Ne pas afficher si limite null
-        if (limits.maxPrivateRidesCreatedPerMonth != null)
-          _buildGauge(
-            label: 'Balades privées ce mois',
-            current: usage.privateRidesCreatedThisMonth,
-            limit: limits.maxPrivateRidesCreatedPerMonth!,
-            unlimited: plan.unlimited,
-          ),
+        // Balades privées ce mois - Toujours afficher
+        _buildGauge(
+          label: 'Balades privées ce mois',
+          current: usage.privateRidesCreatedThisMonth,
+          limit: limits?.maxPrivateRidesCreatedPerMonth,
+          unlimited: isUnlimited,
+        ),
       ],
     );
   }
@@ -211,13 +206,17 @@ class _PremiumScreenState extends State<PremiumScreen> {
   Widget _buildGauge({
     required String label,
     required int current,
-    required int limit,
+    int? limit,
     required bool unlimited,
     String? subtitle,
   }) {
-    final progress = unlimited || limit == 0
-        ? 0.0
-        : (current / limit).clamp(0.0, 1.0);
+    // Pour Premium (unlimited), on n'affiche pas de barre de progression
+    final effectiveLimit = limit;
+    final hasLimit = !unlimited && effectiveLimit != null && effectiveLimit > 0;
+    // ignore: unnecessary_null_comparison
+    final progress = hasLimit && effectiveLimit != null
+        ? (current / effectiveLimit).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -260,20 +259,23 @@ class _PremiumScreenState extends State<PremiumScreen> {
               Text(
                 unlimited
                     ? 'Illimité'
-                    : '$current / $limit',
+                    : hasLimit
+                        ? '$current / $limit'
+                        : '$current',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: unlimited || limit == 0
+                  color: unlimited
                       ? Theme.of(context).primaryColor
-                      : progress >= 1.0
+                      : hasLimit && progress >= 1.0
                           ? Colors.red
                           : Colors.grey.shade700,
                 ),
               ),
             ],
           ),
-          if (!unlimited && limit > 0) ...[
+          // Afficher la barre de progression uniquement si on a une limite (Standard)
+          if (hasLimit) ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: progress,
@@ -361,76 +363,51 @@ class _PremiumScreenState extends State<PremiumScreen> {
       );
     }
 
-    final limits = plan.limits;
     final isPremium = plan.unlimited || plan.isPremium;
 
-    // Formater la valeur du garage pour FREE
-    // Utilise limits.maxVehiclesTotal et limits.maxVehiclesByType
-    String formatGarageFree() {
-      if (limits == null) {
-        return '—';
-      }
-      
-      final total = limits.maxVehiclesTotal;
-      final moto = limits.maxVehiclesByType?['moto'];
-      final voiture = limits.maxVehiclesByType?['voiture'];
-      final photos = limits.maxPhotosTotal;
-      
-      // Si aucune limite n'est définie, afficher "—"
-      if (total == null || total == 0) {
-        return '—';
-      }
+    // Limites Standard (hardcodées, toujours les mêmes)
+    // Ces valeurs correspondent à FREE_LIMITS dans src/config/premium.config.js
+    const standardLimits = {
+      'maxVehiclesTotal': 2,
+      'maxVehiclesByType': {'moto': 1, 'voiture': 1},
+      'maxPrivateGroupsCreated': 1,
+      'maxPrivateRidesCreatedPerMonth': 2,
+    };
+
+    // Formater la valeur du garage pour Standard
+    // Toujours afficher les limites Standard, même si l'utilisateur est Premium
+    String formatGarageStandard() {
+      final total = standardLimits['maxVehiclesTotal'] as int;
+      final moto = (standardLimits['maxVehiclesByType'] as Map)['moto'] as int;
+      final voiture = (standardLimits['maxVehiclesByType'] as Map)['voiture'] as int;
       
       // Construire le texte : "2 véhicules (1 moto + 1 voiture)"
       String result = '$total véhicule${total > 1 ? 's' : ''}';
       
-      // Ajouter les détails par type si disponibles
-      if (moto != null && moto > 0 || voiture != null && voiture > 0) {
-        final parts = <String>[];
-        if (moto != null && moto > 0) {
-          parts.add('$moto moto${moto > 1 ? 's' : ''}');
-        }
-        if (voiture != null && voiture > 0) {
-          parts.add('$voiture voiture${voiture > 1 ? 's' : ''}');
-        }
-        if (parts.isNotEmpty) {
-          result += ' (${parts.join(' + ')})';
-        }
+      // Ajouter les détails par type
+      final parts = <String>[];
+      if (moto > 0) {
+        parts.add('$moto moto${moto > 1 ? 's' : ''}');
       }
-      
-      // Ajouter les photos optionnellement
-      if (photos != null && photos > 0) {
-        result += ', $photos photos';
+      if (voiture > 0) {
+        parts.add('$voiture voiture${voiture > 1 ? 's' : ''}');
+      }
+      if (parts.isNotEmpty) {
+        result += ' (${parts.join(' + ')})';
       }
       
       return result;
     }
 
-    // Formater la valeur des groupes privés pour FREE
-    // Utilise limits.maxPrivateGroupsCreated
-    String formatPrivateGroupsFree() {
-      if (limits == null) {
-        return '—';
-      }
-      final count = limits.maxPrivateGroupsCreated;
-      // Afficher la limite réelle (Standard = 1, Premium = null/illimité)
-      if (count == null) {
-        return '—';
-      }
+    // Formater la valeur des groupes privés pour Standard
+    String formatPrivateGroupsStandard() {
+      final count = standardLimits['maxPrivateGroupsCreated'] as int;
       return '$count';
     }
 
-    // Formater la valeur des balades privées pour FREE
-    // Utilise limits.maxPrivateRidesCreatedPerMonth
-    String formatPrivateRidesFree() {
-      if (limits == null) {
-        return '—';
-      }
-      final count = limits.maxPrivateRidesCreatedPerMonth;
-      // Ne jamais afficher "0/mois", toujours "—" si null ou 0
-      if (count == null || count == 0) {
-        return '—';
-      }
+    // Formater la valeur des balades privées pour Standard
+    String formatPrivateRidesStandard() {
+      final count = standardLimits['maxPrivateRidesCreatedPerMonth'] as int;
       return '$count/mois';
     }
 
@@ -499,7 +476,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           // Garage
           _ComparisonRow(
             feature: 'Garage',
-            freeValue: formatGarageFree(),
+            freeValue: formatGarageStandard(),
             premiumValue: 'Illimité',
             isPremium: isPremium,
           ),
@@ -507,7 +484,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           // Groupes privés (création)
           _ComparisonRow(
             feature: 'Groupes privés (création)',
-            freeValue: formatPrivateGroupsFree(),
+            freeValue: formatPrivateGroupsStandard(),
             premiumValue: 'Illimité',
             isPremium: isPremium,
           ),
@@ -515,7 +492,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           // Balades privées (création)
           _ComparisonRow(
             feature: 'Balades privées (création)',
-            freeValue: formatPrivateRidesFree(),
+            freeValue: formatPrivateRidesStandard(),
             premiumValue: 'Illimité',
             isPremium: isPremium,
           ),
@@ -637,11 +614,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
               title: 'Mode "balade privée secrète"',
               description: 'Crée des balades invisibles, accessibles uniquement par lien',
               icon: Icons.lock,
-            ),
-            _PremiumFeatureItem(
-              title: 'Garage enrichi',
-              description: 'Fiches véhicule détaillées, entretien, notes, photos avant/après',
-              icon: Icons.directions_car,
             ),
           ],
         ),

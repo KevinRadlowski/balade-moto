@@ -11,8 +11,10 @@ import '../../exceptions/plan_limit_exception.dart';
 import '../../widgets/premium/premium_upsell_modal.dart';
 import '../../models/waypoint.dart';
 import '../../models/ride.dart';
+import '../../models/vehicle.dart';
 import '../../widgets/rides/riding_style_chips.dart';
 import '../home/home_screen.dart';
+import '../garage/add_vehicle_screen.dart';
 
 class CreateRideWithMapScreen extends StatefulWidget {
   final Ride? duplicateRide;
@@ -39,6 +41,11 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
   
+  // Véhicules
+  List<Vehicle> _vehicles = [];
+  String? _selectedVehicleId; // ID du véhicule sélectionné
+  bool _isLoadingVehicles = false;
+  
   // Préférences d'itinéraire
   bool _avoidTolls = false;
   bool _avoidHighways = false;
@@ -60,6 +67,118 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
     } else {
       _getCurrentLocation();
     }
+    _loadVehicles();
+  }
+  
+  /// Charge les véhicules de l'utilisateur filtrés par type
+  Future<void> _loadVehicles() async {
+    setState(() {
+      _isLoadingVehicles = true;
+    });
+    
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+      
+      final vehicles = await _apiService.getVehicles(type: _typeVehicule);
+      
+      setState(() {
+        _vehicles = vehicles;
+        // Si un seul véhicule, sélection automatique
+        if (vehicles.length == 1) {
+          _selectedVehicleId = vehicles.first.id;
+        } else if (vehicles.length > 1) {
+          // Si plusieurs véhicules, ne pas sélectionner automatiquement
+          _selectedVehicleId = null;
+        } else {
+          // Aucun véhicule
+          _selectedVehicleId = null;
+        }
+        _isLoadingVehicles = false;
+      });
+      
+      // Afficher une modal si aucun véhicule n'est trouvé
+      if (vehicles.isEmpty && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showNoVehicleDialog();
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des véhicules: $e');
+      setState(() {
+        _vehicles = [];
+        _selectedVehicleId = null;
+        _isLoadingVehicles = false;
+      });
+    }
+  }
+  
+  /// Affiche une modal informant l'utilisateur qu'il n'a pas de véhicule
+  void _showNoVehicleDialog() {
+    final vehicleTypeName = _typeVehicule == 'moto' ? 'moto' : 'voiture';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                _typeVehicule == 'moto' ? Icons.two_wheeler : Icons.directions_car,
+                color: Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Aucun véhicule disponible'),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vous n\'avez pas de $vehicleTypeName dans votre garage.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Pour que cette balade soit comptabilisée dans les statistiques de votre véhicule, il est recommandé d\'ajouter un véhicule dans votre garage.',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Plus tard'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Naviguer vers l'écran d'ajout de véhicule
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AddVehicleScreen(),
+                  ),
+                ).then((result) {
+                  // Si un véhicule a été ajouté, recharger la liste
+                  if (result == true && mounted) {
+                    _loadVehicles();
+                  }
+                });
+              },
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Ajouter un véhicule'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _loadDuplicateRide() {
@@ -830,6 +949,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
           'longitude': depart.longitude,
         },
         waypoints: waypointsJson,
+        vehicleId: _selectedVehicleId, // Envoyer l'ID du véhicule sélectionné
       );
 
       if (mounted) {
@@ -868,6 +988,143 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         });
       }
     }
+  }
+
+  /// Construit le widget de sélection de véhicule
+  Widget _buildVehicleSelector() {
+    if (_isLoadingVehicles) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text('Chargement des véhicules...', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      );
+    }
+    
+    if (_vehicles.isEmpty) {
+      final vehicleTypeName = _typeVehicule == 'moto' ? 'moto' : 'voiture';
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 20, color: Colors.orange.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Aucun $vehicleTypeName dans votre garage',
+                    style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Pour que cette balade soit comptabilisée dans les statistiques, ajoutez un $vehicleTypeName.',
+              style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AddVehicleScreen(),
+                    ),
+                  ).then((result) {
+                    // Si un véhicule a été ajouté, recharger la liste
+                    if (result == true && mounted) {
+                      _loadVehicles();
+                    }
+                  });
+                },
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Ajouter un véhicule'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade700,
+                  side: BorderSide(color: Colors.orange.shade300),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Si un seul véhicule, afficher juste une info
+    if (_vehicles.length == 1) {
+      final vehicle = _vehicles.first;
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _typeVehicule == 'moto' ? Icons.two_wheeler : Icons.directions_car,
+              size: 20,
+              color: Colors.blue.shade700,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Véhicule sélectionné : ${vehicle.displayName}',
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Si plusieurs véhicules, afficher un dropdown
+    return DropdownButtonFormField<String>(
+      value: _selectedVehicleId,
+      decoration: InputDecoration(
+        labelText: 'Véhicule *',
+        hintText: 'Sélectionnez un véhicule',
+        border: const OutlineInputBorder(),
+        prefixIcon: Icon(
+          _typeVehicule == 'moto' ? Icons.two_wheeler : Icons.directions_car,
+        ),
+      ),
+      items: _vehicles.map((vehicle) {
+        return DropdownMenuItem<String>(
+          value: vehicle.id,
+          child: Text(vehicle.displayName),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() {
+          _selectedVehicleId = value;
+        });
+      },
+      validator: (value) {
+        if (_vehicles.isNotEmpty && value == null) {
+          return 'Veuillez sélectionner un véhicule';
+        }
+        return null;
+      },
+    );
   }
 
   @override
@@ -1043,9 +1300,16 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                       onChanged: (value) {
                         setState(() {
                           _typeVehicule = value!;
+                          _selectedVehicleId = null; // Réinitialiser la sélection
                         });
+                        _loadVehicles(); // Recharger les véhicules du nouveau type
                       },
                     ),
+                    // Sélection du véhicule
+                    if (_vehicles.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildVehicleSelector(),
+                    ],
                     const SizedBox(height: 16),
                     RidingStyleChips(
                       selectedStyle: _ridingStyle,

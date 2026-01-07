@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/vehicle.dart';
 import '../../services/garage_service.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/garage/vehicle_card.dart';
 import '../../widgets/garage/empty_state.dart';
 import '../../providers/plan_provider.dart';
 import '../../widgets/premium/premium_upsell_modal.dart';
+import '../../utils/background_helper.dart';
 import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
 
@@ -148,9 +150,20 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.user;
+    final customGarageBackground = user?.customBackgrounds?['garage'];
+    final globalBackground = user?.customBackgrounds?['global'];
+    final backgroundImage = (customGarageBackground != null && customGarageBackground.isNotEmpty)
+        ? customGarageBackground
+        : (globalBackground != null && globalBackground.isNotEmpty)
+            ? globalBackground
+            : getGarageBackgroundImageName(user?.vehiclePreference);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon Garage'),
+        centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -162,7 +175,19 @@ class _GarageHomeScreenState extends State<GarageHomeScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: backgroundImage.startsWith('http') || backgroundImage.startsWith('/uploads')
+                ? NetworkImage(backgroundImage) as ImageProvider
+                : AssetImage(backgroundImage),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: _buildBody(),
+      ),
       floatingActionButton: Consumer<PlanProvider>(
         builder: (context, planProvider, _) {
           final isPremium = planProvider.isPremium;

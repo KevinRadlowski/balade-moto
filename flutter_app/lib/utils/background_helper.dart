@@ -65,6 +65,28 @@ String getProfilBackgroundImageName(String? vehiclePreference, {String? customBa
   }
 }
 
+/// Retourne le nom du fichier background pour l'écran garage
+/// Si un background personnalisé est fourni, il est utilisé en priorité
+String getGarageBackgroundImageName(String? vehiclePreference, {String? customBackground}) {
+  // Utiliser le background personnalisé s'il est fourni
+  if (customBackground != null && customBackground.isNotEmpty) {
+    return customBackground;
+  }
+  
+  // Sinon, utiliser le background par défaut selon la préférence
+  switch (vehiclePreference) {
+    case 'moto':
+      return 'assets/images/moto_garage_background.png';
+    case 'voiture':
+      return 'assets/images/car_garage_background.png';
+    case 'les deux':
+      return 'assets/images/car_moto_garage_background.png';
+    default:
+      // Par défaut, utiliser moto_garage_background si aucune préférence
+      return 'assets/images/moto_garage_background.png';
+  }
+}
+
 /// Retourne le nom du fichier background pour l'écran de login
 String getLoginBackgroundImageName() {
   // Le background de login est toujours car_moto_login_background.png

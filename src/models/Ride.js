@@ -104,8 +104,16 @@ const rideSchema = new mongoose.Schema({
   },
   visibilite: {
     type: String,
-    enum: ['privee', 'publique'],
+    enum: ['privee', 'publique', 'secrete'],
     default: 'publique'
+  },
+  
+  // Lien secret pour les balades secrètes (généré automatiquement)
+  secretLink: {
+    type: String,
+    default: null,
+    unique: true,
+    sparse: true // Permet plusieurs null
   },
   participants: [{
     userId: {
@@ -197,6 +205,125 @@ const rideSchema = new mongoose.Schema({
     enum: ['calme', 'modere', 'sportif', 'mixte'],
     default: null
   },
+
+  // ========== OUTILS ORGANISATEUR ==========
+  
+  // 1) Validation manuelle des participants
+  requiresApproval: {
+    type: Boolean,
+    default: false // Si true, les demandes doivent être approuvées par l'organisateur
+  },
+  
+  // Demandes de participation en attente d'approbation
+  pendingRequests: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now
+    },
+    message: {
+      type: String,
+      maxlength: [500, 'Le message ne peut pas dépasser 500 caractères'],
+      default: null
+    }
+  }],
+  
+  // 2) Limite de participants + liste d'attente
+  maxParticipants: {
+    type: Number,
+    default: null, // null = illimité
+    min: [1, 'La limite doit être au moins 1']
+  },
+  
+  enableWaitlist: {
+    type: Boolean,
+    default: false // Si true, les participants au-delà de la limite sont mis en liste d'attente
+  },
+  
+  waitlist: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now
+    },
+    position: {
+      type: Number,
+      required: true
+    }
+  }],
+  
+  // 3) Message automatique avant la balade
+  autoReminder: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    hoursBefore: {
+      type: Number,
+      default: 24, // Par défaut 24h avant
+      min: [1, 'Le rappel doit être au moins 1 heure avant'],
+      max: [168, 'Le rappel ne peut pas être plus de 7 jours avant']
+    },
+    message: {
+      type: String,
+      maxlength: [1000, 'Le message ne peut pas dépasser 1000 caractères'],
+      default: null // Si null, un message par défaut sera utilisé
+    },
+    sentAt: {
+      type: Date,
+      default: null // Date à laquelle le rappel a été envoyé
+    }
+  },
+  
+  // 4) Balades récurrentes
+  recurrence: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    frequency: {
+      type: String,
+      enum: ['weekly', 'biweekly', 'monthly'],
+      default: 'weekly'
+    },
+    dayOfWeek: {
+      type: Number, // 0 = dimanche, 1 = lundi, ..., 6 = samedi
+      min: 0,
+      max: 6,
+      default: null
+    },
+    endDate: {
+      type: Date,
+      default: null // Date de fin de la récurrence (null = infini)
+    },
+    parentRideId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Ride',
+      default: null // Pour les balades créées automatiquement, référence à la balade parente
+    },
+    nextOccurrence: {
+      type: Date,
+      default: null // Prochaine occurrence à créer
+    }
+  },
   // Événements de la balade (pour mode live)
   rideEvents: [{
     type: {
@@ -249,6 +376,13 @@ rideSchema.index({ 'invitations.userId': 1 }); // Pour rechercher les invitation
 rideSchema.index({ 'invitations.status': 1 }); // Pour filtrer par statut d'invitation
 // Index géospatial 2dsphere pour les requêtes de proximité
 rideSchema.index({ localisation: '2dsphere' });
+// Index pour les outils organisateur
+rideSchema.index({ 'pendingRequests.userId': 1 });
+rideSchema.index({ 'waitlist.userId': 1 });
+rideSchema.index({ 'recurrence.parentRideId': 1 });
+rideSchema.index({ 'recurrence.nextOccurrence': 1 });
+rideSchema.index({ 'autoReminder.enabled': 1, 'autoReminder.sentAt': 1, date: 1 });
+rideSchema.index({ secretLink: 1 }); // Pour rechercher par lien secret
 
 // Méthode pour calculer la note moyenne
 rideSchema.methods.calculateAverageRating = function() {

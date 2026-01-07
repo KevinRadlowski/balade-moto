@@ -2,9 +2,13 @@
 // Pour une production, utilisez express-rate-limit ou redis
 
 const rateLimitMap = new Map();
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 const rateLimitMiddleware = (maxRequests = 10, windowMs = 60000) => {
   return (req, res, next) => {
+    // En développement, multiplier la limite par 5 pour faciliter les tests
+    const effectiveMaxRequests = isDevelopment ? maxRequests * 5 : maxRequests;
+    
     const userId = req.user?._id?.toString();
     if (!userId) {
       return next();
@@ -21,7 +25,7 @@ const rateLimitMiddleware = (maxRequests = 10, windowMs = 60000) => {
     }
 
     // Vérifier la limite
-    if (userRequests.count >= maxRequests) {
+    if (userRequests.count >= effectiveMaxRequests) {
       const remainingTime = Math.ceil((userRequests.resetTime - now) / 1000);
       return res.status(429).json({
         success: false,
@@ -47,7 +51,18 @@ const rateLimitMiddleware = (maxRequests = 10, windowMs = 60000) => {
   };
 };
 
+// Fonction utilitaire pour réinitialiser le rate limiting (utile en développement)
+const resetRateLimit = (userId = null) => {
+  if (userId) {
+    const userKey = `geospatial_${userId}`;
+    rateLimitMap.delete(userKey);
+  } else {
+    rateLimitMap.clear();
+  }
+};
+
 module.exports = rateLimitMiddleware;
+module.exports.resetRateLimit = resetRateLimit;
 
 
 

@@ -130,79 +130,85 @@ class _GroupCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(HomeStyleConstants.innerCardRadius),
-        child: Padding(
-          padding: HomeStyleConstants.innerCardPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Nom du groupe
-              Text(
-                group.nom,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(HomeStyleConstants.innerCardRadius),
+          child: Padding(
+            padding: const EdgeInsets.all(10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Nom du groupe
+                Text(
+                  group.nom,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              // Nombre de membres
-              Row(
-                children: [
-                  Icon(
-                    Icons.people,
-                    size: 16,
+                const SizedBox(height: 6),
+                // Nombre de membres
+                Row(
+                  children: [
+                    Icon(
+                      Icons.people,
+                      size: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${group.membres.length} membre${group.membres.length > 1 ? 's' : ''}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                // Activité récente
+                Text(
+                  _getActivityText(),
+                  style: TextStyle(
+                    fontSize: 11,
                     color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${group.membres.length} membre${group.membres.length > 1 ? 's' : ''}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // Activité récente
-              Text(
-                _getActivityText(),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                  fontStyle: FontStyle.italic,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              // Badge non lus si disponible
-              if (group.unreadCount != null && group.unreadCount! > 0) ...[
-                const Spacer(),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade700,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${group.unreadCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                // Badge non lus si disponible
+                if (group.unreadCount != null && group.unreadCount! > 0) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade700,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${group.unreadCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -1285,16 +1286,22 @@ class _PremiumCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isPremium
-                ? Theme.of(context).primaryColor.withOpacity(0.1)
-                : Colors.white.withOpacity(0.85),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isPremium
                   ? Theme.of(context).primaryColor
-                  : Colors.grey.shade300,
-              width: isPremium ? 2 : 1,
+                  : Colors.grey.shade400,
+              width: isPremium ? 2 : 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1420,6 +1427,11 @@ class _PremiumCard extends StatelessWidget {
                   ),
                 ),
               ],
+              // Section Code promo (pour tous les utilisateurs)
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              _PromoCodeSection(),
             ],
           ),
         );
@@ -1438,6 +1450,171 @@ class _PremiumCard extends StatelessWidget {
             fontSize: 13,
             color: Colors.grey.shade700,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Section pour saisir et utiliser un code promotionnel
+class _PromoCodeSection extends StatefulWidget {
+  const _PromoCodeSection();
+
+  @override
+  State<_PromoCodeSection> createState() => _PromoCodeSectionState();
+}
+
+class _PromoCodeSectionState extends State<_PromoCodeSection> {
+  final TextEditingController _codeController = TextEditingController();
+  bool _isRedeeming = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _redeemCode() async {
+    final code = _codeController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isRedeeming = true;
+    });
+
+    try {
+      final planProvider = Provider.of<PlanProvider>(context, listen: false);
+      await planProvider.redeemPromoCode(code);
+
+      // Afficher le message de succès
+      if (mounted && planProvider.lastRedeemMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(planProvider.lastRedeemMessage!),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+
+      // Vider le champ après succès
+      _codeController.clear();
+    } catch (e) {
+      // Afficher l'erreur
+      if (mounted) {
+        final planProvider = Provider.of<PlanProvider>(context, listen: false);
+        final errorMessage = planProvider.lastRedeemError ?? 
+            e.toString().replaceAll('Exception: ', '');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRedeeming = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.local_offer,
+              size: 20,
+              color: Colors.grey.shade600,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Code promo / cadeau',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _codeController,
+                enabled: !_isRedeeming,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  hintText: 'RT-XXXX-XXXX-XXXX',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  suffixIcon: _isRedeeming
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+                inputFormatters: [
+                  // Formatter pour mettre en majuscules et supprimer les espaces
+                  FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\-]')),
+                ],
+                onChanged: (value) {
+                  // Supprimer les espaces au milieu
+                  final cleaned = value.replaceAll(' ', '').toUpperCase();
+                  if (cleaned != value) {
+                    _codeController.value = TextEditingValue(
+                      text: cleaned,
+                      selection: TextSelection.collapsed(offset: cleaned.length),
+                    );
+                  }
+                  setState(() {}); // Pour mettre à jour l'état du bouton
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: (_isRedeeming || _codeController.text.trim().isEmpty)
+                  ? null
+                  : _redeemCode,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Appliquer',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

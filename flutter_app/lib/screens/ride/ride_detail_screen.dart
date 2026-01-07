@@ -17,6 +17,10 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../../providers/live_ride_provider.dart';
 import 'live_ride_screen.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../models/vehicle.dart';
+import '../garage/add_vehicle_screen.dart';
+import '../../widgets/ride/organizer_tools_section.dart';
+import '../../widgets/ride/advanced_features_section.dart';
 
 class RideDetailScreen extends StatefulWidget {
   final String rideId;
@@ -152,20 +156,77 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     if (_ride == null) return;
 
     try {
-      await _apiService.joinRide(_ride!.id);
+      // Charger les véhicules du type requis
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+      
+      final vehicles = await _apiService.getVehicles(type: _ride!.typeVehicule);
+      
+      String? selectedVehicleId;
+      
+      if (vehicles.isEmpty) {
+        // Aucun véhicule : afficher une modal de conseil
+        final shouldContinue = await _showNoVehicleDialog();
+        if (!shouldContinue || !mounted) return;
+        // Continuer sans véhicule (vehicleId sera null)
+      } else if (vehicles.length == 1) {
+        // Un seul véhicule : sélection automatique
+        selectedVehicleId = vehicles.first.id;
+      } else {
+        // Plusieurs véhicules : afficher une modal de sélection
+        final result = await _showVehicleSelectionDialog(vehicles);
+        if (result == null || !mounted) return; // L'utilisateur a annulé
+        selectedVehicleId = result;
+      }
+      
+      // Rejoindre la balade avec le véhicule sélectionné (ou null)
+      final response = await _apiService.joinRide(_ride!.id, vehicleId: selectedVehicleId);
+      
       if (mounted) {
+        final status = response['status'] ?? 'joined';
+        String message;
+        Color backgroundColor;
+        IconData icon;
+        
+        switch (status) {
+          case 'pending_approval':
+            message = 'Demande envoyée ! L\'organisateur doit approuver votre participation.';
+            backgroundColor = Colors.orange;
+            icon = Icons.hourglass_empty;
+            break;
+          case 'waitlisted':
+            final position = response['position'] ?? '?';
+            message = 'Balade complète. Vous êtes en position $position sur la liste d\'attente.';
+            backgroundColor = Colors.blue;
+            icon = Icons.format_list_numbered;
+            break;
+          default: // 'joined'
+            message = 'Vous participez maintenant à cette balade !';
+            backgroundColor = AppTheme.successColor;
+            icon = Icons.check_circle;
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Vous participez maintenant à cette balade',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
+            content: Row(
+              children: [
+                Icon(icon, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            backgroundColor: AppTheme.successColor.withOpacity(0.9),
+            backgroundColor: backgroundColor.withOpacity(0.9),
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 3),
             margin: const EdgeInsets.all(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -185,6 +246,151 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         );
       }
     }
+  }
+  
+  /// Affiche une modal informant l'utilisateur qu'il n'a pas de véhicule
+  /// Retourne true si l'utilisateur veut continuer, false s'il annule
+  Future<bool> _showNoVehicleDialog() async {
+    final vehicleTypeName = _ride!.typeVehicule == 'moto' ? 'moto' : 'voiture';
+    
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                _ride!.typeVehicule == 'moto' ? Icons.two_wheeler : Icons.directions_car,
+                color: Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Aucun véhicule disponible'),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vous n\'avez pas de $vehicleTypeName dans votre garage.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Pour que cette balade soit comptabilisée dans les statistiques de votre véhicule, il est recommandé d\'ajouter un véhicule dans votre garage.',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Continuer sans véhicule'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+                // Naviguer vers l'écran d'ajout de véhicule
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AddVehicleScreen(),
+                  ),
+                ).then((result) {
+                  // Si un véhicule a été ajouté, relancer le join
+                  if (result == true && mounted) {
+                    _joinRide();
+                  }
+                });
+              },
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Ajouter un véhicule'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+  
+  /// Affiche une modal pour sélectionner un véhicule parmi plusieurs
+  /// Retourne l'ID du véhicule sélectionné, ou null si annulé
+  Future<String?> _showVehicleSelectionDialog(List<Vehicle> vehicles) async {
+    String? selectedVehicleId = vehicles.first.id; // Par défaut, le premier
+    
+    return await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    _ride!.typeVehicule == 'moto' ? Icons.two_wheeler : Icons.directions_car,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('Choisir un véhicule'),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Sélectionnez le véhicule avec lequel vous participez à cette balade :',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ...vehicles.map((vehicle) {
+                    return RadioListTile<String>(
+                      title: Text(vehicle.displayName),
+                      subtitle: vehicle.make != null && vehicle.model != null
+                          ? Text('${vehicle.make} ${vehicle.model}')
+                          : null,
+                      value: vehicle.id,
+                      groupValue: selectedVehicleId,
+                      onChanged: (value) {
+                        setState(() {
+                          selectedVehicleId = value;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(null);
+                  },
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(selectedVehicleId);
+                  },
+                  child: const Text('Confirmer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _leaveRide() async {
@@ -749,6 +955,24 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                   _buildRatedCard(),
                 ],
                 
+                // Outils organisateur (uniquement pour l'organisateur)
+                if (_ride!.organisateur.id == Provider.of<AuthService>(context, listen: false).user?.id) ...[
+                  const SizedBox(height: 24),
+                  OrganizerToolsSection(
+                    ride: _ride!,
+                    apiService: _apiService,
+                    onRideUpdated: _loadRide,
+                  ),
+                ],
+                
+                // Fonctions avancées (accessible à tous)
+                const SizedBox(height: 24),
+                AdvancedFeaturesSection(
+                  ride: _ride!,
+                  apiService: _apiService,
+                  onRideUpdated: _loadRide,
+                ),
+                
                 // Actions principales
                 const SizedBox(height: 32),
                 _buildActionButtons(),
@@ -833,34 +1057,70 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Badge visibilité
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _ride!.visibilite == 'privee'
-                        ? Colors.grey.shade800.withOpacity(0.9)
-                        : Colors.blue.shade700.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _ride!.visibilite == 'privee' ? '🔒' : '🌍',
-                        style: const TextStyle(fontSize: 14, height: 1.0),
+                // Badges (visibilité + premium)
+                Row(
+                  children: [
+                    // Badge visibilité
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _ride!.visibilite == 'privee'
+                            ? Colors.grey.shade800.withOpacity(0.9)
+                            : Colors.blue.shade700.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppTheme.cardShadow,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _ride!.visibilite == 'privee' ? 'Privée' : 'Publique',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _ride!.visibilite == 'privee' ? '🔒' : '🌍',
+                            style: const TextStyle(fontSize: 14, height: 1.0),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _ride!.visibilite == 'privee' ? 'Privée' : 'Publique',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Badge "Organisateur Premium"
+                    if (_ride!.isOrganizerPremium == true) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade700.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppTheme.cardShadow,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.workspace_premium,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Organisateur Premium',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 // Titre
@@ -1005,11 +1265,51 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           child: Column(
             children: [
               // Organisateur
-              _InfoRow(
-                icon: Icons.person,
-                iconColor: AppTheme.primaryColor,
-                title: 'Organisateur',
-                value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
+              Row(
+                children: [
+                  Expanded(
+                    child: _InfoRow(
+                      icon: Icons.person,
+                      iconColor: AppTheme.primaryColor,
+                      title: 'Organisateur',
+                      value: _ride!.organisateur.pseudo ?? _ride!.organisateur.displayName,
+                    ),
+                  ),
+                  // Badge "Organisateur Premium"
+                  if (_ride!.isOrganizerPremium == true) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber.shade300,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 16,
+                            color: Colors.amber.shade900,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Premium',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.amber.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const Divider(height: 24),
               // Participants
@@ -1427,65 +1727,105 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           ],
         ],
         
-        // Actions secondaires : Like et Chat - version allégée
-        const SizedBox(height: 12),
+        // Actions secondaires : Like et Chat - version améliorée
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Like - version allégée
-            TextButton.icon(
-              onPressed: () => _toggleLike(!_isLiked),
-              icon: Icon(
-                _isLiked ? Icons.favorite : Icons.favorite_border,
-                size: 18,
-                color: _isLiked ? AppTheme.errorColor : Colors.grey.shade600,
-              ),
-              label: Text(
-                '$_totalLikes',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: _isLiked ? AppTheme.errorColor : Colors.grey.shade700,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
+            // Like - version améliorée avec fond
+            Container(
+              decoration: BoxDecoration(
+                color: _isLiked 
+                    ? AppTheme.errorColor.withOpacity(0.1)
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isLiked 
+                      ? AppTheme.errorColor.withOpacity(0.3)
+                      : Colors.grey.shade300,
+                  width: 1.5,
                 ),
               ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _toggleLike(!_isLiked),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 22,
+                          color: _isLiked ? AppTheme.errorColor : Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$_totalLikes',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: _isLiked ? AppTheme.errorColor : Colors.grey.shade800,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
             if (_isParticipant) ...[
-              const SizedBox(width: 8),
-              // Chat - version allégée
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RideChatScreenV2(
-                        rideId: _ride!.id,
-                        rideTitle: _ride!.titre,
-                        participantCount: _ride!.participants.length,
-                      ),
-                    ),
-                  );
-                },
-                icon: Icon(
-                  Icons.chat_bubble_outline,
-                  size: 18,
-                  color: Colors.grey.shade600,
-                ),
-                label: Text(
-                  'Chat',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
+              const SizedBox(width: 12),
+              // Chat - version améliorée avec fond
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    width: 1.5,
                   ),
                 ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RideChatScreenV2(
+                            rideId: _ride!.id,
+                            rideTitle: _ride!.titre,
+                            participantCount: _ride!.participants.length,
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 22,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Chat',
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1502,49 +1842,87 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     return Column(
       children: [
         if (isOrganizer) ...[
-          // Supprimer - version allégée
-          TextButton.icon(
-            onPressed: _deleteRide,
-            icon: Icon(
-              Icons.delete_outline,
-              size: 18,
-              color: Colors.grey.shade600,
-            ),
-            label: Text(
-              'Supprimer la balade',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+          // Supprimer - version améliorée avec fond
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppTheme.errorColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.errorColor.withOpacity(0.3),
+                width: 1.5,
               ),
             ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _deleteRide,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        size: 22,
+                        color: AppTheme.errorColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Supprimer la balade',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.errorColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ] else ...[
-          // Quitter - version allégée
-          TextButton.icon(
-            onPressed: _leaveRide,
-            icon: Icon(
-              Icons.exit_to_app,
-              size: 18,
-              color: Colors.grey.shade600,
-            ),
-            label: Text(
-              'Quitter la balade',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+          // Quitter - version améliorée avec fond
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppTheme.warningColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.warningColor.withOpacity(0.3),
+                width: 1.5,
               ),
             ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _leaveRide,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.exit_to_app,
+                        size: 22,
+                        color: AppTheme.warningColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Quitter la balade',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.warningColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -1768,8 +2146,36 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 
   Future<void> _acceptInvitation() async {
+    if (_ride == null) return;
+
     try {
-      await _apiService.acceptRideInvitation(_ride!.id);
+      // Charger les véhicules du type requis
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+      
+      final vehicles = await _apiService.getVehicles(type: _ride!.typeVehicule);
+      
+      String? selectedVehicleId;
+      
+      if (vehicles.isEmpty) {
+        // Aucun véhicule : afficher une modal de conseil
+        final shouldContinue = await _showNoVehicleDialog();
+        if (!shouldContinue || !mounted) return;
+        // Continuer sans véhicule (vehicleId sera null)
+      } else if (vehicles.length == 1) {
+        // Un seul véhicule : sélection automatique
+        selectedVehicleId = vehicles.first.id;
+      } else {
+        // Plusieurs véhicules : afficher une modal de sélection
+        final result = await _showVehicleSelectionDialog(vehicles);
+        if (result == null || !mounted) return; // L'utilisateur a annulé
+        selectedVehicleId = result;
+      }
+      
+      // Accepter l'invitation avec le véhicule sélectionné (ou null)
+      await _apiService.acceptRideInvitation(_ride!.id, vehicleId: selectedVehicleId);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

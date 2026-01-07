@@ -3,11 +3,13 @@ const User = require('../models/User');
 const Like = require('../models/Like');
 const icsService = require('../services/ics.service');
 const https = require('https');
+const PDFDocument = require('pdfkit');
 const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError, createPlanLimitError } = require('../utils/errors');
 const { routeCache, geocodeCache, reverseGeocodeCache } = require('../utils/cache');
 const compatibilityService = require('../services/compatibility.service');
 const achievementService = require('../services/achievement.service');
 const vehicleStatsService = require('../services/vehicleStats.service');
+const subscriptionService = require('../services/subscription.service');
 
 // Helper pour normaliser un organisateur supprimé ou introuvable
 function normalizeOrganizer(organisateur) {
@@ -44,7 +46,8 @@ exports.createRide = async (req, res, next) => {
       rayon,
       visibilite,
       localisation,
-      waypoints // Nouveau système de waypoints
+      waypoints, // Nouveau système de waypoints
+      vehicleId // ID du véhicule avec lequel l'organisateur effectue la balade
     } = req.body;
 
     const hasWaypoints = waypoints && Array.isArray(waypoints) && waypoints.length >= 2;
@@ -118,6 +121,28 @@ exports.createRide = async (req, res, next) => {
       }
     }
     
+    // Si un vehicleId est fourni, vérifier qu'il appartient à l'utilisateur et correspond au type de véhicule
+    let validatedVehicleId = null;
+    if (vehicleId) {
+      const Vehicle = require('../models/Vehicle');
+      const vehicle = await Vehicle.findOne({
+        _id: vehicleId,
+        ownerUserId: req.user._id,
+        active: true
+      });
+      
+      if (!vehicle) {
+        throw new BadRequestError('Véhicule non trouvé ou n\'appartient pas à l\'utilisateur');
+      }
+      
+      // Vérifier que le type du véhicule correspond au type de la balade
+      if (vehicle.type !== typeVehicule) {
+        throw new BadRequestError(`Le véhicule sélectionné est de type "${vehicle.type}" mais la balade est de type "${typeVehicule}"`);
+      }
+      
+      validatedVehicleId = vehicle._id;
+    }
+    
     const rideData = {
       titre,
       description,
@@ -129,7 +154,10 @@ exports.createRide = async (req, res, next) => {
       rayon: rayon || 0,
       organisateur: req.user._id,
       visibilite: finalVisibilite,
-      participants: [{ userId: req.user._id }], // L'organisateur est automatiquement participant
+      participants: [{ 
+        userId: req.user._id,
+        vehicleId: validatedVehicleId // Ajouter le véhicule de l'organisateur
+      }], // L'organisateur est automatiquement participant
       localisation: rideLocalisation,
       status: 'scheduled', // Statut par défaut
       ridingStyle: req.body.ridingStyle || null, // Style de conduite (optionnel)
@@ -213,14 +241,17 @@ exports.getRides = async (req, res) => {
           ];
         } else {
           // Sinon, appliquer le filtre de visibilité normal
+          // Exclure les balades secrètes sauf si l'utilisateur est organisateur ou participant
           if (visibilite && ['privee', 'publique'].includes(visibilite)) {
             filter.visibilite = visibilite;
           } else {
             filter.$or = [
               { visibilite: 'publique' },
-              { organisateur: req.user._id },
-              { 'participants.userId': req.user._id },
-              { 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } }
+              { visibilite: 'privee', organisateur: req.user._id },
+              { visibilite: 'privee', 'participants.userId': req.user._id },
+              { visibilite: 'privee', 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } },
+              { visibilite: 'secrete', organisateur: req.user._id }, // L'organisateur peut voir ses balades secrètes
+              { visibilite: 'secrete', 'participants.userId': req.user._id } // Les participants peuvent voir les balades secrètes
             ];
           }
         }
@@ -283,6 +314,29 @@ exports.getRides = async (req, res) => {
             }
           },
           {
+            // Ajouter un champ isOrganizerPremium pour le tri
+            $addFields: {
+              isOrganizerPremium: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $ne: ['$organisateur', null] },
+                      { $eq: ['$organisateur.subscription.isPremium', true] },
+                      {
+                        $or: [
+                          { $eq: ['$organisateur.subscription.premiumExpiresAt', null] },
+                          { $gte: ['$organisateur.subscription.premiumExpiresAt', new Date()] }
+                        ]
+                      }
+                    ]
+                  },
+                  then: 1,
+                  else: 0
+                }
+              }
+            }
+          },
+          {
             $lookup: {
               from: 'users',
               localField: 'participants',
@@ -300,6 +354,7 @@ exports.getRides = async (req, res) => {
           },
           {
             $sort: {
+              isOrganizerPremium: -1, // Premium en premier
               distance: 1, // Plus proche en premier
               [sortBy]: sortOrder === 'desc' ? -1 : 1
             }
@@ -316,15 +371,21 @@ exports.getRides = async (req, res) => {
         const total = await Ride.countDocuments(filter);
 
         // Vérifier si l'utilisateur a liké chaque balade et compter les likes
+        // Ajouter isOrganizerPremium pour chaque balade
         const ridesWithLikes = await Promise.all(
           rides.map(async (ride) => {
             const totalLikes = await Like.countLikesByRide(ride._id);
             const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
             
+            // Calculer isOrganizerPremium
+            const isOrganizerPremium = ride.organisateur && 
+              subscriptionService.isPremiumActive(ride.organisateur);
+            
             return {
               ...ride,
               totalLikes,
-              hasUserLiked
+              hasUserLiked,
+              isOrganizerPremium: isOrganizerPremium || false
             };
           })
         );
@@ -361,15 +422,19 @@ exports.getRides = async (req, res) => {
       ];
     } else {
       // Sinon, appliquer le filtre de visibilité normal
+      // Exclure les balades secrètes sauf si l'utilisateur est organisateur ou participant
       if (visibilite && ['privee', 'publique'].includes(visibilite)) {
         filter.visibilite = visibilite;
       } else {
         // Montrer les publiques et les privées où l'utilisateur est participant/organisateur/invité
+        // Inclure les balades secrètes uniquement si l'utilisateur est organisateur ou participant
         filter.$or = [
           { visibilite: 'publique' },
-          { organisateur: req.user._id },
-          { 'participants.userId': req.user._id },
-          { 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } }
+          { visibilite: 'privee', organisateur: req.user._id },
+          { visibilite: 'privee', 'participants.userId': req.user._id },
+          { visibilite: 'privee', 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } },
+          { visibilite: 'secrete', organisateur: req.user._id }, // L'organisateur peut voir ses balades secrètes
+          { visibilite: 'secrete', 'participants.userId': req.user._id } // Les participants peuvent voir les balades secrètes
         ];
       }
     }
@@ -403,25 +468,49 @@ exports.getRides = async (req, res) => {
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
+    // Récupérer les balades avec populate de l'organisateur incluant subscription
     const rides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('organisateur', 'firstName lastName pseudo email subscription.isPremium subscription.premiumExpiresAt')
       .populate('participants.userId', 'firstName lastName pseudo')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit));
+      .lean(); // Utiliser lean() pour obtenir des objets JavaScript simples
+    
+    // Trier les balades : premium en premier, puis selon le tri demandé
+    rides.sort((a, b) => {
+      const aIsPremium = a.organisateur && subscriptionService.isPremiumActive(a.organisateur);
+      const bIsPremium = b.organisateur && subscriptionService.isPremiumActive(b.organisateur);
+      
+      // Premium en premier
+      if (aIsPremium && !bIsPremium) return -1;
+      if (!aIsPremium && bIsPremium) return 1;
+      
+      // Si même statut premium, trier selon sortBy
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    // Appliquer pagination après tri
+    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
 
-    const total = await Ride.countDocuments(filter);
+    const total = rides.length;
 
     const ridesWithLikes = await Promise.all(
-      rides.map(async (ride) => {
-        const rideObj = ride.toObject();
+      paginatedRides.map(async (ride) => {
         const totalLikes = await Like.countLikesByRide(ride._id);
         const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
         
+        // Calculer isOrganizerPremium
+        const isOrganizerPremium = ride.organisateur && 
+          subscriptionService.isPremiumActive(ride.organisateur);
+        
         return {
-          ...rideObj,
+          ...ride,
           totalLikes,
-          hasUserLiked
+          hasUserLiked,
+          isOrganizerPremium: isOrganizerPremium || false
         };
       })
     );
@@ -483,7 +572,25 @@ exports.getPastRides = async (req, res) => {
       0, 0, 0, 0
     ));
     
-    const dateFilter = { $lt: tomorrow };
+    // Vérifier si l'utilisateur est premium
+    const isPremium = subscriptionService.isPremiumActive(req.user);
+    
+    // Pour les utilisateurs standard, limiter à 3 mois d'historique
+    // Pour les premium, historique illimité
+    let dateFilter = { $lt: tomorrow };
+    if (!isPremium) {
+      // Calculer la date il y a 3 mois
+      const threeMonthsAgo = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - 3,
+        now.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      dateFilter = {
+        $lt: tomorrow,
+        $gte: threeMonthsAgo
+      };
+    }
     
     filter.$and = [
       {
@@ -512,12 +619,29 @@ exports.getPastRides = async (req, res) => {
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     let rides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('organisateur', 'firstName lastName pseudo email subscription.isPremium subscription.premiumExpiresAt')
       .populate('participants.userId', 'firstName lastName pseudo')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit) * 2);
+      .lean();
+    
+    // Trier les balades : premium en premier, puis selon le tri demandé
+    rides.sort((a, b) => {
+      const aIsPremium = a.organisateur && subscriptionService.isPremiumActive(a.organisateur);
+      const bIsPremium = b.organisateur && subscriptionService.isPremiumActive(b.organisateur);
+      
+      // Premium en premier
+      if (aIsPremium && !bIsPremium) return -1;
+      if (!aIsPremium && bIsPremium) return 1;
+      
+      // Si même statut premium, trier selon sortBy
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
+    // Filtrer par date/heure
     rides = rides.filter(ride => {
       const rideDate = new Date(ride.date);
       const [hours, minutes] = ride.heure.split(':').map(Number);
@@ -531,39 +655,26 @@ exports.getPastRides = async (req, res) => {
       ));
       return rideDateTime < now;
     });
-
-    rides = rides.slice(0, parseInt(limit));
-    const allRides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants.userId', 'firstName lastName pseudo')
-      .sort(sort);
     
-    const filteredRides = allRides.filter(ride => {
-      const rideDate = new Date(ride.date);
-      const [hours, minutes] = ride.heure.split(':').map(Number);
-      const rideDateTime = new Date(Date.UTC(
-        rideDate.getUTCFullYear(),
-        rideDate.getUTCMonth(),
-        rideDate.getUTCDate(),
-        hours,
-        minutes,
-        0
-      ));
-      return rideDateTime < now;
-    });
+    const total = rides.length;
     
-    const total = filteredRides.length;
+    // Appliquer pagination après tri
+    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
 
     const ridesWithLikes = await Promise.all(
-      rides.map(async (ride) => {
-        const rideObj = ride.toObject();
+      paginatedRides.map(async (ride) => {
         const totalLikes = await Like.countLikesByRide(ride._id);
         const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
         
+        // Calculer isOrganizerPremium
+        const isOrganizerPremium = ride.organisateur && 
+          subscriptionService.isPremiumActive(ride.organisateur);
+        
         return {
-          ...rideObj,
+          ...ride,
           totalLikes,
-          hasUserLiked
+          hasUserLiked,
+          isOrganizerPremium: isOrganizerPremium || false
         };
       })
     );
@@ -620,7 +731,25 @@ exports.getMyPastRides = async (req, res) => {
       0, 0, 0, 0
     ));
     
-    const dateFilter = { $lt: tomorrow };
+    // Vérifier si l'utilisateur est premium
+    const isPremium = subscriptionService.isPremiumActive(req.user);
+    
+    // Pour les utilisateurs standard, limiter à 3 mois d'historique
+    // Pour les premium, historique illimité
+    let dateFilter = { $lt: tomorrow };
+    if (!isPremium) {
+      // Calculer la date il y a 3 mois
+      const threeMonthsAgo = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - 3,
+        now.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      dateFilter = {
+        $lt: tomorrow,
+        $gte: threeMonthsAgo
+      };
+    }
     
     const filter = {
       $and: [
@@ -654,12 +783,29 @@ exports.getMyPastRides = async (req, res) => {
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     let rides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('organisateur', 'firstName lastName pseudo email subscription.isPremium subscription.premiumExpiresAt')
       .populate('participants.userId', 'firstName lastName pseudo')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit) * 2);
+      .lean();
+    
+    // Trier les balades : premium en premier, puis selon le tri demandé
+    rides.sort((a, b) => {
+      const aIsPremium = a.organisateur && subscriptionService.isPremiumActive(a.organisateur);
+      const bIsPremium = b.organisateur && subscriptionService.isPremiumActive(b.organisateur);
+      
+      // Premium en premier
+      if (aIsPremium && !bIsPremium) return -1;
+      if (!aIsPremium && bIsPremium) return 1;
+      
+      // Si même statut premium, trier selon sortBy
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
+    // Filtrer par date/heure
     rides = rides.filter(ride => {
       const rideDate = new Date(ride.date);
       const [hours, minutes] = ride.heure.split(':').map(Number);
@@ -673,39 +819,26 @@ exports.getMyPastRides = async (req, res) => {
       ));
       return rideDateTime < now;
     });
-
-    rides = rides.slice(0, parseInt(limit));
-    const allRides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email')
-      .populate('participants.userId', 'firstName lastName pseudo')
-      .sort(sort);
     
-    const filteredRides = allRides.filter(ride => {
-      const rideDate = new Date(ride.date);
-      const [hours, minutes] = ride.heure.split(':').map(Number);
-      const rideDateTime = new Date(Date.UTC(
-        rideDate.getUTCFullYear(),
-        rideDate.getUTCMonth(),
-        rideDate.getUTCDate(),
-        hours,
-        minutes,
-        0
-      ));
-      return rideDateTime < now;
-    });
+    const total = rides.length;
     
-    const total = filteredRides.length;
+    // Appliquer pagination après tri
+    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
 
     const ridesWithLikes = await Promise.all(
-      rides.map(async (ride) => {
-        const rideObj = ride.toObject();
+      paginatedRides.map(async (ride) => {
         const totalLikes = await Like.countLikesByRide(ride._id);
         const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
         
+        // Calculer isOrganizerPremium
+        const isOrganizerPremium = ride.organisateur && 
+          subscriptionService.isPremiumActive(ride.organisateur);
+        
         return {
-          ...rideObj,
+          ...ride,
           totalLikes,
-          hasUserLiked
+          hasUserLiked,
+          isOrganizerPremium: isOrganizerPremium || false
         };
       })
     );
@@ -892,6 +1025,29 @@ exports.getRidesNearby = async (req, res) => {
         }
       },
       {
+        // Ajouter un champ isOrganizerPremium pour le tri
+        $addFields: {
+          isOrganizerPremium: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$organisateur', null] },
+                  { $eq: ['$organisateur.subscription.isPremium', true] },
+                  {
+                    $or: [
+                      { $eq: ['$organisateur.subscription.premiumExpiresAt', null] },
+                      { $gte: ['$organisateur.subscription.premiumExpiresAt', new Date()] }
+                    ]
+                  }
+                ]
+              },
+              then: 1,
+              else: 0
+            }
+          }
+        }
+      },
+      {
         $lookup: {
           from: 'users',
           localField: 'participants',
@@ -909,6 +1065,7 @@ exports.getRidesNearby = async (req, res) => {
       },
       {
         $sort: {
+          isOrganizerPremium: -1, // Premium en premier
           distance: 1, // Plus proche en premier
           date: 1 // Puis par date
         }
@@ -921,11 +1078,16 @@ exports.getRidesNearby = async (req, res) => {
     const rides = await Ride.aggregate(pipeline);
 
     // Vérifier si l'utilisateur a liké chaque balade et compter les likes
+    // Ajouter isOrganizerPremium pour chaque balade
     const ridesWithLikes = await Promise.all(
       rides.map(async (ride) => {
         const rideId = ride._id;
         const totalLikes = await Like.countLikesByRide(rideId);
         const hasUserLiked = await Like.hasUserLiked(rideId, req.user._id);
+        
+        // Calculer isOrganizerPremium
+        const isOrganizerPremium = ride.organisateur && 
+          subscriptionService.isPremiumActive(ride.organisateur);
         
         // Convertir _id en string pour la compatibilité
         const rideObj = {
@@ -933,7 +1095,8 @@ exports.getRidesNearby = async (req, res) => {
           id: ride._id.toString(),
           distance: ride.distance ? (ride.distance / 1000).toFixed(2) : null, // Convertir en km
           totalLikes,
-          hasUserLiked
+          hasUserLiked,
+          isOrganizerPremium: isOrganizerPremium || false
         };
         delete rideObj._id;
         return rideObj;
@@ -977,7 +1140,7 @@ exports.getRideById = async (req, res, next) => {
     const { id } = req.params;
 
     const ride = await Ride.findById(id)
-      .populate('organisateur', 'firstName lastName pseudo email vehiclePreference')
+      .populate('organisateur', 'firstName lastName pseudo email vehiclePreference subscription.isPremium subscription.premiumExpiresAt')
       .populate('participants.userId', 'firstName lastName pseudo')
       .populate('invitations.userId', 'firstName lastName pseudo')
       .populate('likes', 'firstName lastName pseudo');
@@ -990,22 +1153,29 @@ exports.getRideById = async (req, res, next) => {
     ride.organisateur = normalizeOrganizer(ride.organisateur);
 
     // Vérifier la visibilité
+    const isOrganizer = ride.organisateur && ride.organisateur._id && 
+      ride.organisateur._id.toString() === req.user._id.toString();
+    const isParticipant = ride.participants.some(
+      p => p.userId && (p.userId._id ? p.userId._id.toString() : p.userId.toString()) === req.user._id.toString()
+    );
+    const isInvited = ride.invitations && ride.invitations.some(
+      inv => inv.userId && (inv.userId._id ? inv.userId._id.toString() : inv.userId.toString()) === req.user._id.toString() &&
+      (inv.status === 'pending' || inv.status === 'accepted')
+    );
+
     if (ride.visibilite === 'privee') {
-      // Vérifier si l'organisateur existe avant de comparer
-      const isOrganizer = ride.organisateur && ride.organisateur._id && 
-        ride.organisateur._id.toString() === req.user._id.toString();
-      const isParticipant = ride.participants.some(
-        p => p.userId && (p.userId._id ? p.userId._id.toString() : p.userId.toString()) === req.user._id.toString()
-      );
-      const isInvited = ride.invitations && ride.invitations.some(
-        inv => inv.userId && (inv.userId._id ? inv.userId._id.toString() : inv.userId.toString()) === req.user._id.toString() &&
-        (inv.status === 'pending' || inv.status === 'accepted')
-      );
-      
       if (!isOrganizer && !isParticipant && !isInvited) {
         return res.status(403).json({
           success: false,
           message: 'Vous n\'avez pas accès à cette balade privée'
+        });
+      }
+    } else if (ride.visibilite === 'secrete') {
+      // Les balades secrètes ne sont accessibles que par l'organisateur, les participants, ou via le lien secret
+      if (!isOrganizer && !isParticipant) {
+        return res.status(403).json({
+          success: false,
+          message: 'Cette balade est secrète. Accès uniquement via le lien secret.'
         });
       }
     }
@@ -1019,6 +1189,9 @@ exports.getRideById = async (req, res, next) => {
     rideObj.hasUserLiked = hasUserLiked;
     // S'assurer que l'organisateur est normalisé dans l'objet
     rideObj.organisateur = normalizeOrganizer(rideObj.organisateur);
+    // Calculer isOrganizerPremium
+    rideObj.isOrganizerPremium = ride.organisateur && 
+      subscriptionService.isPremiumActive(ride.organisateur) || false;
 
     res.status(200).json({
       success: true,
@@ -1290,6 +1463,72 @@ exports.joinRide = async (req, res) => {
       }
     }
 
+    // Vérifier si l'utilisateur est déjà en liste d'attente
+    const isInWaitlist = ride.waitlist?.some(
+      w => w.userId.toString() === req.user._id.toString()
+    );
+    if (isInWaitlist) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vous êtes déjà en liste d\'attente pour cette balade'
+      });
+    }
+
+    // Vérifier si une demande est déjà en attente
+    const hasPendingRequest = ride.pendingRequests?.some(
+      r => r.userId.toString() === req.user._id.toString()
+    );
+    if (hasPendingRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vous avez déjà une demande en attente pour cette balade'
+      });
+    }
+
+    // Si validation manuelle requise, rediriger vers requestToJoin
+    if (ride.requiresApproval) {
+      ride.pendingRequests = ride.pendingRequests || [];
+      ride.pendingRequests.push({
+        userId: req.user._id,
+        vehicleId: vehicleId || null,
+        requestedAt: new Date()
+      });
+      await ride.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Demande envoyée. L\'organisateur doit approuver votre participation.',
+        data: { status: 'pending_approval' }
+      });
+    }
+
+    // Vérifier la limite de participants
+    if (ride.maxParticipants && ride.participants.length >= ride.maxParticipants) {
+      // Si liste d'attente activée, ajouter à la waitlist
+      if (ride.enableWaitlist) {
+        ride.waitlist = ride.waitlist || [];
+        const position = ride.waitlist.length + 1;
+        ride.waitlist.push({
+          userId: req.user._id,
+          vehicleId: vehicleId || null,
+          addedAt: new Date(),
+          position
+        });
+        await ride.save();
+
+        return res.status(200).json({
+          success: true,
+          message: `Balade complète. Vous êtes en position ${position} sur la liste d'attente.`,
+          data: { status: 'waitlisted', position }
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'La balade est complète'
+        });
+      }
+    }
+
     // Calculer la compatibilité avec l'organisateur (optionnel, pour warning)
     let compatibility = null;
     try {
@@ -1326,6 +1565,7 @@ exports.joinRide = async (req, res) => {
       message: 'Vous avez rejoint la balade avec succès',
       data: { 
         ride,
+        status: 'joined',
         compatibility: compatibility || undefined // Inclure seulement si calculé
       }
     });
@@ -2483,6 +2723,7 @@ exports.inviteUsersToRide = async (req, res, next) => {
 exports.acceptRideInvitation = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { vehicleId } = req.body; // Véhicule optionnel avec lequel participer
 
     const ride = await Ride.findById(id);
 
@@ -2502,6 +2743,33 @@ exports.acceptRideInvitation = async (req, res, next) => {
       });
     }
 
+    // Si un vehicleId est fourni, vérifier qu'il appartient à l'utilisateur et correspond au type de véhicule
+    if (vehicleId) {
+      const Vehicle = require('../models/Vehicle');
+      const vehicle = await Vehicle.findById(vehicleId);
+      
+      if (!vehicle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Véhicule non trouvé'
+        });
+      }
+
+      if (vehicle.ownerUserId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ce véhicule ne vous appartient pas'
+        });
+      }
+
+      if (vehicle.type !== ride.typeVehicule) {
+        return res.status(400).json({
+          success: false,
+          message: `Le type de véhicule ne correspond pas (balade: ${ride.typeVehicule}, véhicule: ${vehicle.type})`
+        });
+      }
+    }
+
     // Mettre à jour l'invitation
     invitation.status = 'accepted';
     invitation.respondedAt = new Date();
@@ -2513,7 +2781,8 @@ exports.acceptRideInvitation = async (req, res, next) => {
 
     if (!isAlreadyParticipant) {
       ride.participants.push({
-        userId: req.user._id
+        userId: req.user._id,
+        vehicleId: vehicleId || null
       });
 
       // Ajouter un événement participant_joined
@@ -2522,6 +2791,14 @@ exports.acceptRideInvitation = async (req, res, next) => {
         timestamp: new Date(),
         userId: req.user._id
       });
+    } else if (vehicleId) {
+      // Si l'utilisateur est déjà participant, mettre à jour son vehicleId
+      const participant = ride.participants.find(
+        p => p.userId && p.userId.toString() === req.user._id.toString()
+      );
+      if (participant) {
+        participant.vehicleId = vehicleId;
+      }
     }
 
     await ride.save();
@@ -2612,6 +2889,977 @@ exports.declineRideInvitation = async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors du refus de l\'invitation',
+      error: error.message
+    });
+  }
+};
+
+// ========== OUTILS ORGANISATEUR ==========
+
+// Mettre à jour les paramètres organisateur d'une balade
+exports.updateOrganizerSettings = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      requiresApproval,
+      maxParticipants,
+      enableWaitlist,
+      autoReminder,
+      recurrence
+    } = req.body;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut modifier ces paramètres');
+    }
+
+    // Mettre à jour les paramètres
+    if (typeof requiresApproval === 'boolean') {
+      ride.requiresApproval = requiresApproval;
+    }
+
+    if (maxParticipants !== undefined) {
+      ride.maxParticipants = maxParticipants === 0 ? null : maxParticipants;
+    }
+
+    if (typeof enableWaitlist === 'boolean') {
+      ride.enableWaitlist = enableWaitlist;
+    }
+
+    if (autoReminder) {
+      ride.autoReminder = {
+        ...ride.autoReminder,
+        enabled: autoReminder.enabled ?? ride.autoReminder?.enabled ?? false,
+        hoursBefore: autoReminder.hoursBefore ?? ride.autoReminder?.hoursBefore ?? 24,
+        message: autoReminder.message ?? ride.autoReminder?.message ?? null
+      };
+    }
+
+    if (recurrence) {
+      ride.recurrence = {
+        ...ride.recurrence,
+        enabled: recurrence.enabled ?? ride.recurrence?.enabled ?? false,
+        frequency: recurrence.frequency ?? ride.recurrence?.frequency ?? 'weekly',
+        dayOfWeek: recurrence.dayOfWeek ?? ride.recurrence?.dayOfWeek ?? null,
+        endDate: recurrence.endDate ? new Date(recurrence.endDate) : ride.recurrence?.endDate ?? null
+      };
+      
+      // Calculer la prochaine occurrence si la récurrence est activée
+      if (ride.recurrence.enabled) {
+        ride.recurrence.nextOccurrence = calculateNextOccurrence(
+          ride.date,
+          ride.recurrence.frequency,
+          ride.recurrence.dayOfWeek
+        );
+      }
+    }
+
+    await ride.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Paramètres mis à jour',
+      data: { ride }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour des paramètres',
+      error: error.message
+    });
+  }
+};
+
+// Demander à rejoindre une balade (avec validation manuelle)
+exports.requestToJoin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { vehicleId, message } = req.body;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que la balade n'est pas passée
+    if (new Date(ride.date) < new Date()) {
+      throw new BadRequestError('Impossible de rejoindre une balade passée');
+    }
+
+    // Vérifier si l'utilisateur est déjà participant
+    const isParticipant = ride.participants.some(
+      p => p.userId && p.userId.toString() === req.user._id.toString()
+    );
+    if (isParticipant) {
+      throw new ConflictError('Vous êtes déjà participant à cette balade');
+    }
+
+    // Vérifier si une demande est déjà en attente
+    const hasPendingRequest = ride.pendingRequests?.some(
+      r => r.userId.toString() === req.user._id.toString()
+    );
+    if (hasPendingRequest) {
+      throw new ConflictError('Vous avez déjà une demande en attente');
+    }
+
+    // Vérifier si l'utilisateur est déjà en liste d'attente
+    const isInWaitlist = ride.waitlist?.some(
+      w => w.userId.toString() === req.user._id.toString()
+    );
+    if (isInWaitlist) {
+      throw new ConflictError('Vous êtes déjà en liste d\'attente');
+    }
+
+    // Si validation manuelle requise, ajouter à pendingRequests
+    if (ride.requiresApproval) {
+      ride.pendingRequests = ride.pendingRequests || [];
+      ride.pendingRequests.push({
+        userId: req.user._id,
+        vehicleId: vehicleId || null,
+        message: message || null,
+        requestedAt: new Date()
+      });
+
+      await ride.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Demande envoyée. L\'organisateur doit approuver votre participation.',
+        data: { status: 'pending_approval' }
+      });
+    }
+
+    // Sinon, vérifier la limite de participants
+    if (ride.maxParticipants && ride.participants.length >= ride.maxParticipants) {
+      // Si liste d'attente activée, ajouter à la waitlist
+      if (ride.enableWaitlist) {
+        ride.waitlist = ride.waitlist || [];
+        const position = ride.waitlist.length + 1;
+        ride.waitlist.push({
+          userId: req.user._id,
+          vehicleId: vehicleId || null,
+          addedAt: new Date(),
+          position
+        });
+
+        await ride.save();
+
+        return res.status(200).json({
+          success: true,
+          message: `Balade complète. Vous êtes en position ${position} sur la liste d'attente.`,
+          data: { status: 'waitlisted', position }
+        });
+      } else {
+        throw new BadRequestError('La balade est complète');
+      }
+    }
+
+    // Ajouter directement comme participant
+    ride.participants.push({
+      userId: req.user._id,
+      vehicleId: vehicleId || null
+    });
+
+    ride.rideEvents.push({
+      type: 'participant_joined',
+      timestamp: new Date(),
+      userId: req.user._id
+    });
+
+    await ride.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vous avez rejoint la balade',
+      data: { status: 'joined' }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError || 
+        error instanceof BadRequestError || error instanceof ConflictError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la demande',
+      error: error.message
+    });
+  }
+};
+
+// Approuver une demande de participation
+exports.approveRequest = async (req, res, next) => {
+  try {
+    const { id, userId } = req.params;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut approuver les demandes');
+    }
+
+    // Trouver la demande
+    const requestIndex = ride.pendingRequests?.findIndex(
+      r => r.userId.toString() === userId
+    );
+    if (requestIndex === -1 || requestIndex === undefined) {
+      throw new NotFoundError('Demande non trouvée');
+    }
+
+    const request = ride.pendingRequests[requestIndex];
+
+    // Vérifier la limite de participants
+    if (ride.maxParticipants && ride.participants.length >= ride.maxParticipants) {
+      if (ride.enableWaitlist) {
+        // Ajouter à la liste d'attente
+        ride.waitlist = ride.waitlist || [];
+        const position = ride.waitlist.length + 1;
+        ride.waitlist.push({
+          userId: request.userId,
+          vehicleId: request.vehicleId,
+          addedAt: new Date(),
+          position
+        });
+        ride.pendingRequests.splice(requestIndex, 1);
+        await ride.save();
+
+        return res.status(200).json({
+          success: true,
+          message: `Balade complète. L'utilisateur a été ajouté en position ${position} sur la liste d'attente.`,
+          data: { status: 'waitlisted', position }
+        });
+      } else {
+        throw new BadRequestError('La balade est complète');
+      }
+    }
+
+    // Ajouter comme participant
+    ride.participants.push({
+      userId: request.userId,
+      vehicleId: request.vehicleId
+    });
+
+    ride.rideEvents.push({
+      type: 'participant_joined',
+      timestamp: new Date(),
+      userId: request.userId
+    });
+
+    // Retirer de pendingRequests
+    ride.pendingRequests.splice(requestIndex, 1);
+
+    await ride.save();
+
+    // Populer pour la réponse
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Demande approuvée',
+      data: { ride }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError || error instanceof BadRequestError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'approbation',
+      error: error.message
+    });
+  }
+};
+
+// Refuser une demande de participation
+exports.rejectRequest = async (req, res, next) => {
+  try {
+    const { id, userId } = req.params;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut refuser les demandes');
+    }
+
+    // Trouver et retirer la demande
+    const requestIndex = ride.pendingRequests?.findIndex(
+      r => r.userId.toString() === userId
+    );
+    if (requestIndex === -1 || requestIndex === undefined) {
+      throw new NotFoundError('Demande non trouvée');
+    }
+
+    ride.pendingRequests.splice(requestIndex, 1);
+    await ride.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Demande refusée'
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du refus',
+      error: error.message
+    });
+  }
+};
+
+// Obtenir les demandes en attente
+exports.getPendingRequests = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const ride = await Ride.findById(id)
+      .populate('pendingRequests.userId', 'firstName lastName pseudo avatarUrl')
+      .populate('pendingRequests.vehicleId', 'nickname make model');
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut voir les demandes');
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        pendingRequests: ride.pendingRequests || [],
+        count: ride.pendingRequests?.length || 0
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des demandes',
+      error: error.message
+    });
+  }
+};
+
+// Obtenir la liste d'attente
+exports.getWaitlist = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const ride = await Ride.findById(id)
+      .populate('waitlist.userId', 'firstName lastName pseudo avatarUrl')
+      .populate('waitlist.vehicleId', 'nickname make model');
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // L'organisateur ou les personnes en liste d'attente peuvent voir
+    const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
+    const isInWaitlist = ride.waitlist?.some(
+      w => w.userId._id?.toString() === req.user._id.toString() || 
+           w.userId.toString() === req.user._id.toString()
+    );
+
+    if (!isOrganizer && !isInWaitlist) {
+      throw new ForbiddenError('Accès non autorisé');
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        waitlist: ride.waitlist || [],
+        count: ride.waitlist?.length || 0,
+        maxParticipants: ride.maxParticipants,
+        currentParticipants: ride.participants.length
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération de la liste d\'attente',
+      error: error.message
+    });
+  }
+};
+
+// Promouvoir un utilisateur de la liste d'attente
+exports.promoteFromWaitlist = async (req, res, next) => {
+  try {
+    const { id, userId } = req.params;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut promouvoir');
+    }
+
+    // Trouver l'utilisateur dans la waitlist
+    const waitlistIndex = ride.waitlist?.findIndex(
+      w => w.userId.toString() === userId
+    );
+    if (waitlistIndex === -1 || waitlistIndex === undefined) {
+      throw new NotFoundError('Utilisateur non trouvé dans la liste d\'attente');
+    }
+
+    const waitlistEntry = ride.waitlist[waitlistIndex];
+
+    // Ajouter comme participant
+    ride.participants.push({
+      userId: waitlistEntry.userId,
+      vehicleId: waitlistEntry.vehicleId
+    });
+
+    ride.rideEvents.push({
+      type: 'participant_joined',
+      timestamp: new Date(),
+      userId: waitlistEntry.userId
+    });
+
+    // Retirer de la waitlist et réorganiser les positions
+    ride.waitlist.splice(waitlistIndex, 1);
+    ride.waitlist.forEach((w, index) => {
+      w.position = index + 1;
+    });
+
+    await ride.save();
+    await ride.populate('participants.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Utilisateur promu de la liste d\'attente',
+      data: { ride }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la promotion',
+      error: error.message
+    });
+  }
+};
+
+// Retirer un utilisateur de la liste d'attente
+exports.removeFromWaitlist = async (req, res, next) => {
+  try {
+    const { id, userId } = req.params;
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // L'organisateur ou l'utilisateur lui-même peut se retirer
+    const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
+    const isSelf = userId === req.user._id.toString();
+
+    if (!isOrganizer && !isSelf) {
+      throw new ForbiddenError('Non autorisé');
+    }
+
+    const waitlistIndex = ride.waitlist?.findIndex(
+      w => w.userId.toString() === userId
+    );
+    if (waitlistIndex === -1 || waitlistIndex === undefined) {
+      throw new NotFoundError('Utilisateur non trouvé dans la liste d\'attente');
+    }
+
+    // Retirer et réorganiser les positions
+    ride.waitlist.splice(waitlistIndex, 1);
+    ride.waitlist.forEach((w, index) => {
+      w.position = index + 1;
+    });
+
+    await ride.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Retiré de la liste d\'attente'
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du retrait',
+      error: error.message
+    });
+  }
+};
+
+// Helper pour calculer la prochaine occurrence
+function calculateNextOccurrence(baseDate, frequency, dayOfWeek) {
+  const date = new Date(baseDate);
+  const now = new Date();
+  
+  // S'assurer qu'on part d'une date future
+  while (date <= now) {
+    switch (frequency) {
+      case 'weekly':
+        date.setDate(date.getDate() + 7);
+        break;
+      case 'biweekly':
+        date.setDate(date.getDate() + 14);
+        break;
+      case 'monthly':
+        date.setMonth(date.getMonth() + 1);
+        break;
+    }
+  }
+  
+  return date;
+}
+
+// Créer la prochaine occurrence d'une balade récurrente
+exports.createRecurringRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const parentRide = await Ride.findById(id);
+    if (!parentRide) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (parentRide.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut créer des occurrences');
+    }
+
+    if (!parentRide.recurrence?.enabled) {
+      throw new BadRequestError('La récurrence n\'est pas activée pour cette balade');
+    }
+
+    // Vérifier la date de fin
+    if (parentRide.recurrence.endDate && new Date() > parentRide.recurrence.endDate) {
+      throw new BadRequestError('La période de récurrence est terminée');
+    }
+
+    const nextDate = calculateNextOccurrence(
+      parentRide.date,
+      parentRide.recurrence.frequency,
+      parentRide.recurrence.dayOfWeek
+    );
+
+    // Créer la nouvelle balade
+    const newRide = new Ride({
+      titre: parentRide.titre,
+      description: parentRide.description,
+      typeVehicule: parentRide.typeVehicule,
+      date: nextDate,
+      heure: parentRide.heure,
+      lieuDepart: parentRide.lieuDepart,
+      lieuArrivee: parentRide.lieuArrivee,
+      waypoints: parentRide.waypoints,
+      localisation: parentRide.localisation,
+      rayon: parentRide.rayon,
+      organisateur: parentRide.organisateur,
+      visibilite: parentRide.visibilite,
+      ridingStyle: parentRide.ridingStyle,
+      requiresApproval: parentRide.requiresApproval,
+      maxParticipants: parentRide.maxParticipants,
+      enableWaitlist: parentRide.enableWaitlist,
+      autoReminder: parentRide.autoReminder,
+      recurrence: {
+        ...parentRide.recurrence.toObject(),
+        parentRideId: parentRide._id
+      },
+      participants: [{
+        userId: parentRide.organisateur,
+        vehicleId: null
+      }]
+    });
+
+    await newRide.save();
+
+    // Mettre à jour la prochaine occurrence sur la balade parente
+    parentRide.recurrence.nextOccurrence = calculateNextOccurrence(
+      nextDate,
+      parentRide.recurrence.frequency,
+      parentRide.recurrence.dayOfWeek
+    );
+    await parentRide.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Nouvelle occurrence créée',
+      data: { ride: newRide }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError || error instanceof BadRequestError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la création',
+      error: error.message
+    });
+  }
+};
+
+// Envoyer un rappel manuel aux participants
+exports.sendReminderToParticipants = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    const ride = await Ride.findById(id)
+      .populate('participants.userId', 'firstName lastName pseudo email');
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut envoyer des rappels');
+    }
+
+    // Pour l'instant, on simule l'envoi (TODO: intégrer avec un service de notification)
+    const participantEmails = ride.participants
+      .filter(p => p.userId?.email)
+      .map(p => p.userId.email);
+
+    // Marquer comme envoyé
+    ride.autoReminder = ride.autoReminder || {};
+    ride.autoReminder.sentAt = new Date();
+    await ride.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Rappel envoyé à ${participantEmails.length} participant(s)`,
+      data: {
+        sentTo: participantEmails.length,
+        sentAt: ride.autoReminder.sentAt
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'envoi du rappel',
+      error: error.message
+    });
+  }
+};
+
+// ========== FONCTIONS AVANCÉES ==========
+
+// Exporter une balade en format GPX
+exports.exportRideGPX = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const ride = await Ride.findById(id);
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier les droits d'accès
+    const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
+    const isParticipant = ride.participants.some(
+      p => p.userId && p.userId.toString() === req.user._id.toString()
+    );
+    
+    if (ride.visibilite === 'secrete' && !isOrganizer && !isParticipant) {
+      throw new ForbiddenError('Accès non autorisé');
+    }
+
+    if (ride.visibilite === 'privee' && !isOrganizer && !isParticipant) {
+      const isInvited = ride.invitations && ride.invitations.some(
+        inv => inv.userId && inv.userId.toString() === req.user._id.toString() && 
+        (inv.status === 'pending' || inv.status === 'accepted')
+      );
+      if (!isInvited) {
+        throw new ForbiddenError('Accès non autorisé');
+      }
+    }
+
+    // Générer le GPX à partir des waypoints
+    let gpxContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    gpxContent += '<gpx version="1.1" creator="RideTogether">\n';
+    gpxContent += `  <metadata>\n`;
+    gpxContent += `    <name>${ride.titre}</name>\n`;
+    if (ride.description) {
+      gpxContent += `    <desc>${ride.description}</desc>\n`;
+    }
+    gpxContent += `  </metadata>\n`;
+
+    if (ride.waypoints && ride.waypoints.length > 0) {
+      // Trier les waypoints par ordre
+      const sortedWaypoints = [...ride.waypoints].sort((a, b) => a.order - b.order);
+      
+      gpxContent += `  <trk>\n`;
+      gpxContent += `    <name>${ride.titre}</name>\n`;
+      gpxContent += `    <trkseg>\n`;
+      
+      for (const waypoint of sortedWaypoints) {
+        if (waypoint.coordinates && waypoint.coordinates.coordinates) {
+          const [lon, lat] = waypoint.coordinates.coordinates;
+          gpxContent += `      <trkpt lat="${lat}" lon="${lon}">\n`;
+          gpxContent += `        <name>${waypoint.address || waypoint.type}</name>\n`;
+          gpxContent += `        <desc>${waypoint.type}</desc>\n`;
+          gpxContent += `      </trkpt>\n`;
+        }
+      }
+      
+      gpxContent += `    </trkseg>\n`;
+      gpxContent += `  </trk>\n`;
+    }
+
+    gpxContent += '</gpx>';
+
+    res.setHeader('Content-Type', 'application/gpx+xml');
+    res.setHeader('Content-Disposition', `attachment; filename="balade_${ride._id}.gpx"`);
+    res.send(gpxContent);
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'export GPX',
+      error: error.message
+    });
+  }
+};
+
+// Exporter une balade en format PDF
+exports.exportRidePDF = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const ride = await Ride.findById(id)
+      .populate('organisateur', 'firstName lastName pseudo')
+      .populate('participants.userId', 'firstName lastName pseudo');
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier les droits d'accès
+    const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
+    const isParticipant = ride.participants.some(
+      p => p.userId && p.userId.toString() === req.user._id.toString()
+    );
+    
+    if (ride.visibilite === 'secrete' && !isOrganizer && !isParticipant) {
+      throw new ForbiddenError('Accès non autorisé');
+    }
+
+    if (ride.visibilite === 'privee' && !isOrganizer && !isParticipant) {
+      const isInvited = ride.invitations && ride.invitations.some(
+        inv => inv.userId && inv.userId.toString() === req.user._id.toString() && 
+        (inv.status === 'pending' || inv.status === 'accepted')
+      );
+      if (!isInvited) {
+        throw new ForbiddenError('Accès non autorisé');
+      }
+    }
+
+    // Générer un PDF avec pdfkit
+    const doc = new PDFDocument();
+    const chunks = [];
+
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="balade_${ride._id}.pdf"`);
+      res.send(pdfBuffer);
+    });
+
+    // Contenu du PDF
+    doc.fontSize(20).text(ride.titre, { align: 'center' });
+    doc.moveDown();
+    
+    if (ride.description) {
+      doc.fontSize(12).text('Description:', { underline: true });
+      doc.fontSize(10).text(ride.description);
+      doc.moveDown();
+    }
+
+    doc.fontSize(12).text('Informations:', { underline: true });
+    doc.fontSize(10);
+    doc.text(`Type de véhicule: ${ride.typeVehicule === 'moto' ? 'Moto' : 'Voiture'}`);
+    doc.text(`Date: ${new Date(ride.date).toLocaleDateString('fr-FR')}`);
+    doc.text(`Heure: ${ride.heure}`);
+    
+    if (typeof ride.lieuDepart === 'string') {
+      doc.text(`Lieu de départ: ${ride.lieuDepart}`);
+    }
+    if (typeof ride.lieuArrivee === 'string') {
+      doc.text(`Lieu d'arrivée: ${ride.lieuArrivee}`);
+    }
+    
+    doc.moveDown();
+    doc.fontSize(12).text('Organisateur:', { underline: true });
+    doc.fontSize(10);
+    const organizerName = ride.organisateur.pseudo || 
+      `${ride.organisateur.firstName || ''} ${ride.organisateur.lastName || ''}`.trim() ||
+      'Organisateur';
+    doc.text(organizerName);
+    
+    doc.moveDown();
+    doc.fontSize(12).text(`Participants (${ride.participants.length}):`, { underline: true });
+    doc.fontSize(10);
+    ride.participants.forEach((p, index) => {
+      const participantName = p.userId?.pseudo || 
+        `${p.userId?.firstName || ''} ${p.userId?.lastName || ''}`.trim() ||
+        'Participant';
+      doc.text(`${index + 1}. ${participantName}`);
+    });
+
+    doc.end();
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'export PDF',
+      error: error.message
+    });
+  }
+};
+
+// Mettre à jour la visibilité d'une balade (pour le mode secret)
+exports.updateRideVisibility = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { visibilite } = req.body;
+
+    if (!['privee', 'publique', 'secrete'].includes(visibilite)) {
+      throw new BadRequestError('Visibilité invalide');
+    }
+
+    const ride = await Ride.findById(id);
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    // Vérifier que l'utilisateur est l'organisateur
+    if (ride.organisateur.toString() !== req.user._id.toString()) {
+      throw new ForbiddenError('Seul l\'organisateur peut modifier la visibilité');
+    }
+
+    ride.visibilite = visibilite;
+
+    // Si mode secret activé, générer un lien secret unique
+    if (visibilite === 'secrete') {
+      if (!ride.secretLink) {
+        const crypto = require('crypto');
+        ride.secretLink = crypto.randomBytes(32).toString('hex');
+      }
+    } else {
+      // Si on désactive le mode secret, on peut garder le lien ou le supprimer
+      // Pour l'instant, on le garde au cas où l'utilisateur réactive le mode
+    }
+
+    await ride.save();
+
+    // Recharger la balade pour avoir les données à jour
+    const updatedRide = await Ride.findById(id)
+      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('participants.userId', 'firstName lastName pseudo');
+
+    res.status(200).json({
+      success: true,
+      message: 'Visibilité mise à jour',
+      data: {
+        ride: updatedRide,
+        secretLink: ride.secretLink ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/secret/${ride.secretLink}` : null
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ForbiddenError || error instanceof BadRequestError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour de la visibilité',
+      error: error.message
+    });
+  }
+};
+
+// Accéder à une balade via son lien secret
+exports.getRideBySecretLink = async (req, res, next) => {
+  try {
+    const { secretLink } = req.params;
+
+    const ride = await Ride.findOne({ secretLink })
+      .populate('organisateur', 'firstName lastName pseudo email')
+      .populate('participants.userId', 'firstName lastName pseudo')
+      .populate('invitations.userId', 'firstName lastName pseudo');
+
+    if (!ride) {
+      throw new NotFoundError('Balade');
+    }
+
+    if (ride.visibilite !== 'secrete') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette balade n\'est pas en mode secret'
+      });
+    }
+
+    // Vérifier si l'utilisateur a liké la balade et compter les likes
+    const totalLikes = await Like.countLikesByRide(ride._id);
+    const hasUserLiked = req.user ? await Like.hasUserLiked(ride._id, req.user._id) : false;
+    
+    // Calculer isOrganizerPremium
+    const isOrganizerPremium = ride.organisateur && 
+      subscriptionService.isPremiumActive(ride.organisateur);
+
+    const rideObject = ride.toObject();
+    rideObject.totalLikes = totalLikes;
+    rideObject.hasUserLiked = hasUserLiked;
+    rideObject.isOrganizerPremium = isOrganizerPremium || false;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ride: rideObject
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération de la balade',
       error: error.message
     });
   }

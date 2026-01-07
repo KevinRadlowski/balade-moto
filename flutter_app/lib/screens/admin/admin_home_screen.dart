@@ -4,6 +4,7 @@ import 'catalog/admin_catalog_proposals_screen.dart';
 import 'users/admin_users_screen.dart';
 import 'rides/admin_rides_screen.dart';
 import 'groups/admin_groups_screen.dart';
+import 'promoCodes/admin_promo_codes_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -77,6 +78,21 @@ class AdminHomeScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const AdminGroupsScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildAdminCard(
+              context,
+              title: 'Codes promo',
+              subtitle: 'Génération',
+              icon: Icons.confirmation_number,
+              color: Colors.teal,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminPromoCodesScreen(),
                   ),
                 );
               },

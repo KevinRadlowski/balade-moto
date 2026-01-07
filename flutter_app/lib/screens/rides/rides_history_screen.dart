@@ -95,6 +95,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
   }
 
   Future<void> _loadUpcomingRides() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingUpcoming = true;
       _errorUpcoming = null;
@@ -126,21 +127,26 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
       }
 
-      setState(() {
-        _upcomingRides = rides;
-        _likesState.addAll(likesState);
-        _likesCount.addAll(likesCount);
-        _isLoadingUpcoming = false;
-      });
+      if (mounted) {
+        setState(() {
+          _upcomingRides = rides;
+          _likesState.addAll(likesState);
+          _likesCount.addAll(likesCount);
+          _isLoadingUpcoming = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorUpcoming = e.toString();
-        _isLoadingUpcoming = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorUpcoming = e.toString();
+          _isLoadingUpcoming = false;
+        });
+      }
     }
   }
 
   Future<void> _loadPastRides() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingPast = true;
       _errorPast = null;
@@ -173,21 +179,26 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
       }
 
-      setState(() {
-        _pastRides = rides;
-        _likesState.addAll(likesState);
-        _likesCount.addAll(likesCount);
-        _isLoadingPast = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pastRides = rides;
+          _likesState.addAll(likesState);
+          _likesCount.addAll(likesCount);
+          _isLoadingPast = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorPast = e.toString();
-        _isLoadingPast = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorPast = e.toString();
+          _isLoadingPast = false;
+        });
+      }
     }
   }
 
   Future<void> _loadMyPastRides() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingMyPast = true;
       _errorMyPast = null;
@@ -223,17 +234,21 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
       }
 
-      setState(() {
-        _myPastRides = rides;
-        _likesState.addAll(likesState);
-        _likesCount.addAll(likesCount);
-        _isLoadingMyPast = false;
-      });
+      if (mounted) {
+        setState(() {
+          _myPastRides = rides;
+          _likesState.addAll(likesState);
+          _likesCount.addAll(likesCount);
+          _isLoadingMyPast = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMyPast = e.toString();
-        _isLoadingMyPast = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMyPast = e.toString();
+          _isLoadingMyPast = false;
+        });
+      }
     }
   }
 
@@ -252,6 +267,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
   }
 
   Future<void> _toggleLike(String rideId, bool newLikeState) async {
+    if (!mounted) return;
     setState(() {
       _likesState[rideId] = newLikeState;
       _likesCount[rideId] = (_likesCount[rideId] ?? 0) + (newLikeState ? 1 : -1);
@@ -356,7 +372,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
             ),
           ).then((result) {
             // Rafraîchir si une balade a été créée (result == true ou result est un objet Ride)
-            if (result == true || result != null) {
+            if ((result == true || result != null) && mounted) {
               _loadRides();
             }
           });
@@ -479,7 +495,9 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                                       builder: (_) => RideDetailScreen(rideId: ride.id),
                                     ),
                                   ).then((_) {
-                                    _loadUpcomingRides();
+                                    if (mounted) {
+                                      _loadUpcomingRides();
+                                    }
                                   });
                                 },
                                 onLikeTap: (newLikeState) => _toggleLike(ride.id, newLikeState),
@@ -604,7 +622,9 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                                       builder: (_) => RideDetailScreen(rideId: ride.id),
                                     ),
                                   ).then((_) {
-                                    _loadPastRides();
+                                    if (mounted) {
+                                      _loadPastRides();
+                                    }
                                   });
                                 },
                                 onLikeTap: (newLikeState) => _toggleLike(ride.id, newLikeState),
@@ -729,7 +749,9 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                                       builder: (_) => RideDetailScreen(rideId: ride.id),
                                     ),
                                   ).then((_) {
-                                    _loadMyPastRides();
+                                    if (mounted) {
+                                      _loadMyPastRides();
+                                    }
                                   });
                                 },
                                 onLikeTap: (newLikeState) => _toggleLike(ride.id, newLikeState),
@@ -856,6 +878,40 @@ class _RideCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Badge "Organisateur Premium"
+                  if (ride.isOrganizerPremium == true) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber.shade300,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 14,
+                            color: Colors.amber.shade900,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Premium',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.amber.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (showDuplicate && onDuplicate != null) ...[
                     const SizedBox(width: 8),
                     IconButton(

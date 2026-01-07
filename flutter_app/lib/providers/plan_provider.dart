@@ -9,11 +9,15 @@ class PlanProvider extends ChangeNotifier {
   UserPlan? _plan;
   bool _isLoading = false;
   String? _error;
+  String? _lastRedeemMessage;
+  String? _lastRedeemError;
 
   // Getters
   UserPlan? get plan => _plan;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get lastRedeemMessage => _lastRedeemMessage;
+  String? get lastRedeemError => _lastRedeemError;
 
   PlanProvider({required ApiService apiService}) : _apiService = apiService;
 
@@ -55,7 +59,57 @@ class PlanProvider extends ChangeNotifier {
     _plan = null;
     _error = null;
     _isLoading = false;
+    _lastRedeemMessage = null;
+    _lastRedeemError = null;
     notifyListeners();
+  }
+
+  /// Utilise un code promotionnel
+  /// [code] : Le code promotionnel à utiliser
+  Future<void> redeemPromoCode(String code) async {
+    _isLoading = true;
+    _lastRedeemMessage = null;
+    _lastRedeemError = null;
+    notifyListeners();
+
+    try {
+      final result = await _apiService.redeemPromoCode(code);
+      
+      // Construire le message de succès selon l'effet
+      final effect = result['effect'] as Map<String, dynamic>?;
+      if (effect != null) {
+        final type = effect['type'] as String?;
+        if (type == 'DISCOUNT_PERCENT') {
+          final discountPercent = effect['discountPercent'] as int?;
+          _lastRedeemMessage = discountPercent != null 
+              ? 'Réduction de $discountPercent% appliquée'
+              : 'Réduction appliquée';
+        } else if (type == 'GRANT_PREMIUM_MONTHS') {
+          final premiumMonths = effect['premiumMonths'] as int?;
+          _lastRedeemMessage = premiumMonths != null
+              ? 'Premium +$premiumMonths mois accordé${premiumMonths > 1 ? 's' : ''}'
+              : 'Premium accordé';
+        } else if (type == 'GRANT_PREMIUM_PERMANENT') {
+          _lastRedeemMessage = 'Premium permanent accordé';
+        } else {
+          _lastRedeemMessage = 'Code promotionnel utilisé avec succès';
+        }
+      } else {
+        _lastRedeemMessage = 'Code promotionnel utilisé avec succès';
+      }
+
+      // Rafraîchir le plan pour mettre à jour les informations
+      await loadPlan(silent: true);
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _lastRedeemError = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      debugPrint('[PlanProvider] Erreur redeemPromoCode: $e');
+      rethrow;
+    }
   }
 
   // ==================== HELPERS ====================

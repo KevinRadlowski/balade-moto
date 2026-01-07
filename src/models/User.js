@@ -293,9 +293,54 @@ const userSchema = new mongoose.Schema({
     },
     premiumSource: {
       type: String,
-      enum: ['purchase', 'referral_reward', 'admin_grant'],
+      enum: ['purchase', 'referral_reward', 'admin_grant', 'promo_code'],
       default: null
     }
+  },
+  // Bénéfices des codes promotionnels
+  promoBenefits: {
+    // Pourcentage de réduction actif
+    activeDiscountPercent: {
+      type: Number,
+      default: null,
+      min: [1, 'Le pourcentage de réduction doit être entre 1 et 100'],
+      max: [100, 'Le pourcentage de réduction doit être entre 1 et 100']
+    },
+    // Date d'expiration de la réduction
+    discountValidUntil: {
+      type: Date,
+      default: null
+    },
+    // Préfixe du dernier code utilisé (pour affichage uniquement)
+    lastPromoCodePrefix: {
+      type: String,
+      default: null,
+      trim: true,
+      uppercase: true,
+      maxlength: [10, 'Le préfixe ne peut pas dépasser 10 caractères']
+    },
+    // Historique des codes utilisés
+    history: [{
+      type: {
+        type: String,
+        enum: ['DISCOUNT_PERCENT', 'GRANT_PREMIUM_MONTHS', 'GRANT_PREMIUM_PERMANENT'],
+        required: true
+      },
+      prefix: {
+        type: String,
+        required: true,
+        trim: true,
+        uppercase: true
+      },
+      appliedAt: {
+        type: Date,
+        default: Date.now
+      },
+      details: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+      }
+    }]
   }
 }, {
   timestamps: true

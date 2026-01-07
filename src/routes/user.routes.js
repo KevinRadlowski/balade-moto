@@ -11,6 +11,9 @@ const {
   validateEmergencyContact,
   validateTriggerAlert
 } = require('../validators/emergencyContact.validator');
+const {
+  validateRedeemPromoCode
+} = require('../validators/promoCode.validator');
 
 // Toutes les routes nécessitent une authentification
 router.put('/update-profile', authMiddleware, subscriptionMiddleware, userController.updateProfile);
@@ -21,6 +24,7 @@ router.post('/upload-background', authMiddleware, subscriptionMiddleware, upload
 router.delete('/delete-background/:type', authMiddleware, subscriptionMiddleware, userController.deleteBackground);
 router.get('/search', authMiddleware, subscriptionMiddleware, userController.searchUsers);
 router.get('/me/plan', authMiddleware, subscriptionMiddleware, userController.getMyPlan);
+router.post('/me/promo-codes/redeem', authMiddleware, subscriptionMiddleware, validateRedeemPromoCode, userController.redeemPromoCode);
 
 // Routes contact d'urgence
 router.get('/emergency-contact', authMiddleware, subscriptionMiddleware, emergencyContactController.getEmergencyContact);

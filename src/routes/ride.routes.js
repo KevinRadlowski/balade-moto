@@ -55,6 +55,9 @@ router.get('/reverse-geocode',
   validateReverseGeocode, 
   rideController.reverseGeocode
 );
+// Route pour accéder à une balade via son lien secret (AVANT /:id pour éviter les conflits)
+router.get('/secret/:secretLink', authMiddleware, subscriptionMiddleware, rideController.getRideBySecretLink);
+
 // Routes avec paramètre :id (doivent être en dernier)
 router.get('/:id', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getRideById);
 router.get('/:id/ics', authMiddleware, subscriptionMiddleware, validateRideId, rideController.exportRideICS);
@@ -71,6 +74,35 @@ router.post('/:id/complete', authMiddleware, subscriptionMiddleware, validateRid
 router.post('/:id/arrival', authMiddleware, subscriptionMiddleware, validateRideId, rideController.markArrival);
 router.post('/:id/participants/:userId/validate-punctuality', authMiddleware, subscriptionMiddleware, validateRideId, rideController.validatePunctuality);
 router.post('/:id/claim-organizer', authMiddleware, subscriptionMiddleware, validateRideId, rideController.claimOrganizer);
+
+// ========== OUTILS ORGANISATEUR ==========
+// Paramètres organisateur
+router.put('/:id/organizer-settings', authMiddleware, subscriptionMiddleware, validateRideId, rideController.updateOrganizerSettings);
+
+// Demandes de participation (validation manuelle)
+router.post('/:id/request-join', authMiddleware, subscriptionMiddleware, validateRideId, rideController.requestToJoin);
+router.get('/:id/pending-requests', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getPendingRequests);
+router.post('/:id/pending-requests/:userId/approve', authMiddleware, subscriptionMiddleware, validateRideId, rideController.approveRequest);
+router.post('/:id/pending-requests/:userId/reject', authMiddleware, subscriptionMiddleware, validateRideId, rideController.rejectRequest);
+
+// Liste d'attente
+router.get('/:id/waitlist', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getWaitlist);
+router.post('/:id/waitlist/:userId/promote', authMiddleware, subscriptionMiddleware, validateRideId, rideController.promoteFromWaitlist);
+router.delete('/:id/waitlist/:userId', authMiddleware, subscriptionMiddleware, validateRideId, rideController.removeFromWaitlist);
+
+// Balades récurrentes
+router.post('/:id/create-next-occurrence', authMiddleware, subscriptionMiddleware, validateRideId, rideController.createRecurringRide);
+
+// Rappels
+router.post('/:id/send-reminder', authMiddleware, subscriptionMiddleware, validateRideId, rideController.sendReminderToParticipants);
+
+// ========== FONCTIONS AVANCÉES ==========
+// Export GPX
+router.get('/:id/export/gpx', authMiddleware, subscriptionMiddleware, validateRideId, rideController.exportRideGPX);
+// Export PDF
+router.get('/:id/export/pdf', authMiddleware, subscriptionMiddleware, validateRideId, rideController.exportRidePDF);
+// Mise à jour visibilité (mode secret)
+router.put('/:id/visibility', authMiddleware, subscriptionMiddleware, validateRideId, rideController.updateRideVisibility);
 
 // Routes live ride (doivent être avant /:id pour éviter les conflits)
 router.post('/:id/start', authMiddleware, subscriptionMiddleware, validateLiveRideId, liveRideController.startLiveRide);

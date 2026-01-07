@@ -49,6 +49,7 @@ const PREMIUM_LIMITS = {
 
 /**
  * Détermine le plan d'un utilisateur à partir de son objet subscription
+ * Utilise la même logique que isPremiumActive() pour garantir la cohérence
  * @param {object} user - L'utilisateur (doit avoir subscription.isPremium)
  * @returns {string} Le plan (PLANS.FREE ou PLANS.PREMIUM)
  */
@@ -57,19 +58,25 @@ function getUserPlan(user) {
     return PLANS.FREE;
   }
   
-  // Vérifier si premium est actif (isPremium = true et pas expiré si premiumExpiresAt existe)
-  if (user.subscription.isPremium) {
-    if (user.subscription.premiumExpiresAt) {
-      const now = new Date();
-      const expiresAt = new Date(user.subscription.premiumExpiresAt);
-      if (expiresAt > now) {
-        return PLANS.PREMIUM;
-      }
-      // Premium expiré
-      return PLANS.FREE;
+  // Vérifier si premium est actif (cohérent avec isPremiumActive)
+  // Premium actif si: isPremium=true ET (premiumExpiresAt=null OU premiumExpiresAt>=now)
+  if (user.subscription.isPremium === true) {
+    const expiresAt = user.subscription.premiumExpiresAt;
+    
+    if (!expiresAt) {
+      // Premium permanent (premiumExpiresAt = null)
+      return PLANS.PREMIUM;
     }
-    // Premium sans date d'expiration (permanent ou admin)
-    return PLANS.PREMIUM;
+    
+    // Premium à durée limitée : vérifier que la date d'expiration est >= maintenant
+    const now = new Date();
+    const expirationDate = new Date(expiresAt);
+    if (expirationDate >= now) {
+      return PLANS.PREMIUM;
+    }
+    
+    // Premium expiré
+    return PLANS.FREE;
   }
   
   return PLANS.FREE;

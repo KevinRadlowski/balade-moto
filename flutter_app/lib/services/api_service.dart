@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/ride.dart';
+import '../models/vehicle.dart';
 import '../models/plan/user_plan.dart';
 import '../config/api_config.dart';
 import '../exceptions/auth_exception.dart';
@@ -626,6 +627,88 @@ class ApiService {
   }
 
   /// Récupère le plan de l'utilisateur connecté
+  /// Utiliser un code promotionnel
+  /// POST /api/users/me/promo-codes/redeem
+  Future<Map<String, dynamic>> redeemPromoCode(String code) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/users/me/promo-codes/redeem'),
+        headers: _headers,
+        body: jsonEncode({
+          'code': code.trim().toUpperCase(),
+        }),
+      );
+    });
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return responseData['data'] ?? {};
+    } else {
+      final message = responseData['message'] ?? 'Erreur lors de l\'utilisation du code promotionnel';
+      throw Exception(message);
+    }
+  }
+
+  /// Générer des codes promotionnels (admin)
+  /// POST /api/admin/promo-codes/generate
+  Future<Map<String, dynamic>> generatePromoCodes({
+    required String type,
+    required int count,
+    int? discountPercent,
+    int? premiumMonths,
+    int? usageLimit,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final body = <String, dynamic>{
+      'type': type,
+      'count': count,
+    };
+
+    if (discountPercent != null) {
+      body['discountPercent'] = discountPercent;
+    }
+    if (premiumMonths != null) {
+      body['premiumMonths'] = premiumMonths;
+    }
+    if (usageLimit != null) {
+      body['usageLimit'] = usageLimit;
+    }
+    if (validFrom != null) {
+      body['validFrom'] = validFrom.toIso8601String();
+    }
+    if (validUntil != null) {
+      body['validUntil'] = validUntil.toIso8601String();
+    }
+    if (metadata != null) {
+      body['metadata'] = metadata;
+    }
+
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/admin/promo-codes/generate'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+    });
+
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 201) {
+      return responseData['data'] ?? {};
+    } else {
+      final message = responseData['message'] ?? 'Erreur lors de la génération des codes promotionnels';
+      final errors = responseData['errors'] as List?;
+      if (errors != null && errors.isNotEmpty) {
+        final errorMessages = errors.map((e) => e['message'] ?? '').join(', ');
+        throw Exception(errorMessages);
+      }
+      throw Exception(message);
+    }
+  }
+
   Future<UserPlan> getMyPlan() async {
     final response = await _makeRequest(() async {
       return await http.get(
@@ -924,6 +1007,29 @@ class ApiService {
   }
 
   // Créer une balade
+  /// Récupère les véhicules de l'utilisateur
+  /// GET /api/garage/vehicles?type=moto|voiture
+  Future<List<Vehicle>> getVehicles({String? type}) async {
+    final queryParams = <String, String>{};
+    if (type != null) {
+      queryParams['type'] = type;
+    }
+    
+    final uri = Uri.parse('$baseUrl/garage/vehicles').replace(queryParameters: queryParams);
+    final response = await _makeRequest(() async {
+      return await http.get(uri, headers: _headers);
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final vehiclesList = data['data']['vehicles'] as List;
+      return vehiclesList.map((v) => Vehicle.fromJson(v)).toList();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des véhicules');
+    }
+  }
+
   Future<Ride> createRide({
     required String titre,
     String? description,
@@ -937,6 +1043,7 @@ class ApiService {
     String? ridingStyle,
     Map<String, dynamic>? localisation,
     List<Map<String, dynamic>>? waypoints, // Nouveau système de waypoints
+    String? vehicleId, // ID du véhicule avec lequel l'organisateur effectue la balade
   }) async {
     final response = await _makeRequest(() async {
       return await http.post(
@@ -955,6 +1062,7 @@ class ApiService {
           if (ridingStyle != null) 'ridingStyle': ridingStyle,
           if (localisation != null) 'localisation': localisation,
           if (waypoints != null && waypoints.isNotEmpty) 'waypoints': waypoints,
+          if (vehicleId != null) 'vehicleId': vehicleId,
         }),
       );
     });
@@ -1130,11 +1238,14 @@ class ApiService {
     }
   }
 
-  Future<void> acceptRideInvitation(String rideId) async {
+  Future<void> acceptRideInvitation(String rideId, {String? vehicleId}) async {
     final response = await _makeRequest(
       () => http.post(
         Uri.parse('$baseUrl/rides/$rideId/invitations/accept'),
         headers: _headers,
+        body: jsonEncode({
+          if (vehicleId != null) 'vehicleId': vehicleId,
+        }),
       ),
     );
 
@@ -1158,15 +1269,29 @@ class ApiService {
     }
   }
 
-  Future<void> joinRide(String id) async {
+  /// Rejoindre une balade
+  /// Retourne un Map avec 'status': 'joined' | 'pending_approval' | 'waitlisted'
+  /// et potentiellement 'position' pour waitlisted
+  Future<Map<String, dynamic>> joinRide(String id, {String? vehicleId}) async {
     final response = await _makeRequest(() async {
       return await http.post(
         Uri.parse('$baseUrl/rides/$id/join'),
         headers: _headers,
+        body: jsonEncode({
+          if (vehicleId != null) 'vehicleId': vehicleId,
+        }),
       );
     });
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'success': true,
+        'message': data['message'] ?? 'Succès',
+        'status': data['data']?['status'] ?? 'joined',
+        'position': data['data']?['position'],
+      };
+    } else {
       throw Exception(jsonDecode(response.body)['message'] ?? 'Erreur lors de la participation');
     }
   }
@@ -1238,6 +1363,254 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception(jsonDecode(response.body)['message'] ?? 'Erreur lors de la sortie de la balade');
+    }
+  }
+
+  // ========== OUTILS ORGANISATEUR ==========
+
+  /// Mettre à jour les paramètres organisateur d'une balade
+  Future<Map<String, dynamic>> updateOrganizerSettings(
+    String rideId, {
+    bool? requiresApproval,
+    int? maxParticipants,
+    bool? enableWaitlist,
+    Map<String, dynamic>? autoReminder,
+    Map<String, dynamic>? recurrence,
+  }) async {
+    final body = <String, dynamic>{};
+    if (requiresApproval != null) body['requiresApproval'] = requiresApproval;
+    if (maxParticipants != null) body['maxParticipants'] = maxParticipants;
+    if (enableWaitlist != null) body['enableWaitlist'] = enableWaitlist;
+    if (autoReminder != null) body['autoReminder'] = autoReminder;
+    if (recurrence != null) body['recurrence'] = recurrence;
+
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/rides/$rideId/organizer-settings'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la mise à jour des paramètres');
+    }
+  }
+
+  /// Demander à rejoindre une balade (avec validation manuelle)
+  Future<Map<String, dynamic>> requestToJoinRide(String rideId, {String? vehicleId, String? message}) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/request-join'),
+        headers: _headers,
+        body: jsonEncode({
+          if (vehicleId != null) 'vehicleId': vehicleId,
+          if (message != null) 'message': message,
+        }),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la demande');
+    }
+  }
+
+  /// Obtenir les demandes en attente
+  Future<Map<String, dynamic>> getPendingRequests(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/pending-requests'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des demandes');
+    }
+  }
+
+  /// Approuver une demande de participation
+  Future<void> approveJoinRequest(String rideId, String userId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/pending-requests/$userId/approve'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'approbation');
+    }
+  }
+
+  /// Refuser une demande de participation
+  Future<void> rejectJoinRequest(String rideId, String userId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/pending-requests/$userId/reject'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du refus');
+    }
+  }
+
+  /// Obtenir la liste d'attente
+  Future<Map<String, dynamic>> getWaitlist(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/waitlist'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération de la liste d\'attente');
+    }
+  }
+
+  /// Promouvoir un utilisateur de la liste d'attente
+  Future<void> promoteFromWaitlist(String rideId, String userId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/waitlist/$userId/promote'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la promotion');
+    }
+  }
+
+  /// Retirer un utilisateur de la liste d'attente
+  Future<void> removeFromWaitlist(String rideId, String userId) async {
+    final response = await _makeRequest(() async {
+      return await http.delete(
+        Uri.parse('$baseUrl/rides/$rideId/waitlist/$userId'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du retrait');
+    }
+  }
+
+  /// Créer la prochaine occurrence d'une balade récurrente
+  Future<Map<String, dynamic>> createNextOccurrence(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/create-next-occurrence'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la création');
+    }
+  }
+
+  /// Envoyer un rappel aux participants
+  Future<Map<String, dynamic>> sendRideReminder(String rideId, {String? message}) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/send-reminder'),
+        headers: _headers,
+        body: jsonEncode({
+          if (message != null) 'message': message,
+        }),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'envoi du rappel');
+    }
+  }
+
+  // ========== FONCTIONS AVANCÉES ==========
+
+  /// Exporter une balade en format GPX
+  Future<String> exportRideGPX(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/export/gpx'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      // Le backend retourne le fichier GPX en texte
+      return response.body;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'export GPX');
+    }
+  }
+
+  /// Exporter une balade en format PDF
+  Future<Uint8List> exportRidePDF(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/export/pdf'),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      // Le backend retourne le PDF en bytes
+      return response.bodyBytes;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'export PDF');
+    }
+  }
+
+  /// Mettre à jour la visibilité d'une balade (pour le mode secret)
+  /// Retourne le secretLink si le mode secret est activé
+  Future<Map<String, dynamic>> updateRideVisibility(String rideId, String visibility) async {
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/rides/$rideId/visibility'),
+        headers: _headers,
+        body: jsonEncode({'visibilite': visibility}),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'success': true,
+        'secretLink': data['data']?['secretLink'],
+        'ride': data['data']?['ride'],
+      };
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la mise à jour de la visibilité');
     }
   }
 

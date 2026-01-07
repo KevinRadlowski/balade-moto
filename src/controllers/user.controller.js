@@ -6,6 +6,7 @@ const { getBaseUrl, buildFileUrl } = require('../utils/urlHelper');
 const subscriptionService = require('../services/subscription.service');
 const premiumConfig = require('../config/premium.config');
 const planQuotaService = require('../services/planQuota.service');
+const promoCodeService = require('../services/promoCode.service');
 
 // Mettre à jour le profil utilisateur
 exports.updateProfile = async (req, res) => {
@@ -600,6 +601,168 @@ exports.getMyPlan = async (req, res) => {
       success: false,
       message: 'Erreur lors de la récupération des informations du plan',
       error: error.message
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /api/users/me/promo-codes/redeem:
+ *   post:
+ *     summary: Utiliser un code promotionnel
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: "RT-A3B2-C4D1-E5F6"
+ *                 description: Code promotionnel à utiliser
+ *     responses:
+ *       200:
+ *         description: Code utilisé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     effect:
+ *                       type: object
+ *                       properties:
+ *                         type:
+ *                           type: string
+ *                           enum: [DISCOUNT_PERCENT, GRANT_PREMIUM_MONTHS, GRANT_PREMIUM_PERMANENT]
+ *                         discountPercent:
+ *                           type: number
+ *                         premiumMonths:
+ *                           type: number
+ *                         premiumPermanent:
+ *                           type: boolean
+ *                     planAfter:
+ *                       type: object
+ *                       properties:
+ *                         plan:
+ *                           type: string
+ *                           enum: [FREE, PREMIUM]
+ *                         isPremium:
+ *                           type: boolean
+ *                         premiumExpiresAt:
+ *                           type: string
+ *                           format: date-time
+ *                           nullable: true
+ *                         premiumSource:
+ *                           type: string
+ *       400:
+ *         description: Code invalide, expiré, déjà utilisé ou désactivé
+ *       404:
+ *         description: Code non trouvé
+ */
+exports.redeemPromoCode = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userId = req.user._id;
+
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le code promotionnel est requis'
+      });
+    }
+
+    // Utiliser le service pour utiliser le code
+    const result = await promoCodeService.redeemPromoCode({
+      userId,
+      codePlain: code.trim()
+    });
+
+    // Recharger l'utilisateur pour avoir les données à jour
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    // Construire la réponse avec les informations du plan
+    const userPlan = premiumConfig.getUserPlan(user);
+    const isPremium = subscriptionService.isPremiumActive(user);
+
+    // Construire l'effet appliqué
+    const effect = {
+      type: result.type
+    };
+
+    if (result.type === 'DISCOUNT_PERCENT') {
+      effect.discountPercent = result.details.discountPercent;
+    } else if (result.type === 'GRANT_PREMIUM_MONTHS') {
+      effect.premiumMonths = result.details.premiumMonths;
+    } else if (result.type === 'GRANT_PREMIUM_PERMANENT') {
+      effect.premiumPermanent = true;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: result.appliedEffect,
+      data: {
+        effect,
+        planAfter: {
+          plan: userPlan,
+          isPremium,
+          premiumExpiresAt: user.subscription?.premiumExpiresAt || null,
+          premiumSource: user.subscription?.premiumSource || null
+        }
+      }
+    });
+  } catch (error) {
+    // Messages d'erreur clairs selon le type d'erreur
+    let statusCode = 400;
+    let message = error.message;
+
+    if (error.message.includes('non trouvé') || error.message.includes('non trouvée')) {
+      statusCode = 404;
+      message = 'Code promotionnel non trouvé';
+    } else if (error.message.includes('expiré')) {
+      statusCode = 400;
+      message = 'Ce code promotionnel a expiré';
+    } else if (error.message.includes('déjà utilisé')) {
+      statusCode = 400;
+      message = 'Vous avez déjà utilisé ce code promotionnel';
+    } else if (error.message.includes('désactivé')) {
+      statusCode = 400;
+      message = 'Ce code promotionnel est désactivé';
+    } else if (error.message.includes('invalide')) {
+      statusCode = 400;
+      message = 'Code promotionnel invalide';
+    } else if (error.message.includes('pas encore valide')) {
+      statusCode = 400;
+      message = 'Ce code promotionnel n\'est pas encore valide';
+    } else if (error.message.includes('limite')) {
+      statusCode = 400;
+      message = 'Ce code promotionnel a atteint sa limite d\'utilisation';
+    }
+
+    // Ne jamais logger le code en clair
+    console.log(`Erreur lors de l'utilisation d'un code promotionnel par l'utilisateur ${req.user._id}: ${message}`);
+
+    res.status(statusCode).json({
+      success: false,
+      message
     });
   }
 };
