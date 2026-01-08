@@ -1,9 +1,11 @@
 const Ride = require('../models/Ride');
 const User = require('../models/User');
 const Like = require('../models/Like');
+const RouteCache = require('../models/RouteCache');
 const icsService = require('../services/ics.service');
 const https = require('https');
 const PDFDocument = require('pdfkit');
+const crypto = require('crypto');
 const { NotFoundError, ForbiddenError, BadRequestError, ConflictError, InternalServerError, createPlanLimitError } = require('../utils/errors');
 const { routeCache, geocodeCache, reverseGeocodeCache } = require('../utils/cache');
 const compatibilityService = require('../services/compatibility.service');
@@ -931,25 +933,25 @@ exports.getMyPastRides = async (req, res) => {
  */
 exports.getRidesNearby = async (req, res) => {
   try {
-    const { lat, lng, rayon = 10, typeVehicule, dateDebut, dateFin, limit = 20 } = req.query;
+    const { latitude, longitude, rayon = 10, typeVehicule, dateDebut, dateFin, limit = 20 } = req.query;
 
     // Validation des paramètres requis
-    if (!lat || !lng) {
+    if (!latitude || !longitude) {
       return res.status(400).json({
         success: false,
-        message: 'Les paramètres lat (latitude) et lng (longitude) sont requis'
+        message: 'Les paramètres latitude et longitude sont requis'
       });
     }
 
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
     const radiusKm = Math.min(parseFloat(rayon) || 10, 100); // Max 100 km
     const limitNum = Math.min(parseInt(limit) || 20, 50); // Max 50 résultats
 
     // Validation des coordonnées
-    if (isNaN(latitude) || isNaN(longitude) || 
-        latitude < -90 || latitude > 90 || 
-        longitude < -180 || longitude > 180) {
+    if (isNaN(lat) || isNaN(lng) || 
+        lat < -90 || lat > 90 || 
+        lng < -180 || lng > 180) {
       return res.status(400).json({
         success: false,
         message: 'Coordonnées GPS invalides. Latitude doit être entre -90 et 90, longitude entre -180 et 180'
@@ -1002,7 +1004,7 @@ exports.getRidesNearby = async (req, res) => {
         $geoNear: {
           near: {
             type: 'Point',
-            coordinates: [longitude, latitude] // MongoDB utilise [lng, lat]
+            coordinates: [lng, lat] // MongoDB utilise [lng, lat]
           },
           distanceField: 'distance',
           maxDistance: radiusKm * 1000, // Convertir km en mètres
@@ -1599,8 +1601,9 @@ exports.leaveRide = async (req, res, next) => {
     }
 
     // Vérifier si l'utilisateur est participant
+    // Les participants sont des objets avec un champ userId
     const isParticipant = ride.participants.some(
-      p => p.toString() === req.user._id.toString()
+      p => p.userId && p.userId.toString() === req.user._id.toString()
     );
     
     if (!isParticipant) {
@@ -1620,7 +1623,7 @@ exports.leaveRide = async (req, res, next) => {
 
     // Retirer l'utilisateur des participants
     ride.participants = ride.participants.filter(
-      p => p.toString() !== req.user._id.toString()
+      p => !p.userId || p.userId.toString() !== req.user._id.toString()
     );
     
     // Ajouter un événement participant_left
@@ -1731,7 +1734,7 @@ exports.rateRide = async (req, res, next) => {
 
     // Vérifier que l'utilisateur est participant
     const isParticipant = ride.participants.some(
-      p => p.toString() === req.user._id.toString()
+      p => p.userId && p.userId.toString() === req.user._id.toString()
     );
 
     if (!isParticipant) {
@@ -2037,16 +2040,34 @@ exports.calculateRoute = async (req, res, next) => {
     }
     const avoidParam = avoidParams.length > 0 ? avoidParams.join('|') : null;
 
-    // Vérifier le cache (inclure avoid dans la clé de cache)
-    const cacheKey = { 
+    // Générer une clé de cache unique basée sur les paramètres
+    const waypointsStr = waypoints || '';
+    const avoidStr = avoidParam || '';
+    const cacheKeyString = `${origin}|${destination}|${waypointsStr}|${avoidStr}`;
+    const cacheKeyHash = crypto.createHash('sha256').update(cacheKeyString).digest('hex');
+
+    // Vérifier d'abord le cache en mémoire (pour les requêtes récentes)
+    const memoryCacheKey = { 
       origin, 
       destination, 
-      waypoints: waypoints || '',
-      avoid: avoidParam || ''
+      waypoints: waypointsStr,
+      avoid: avoidStr
     };
-    const cached = routeCache.get(cacheKey);
-    if (cached) {
-      return res.status(200).json(cached);
+    const memoryCached = routeCache.get(memoryCacheKey);
+    if (memoryCached) {
+      return res.status(200).json(memoryCached);
+    }
+
+    // Vérifier le cache MongoDB (persistant)
+    const dbCached = await RouteCache.findOne({ cacheKey: cacheKeyHash });
+    if (dbCached) {
+      const responseData = {
+        success: true,
+        data: dbCached.directionsData
+      };
+      // Mettre aussi en cache mémoire pour les prochaines requêtes
+      routeCache.set(memoryCacheKey, responseData);
+      return res.status(200).json(responseData);
     }
 
     // Construire l'URL de l'API Directions
@@ -2081,7 +2102,7 @@ exports.calculateRoute = async (req, res, next) => {
           data += chunk;
         });
 
-        response.on('end', () => {
+        response.on('end', async () => {
           try {
             const jsonData = JSON.parse(data);
             
@@ -2090,8 +2111,28 @@ exports.calculateRoute = async (req, res, next) => {
                 success: true,
                 data: jsonData
               };
-              // Mettre en cache
-              routeCache.set(cacheKey, responseData);
+              
+              // Mettre en cache mémoire (pour les requêtes récentes)
+              routeCache.set(memoryCacheKey, responseData);
+              
+              // Mettre en cache MongoDB (persistant) - ne pas bloquer la réponse
+              RouteCache.findOneAndUpdate(
+                { cacheKey: cacheKeyHash },
+                {
+                  cacheKey: cacheKeyHash,
+                  origin,
+                  destination,
+                  waypoints: waypointsStr,
+                  avoid: avoidStr,
+                  directionsData: jsonData,
+                  createdAt: new Date()
+                },
+                { upsert: true, new: true }
+              ).catch((cacheError) => {
+                // Ne pas bloquer la réponse si le cache échoue
+                console.error('Erreur lors de la mise en cache MongoDB:', cacheError);
+              });
+              
               res.status(200).json(responseData);
             } else {
               return next(new BadRequestError(`Erreur Directions API: ${jsonData.status} - ${jsonData.error_message || 'Erreur inconnue'}`));
@@ -3579,6 +3620,11 @@ exports.sendReminderToParticipants = async (req, res, next) => {
 // Exporter une balade en format GPX
 exports.exportRideGPX = async (req, res, next) => {
   try {
+    // Vérifier que l'utilisateur est premium
+    if (!req.userIsPremium) {
+      throw new ForbiddenError('Cette fonctionnalité est réservée aux membres premium');
+    }
+
     const { id } = req.params;
     const ride = await Ride.findById(id);
 
@@ -3658,6 +3704,11 @@ exports.exportRideGPX = async (req, res, next) => {
 // Exporter une balade en format PDF
 exports.exportRidePDF = async (req, res, next) => {
   try {
+    // Vérifier que l'utilisateur est premium
+    if (!req.userIsPremium) {
+      throw new ForbiddenError('Cette fonctionnalité est réservée aux membres premium');
+    }
+
     const { id } = req.params;
     const ride = await Ride.findById(id)
       .populate('organisateur', 'firstName lastName pseudo')
@@ -3771,6 +3822,11 @@ exports.updateRideVisibility = async (req, res, next) => {
     // Vérifier que l'utilisateur est l'organisateur
     if (ride.organisateur.toString() !== req.user._id.toString()) {
       throw new ForbiddenError('Seul l\'organisateur peut modifier la visibilité');
+    }
+
+    // Vérifier que l'utilisateur est premium pour activer le mode secret
+    if (visibilite === 'secrete' && !req.userIsPremium) {
+      throw new ForbiddenError('Le mode "balade privée secrète" est réservé aux membres premium');
     }
 
     ride.visibilite = visibilite;

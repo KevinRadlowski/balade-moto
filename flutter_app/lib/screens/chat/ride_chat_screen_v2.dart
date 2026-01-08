@@ -506,9 +506,22 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
     });
   }
 
+  // Helper pour vérifier si le texte contient du contenu valide (y compris les emojis)
+  bool _hasValidContent(String text) {
+    if (text.isEmpty) return false;
+    // Enlever uniquement les espaces blancs (whitespace) en début et fin
+    // Les emojis sont des caractères Unicode valides et ne sont pas considérés comme des espaces
+    final trimmed = text.trim();
+    // Vérifier que le texte trimmé n'est pas vide
+    // Cela fonctionne correctement avec les emojis car ils ne sont pas des espaces
+    return trimmed.isNotEmpty;
+  }
+
   Future<void> _sendMessage() async {
-    final messageText = _messageController.text.trim();
-    if (messageText.isEmpty) return;
+    final messageText = _messageController.text;
+    if (!_hasValidContent(messageText)) return;
+    
+    final trimmedMessage = messageText.trim();
 
     if (!_socketService.isConnected) {
       if (mounted) {
@@ -531,7 +544,7 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
       id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
       auteurId: _currentUser!.id,
       auteurPseudo: _currentUser!.pseudo,
-      contenu: messageText,
+      contenu: trimmedMessage,
       date: DateTime.now(),
       idBalade: widget.rideId,
       replyPreview: _replyPreview,
@@ -555,7 +568,7 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
     try {
       _socketService.sendRideMessageWithReply(
         widget.rideId,
-        messageText,
+        trimmedMessage,
         replyToMessageId: replyToId,
       );
     } catch (e) {
@@ -769,11 +782,12 @@ class _RideChatScreenV2State extends State<RideChatScreenV2> {
 
   Future<void> _saveEdit() async {
     if (_editingMessage == null) return;
-    final newContent = _messageController.text.trim();
-    if (newContent.isEmpty) return;
+    final newContent = _messageController.text;
+    if (!_hasValidContent(newContent)) return;
+    final trimmedContent = newContent.trim();
 
     try {
-      _socketService.editMessage(_editingMessage!.id, newContent);
+      _socketService.editMessage(_editingMessage!.id, trimmedContent);
       if (mounted) {
         setState(() {
           _editingMessage = null;

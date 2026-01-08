@@ -43,10 +43,19 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final achievements = (data['data']['achievements'] as List)
+            .map((a) => Achievement.fromJson(a))
+            .toList();
+        
+        // Trier les badges : obtenus en premier, puis non obtenus
+        achievements.sort((a, b) {
+          if (a.isEarned && !b.isEarned) return -1;
+          if (!a.isEarned && b.isEarned) return 1;
+          return 0; // Garder l'ordre original pour les badges du même statut
+        });
+        
         setState(() {
-          _achievements = (data['data']['achievements'] as List)
-              .map((a) => Achievement.fromJson(a))
-              .toList();
+          _achievements = achievements;
         });
       }
     } catch (e) {

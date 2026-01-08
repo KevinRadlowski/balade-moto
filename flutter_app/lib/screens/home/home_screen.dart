@@ -6,17 +6,14 @@ import '../../services/api_service.dart';
 import '../../models/ride.dart';
 import '../../models/group.dart';
 import '../../models/user.dart';
-import '../../widgets/like_button.dart';
-import '../../widgets/ride_route_preview.dart';
 import '../../utils/background_helper.dart';
 import '../../config/api_config.dart';
-import '../../constants/home_style_constants.dart';
 import '../../widgets/home/home_community_header.dart';
 import '../../widgets/home/next_ride_section.dart';
 import '../../widgets/home/discover_rides_section.dart';
 import '../../widgets/home/active_groups_section.dart';
 import '../../widgets/home/quick_actions_fab.dart';
-import '../ride/ride_detail_screen.dart';
+import '../../services/navigation_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,9 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   
   // Données
-  List<Ride> _allRides = [];
   Ride? _nextRide;
   List<Group> _myGroups = [];
+  List<Group> _allGroups = []; // Tous les groupes pour les statistiques
   List<Ride> _suggestedRides = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -49,10 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Statistiques communautaires
   int _ridesThisMonth = 0;
   int _activeGroups = 0;
-  
-  // Map pour stocker l'état des likes par balade
-  final Map<String, bool> _likesState = {};
-  final Map<String, int> _likesCount = {};
 
   @override
   void initState() {
@@ -96,15 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = authService.user;
       _apiService.setToken(token);
 
-      // Charger la position de l'utilisateur pour calculer les distances
-      _loadUserPosition();
+      // Charger la position de l'utilisateur d'abord (nécessaire pour les suggestions de balades proches)
+      await _loadUserPosition();
 
       // Charger toutes les données en parallèle
       await Future.wait([
         _loadNextRide(user?.id),
         _loadMyGroups(),
-        _loadSuggestedRides(user),
-        _loadAllRides(),
+        _loadAllGroups(), // Charger tous les groupes pour les statistiques
+        _loadSuggestedRides(user), // Utilisera la position si disponible
       ]);
 
       // Calculer les statistiques après avoir chargé les données
@@ -298,18 +291,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Charge tous les groupes pour les statistiques communautaires
+  Future<void> _loadAllGroups() async {
+    try {
+      // Charger tous les groupes (sans filtre membre) pour les statistiques
+      final groupsData = await _apiService.getGroups();
+      final groups = groupsData.map((g) => Group.fromJson(g)).toList();
+      
+      if (mounted) {
+        setState(() {
+          _allGroups = groups;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement de tous les groupes: $e');
+    }
+  }
+
   Future<void> _loadSuggestedRides(User? user) async {
     try {
-      // Charger quelques balades publiques récentes
-      final allRides = await _apiService.getRides(
-        typeVehicule: user?.vehiclePreference == 'les deux' ? null : user?.vehiclePreference,
-        limit: 20, // Charger plus pour filtrer
-      );
-
-      // Filtrer pour ne garder que les balades où l'utilisateur n'a pas participé
       final authService = Provider.of<AuthService>(context, listen: false);
       final userId = authService.user?.id;
       
+      List<Ride> allRides;
+      
+      // Si la position GPS est disponible, utiliser getRidesNearby pour obtenir les balades les plus proches
+      if (_userPosition != null) {
+        allRides = await _apiService.getRidesNearby(
+          latitude: _userPosition!.latitude,
+          longitude: _userPosition!.longitude,
+          rayon: 50, // Rayon de 50 km
+          typeVehicule: user?.vehiclePreference == 'les deux' ? null : user?.vehiclePreference,
+          limit: 20, // Charger plus pour filtrer
+        );
+      } else {
+        // Sinon, charger les balades publiques récentes normalement
+        allRides = await _apiService.getRides(
+          typeVehicule: user?.vehiclePreference == 'les deux' ? null : user?.vehiclePreference,
+          limit: 20, // Charger plus pour filtrer
+        );
+      }
+
+      // Filtrer pour ne garder que les balades où l'utilisateur n'a pas participé
       final filteredRides = allRides.where((ride) {
         // Exclure les balades où l'utilisateur participe déjà
         if (userId != null) {
@@ -332,49 +355,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadAllRides() async {
-    try {
-      final rides = await _apiService.getRides();
-      
-      // Initialiser l'état des likes
-      final likesState = <String, bool>{};
-      final likesCount = <String, int>{};
-      for (final ride in rides) {
-        likesState[ride.id] = ride.hasUserLiked ?? false;
-        likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
-      }
-
-      if (mounted) {
-        setState(() {
-          _allRides = rides;
-          _likesState.clear();
-          _likesState.addAll(likesState);
-          _likesCount.clear();
-          _likesCount.addAll(likesCount);
-        });
-      }
-    } catch (e) {
-      debugPrint('Erreur lors du chargement des balades: $e');
-    }
-  }
-
   /// Calcule les statistiques communautaires à partir des données disponibles
   Future<void> _calculateCommunityStats() async {
     try {
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
+      // Compter tous les groupes créés dans l'application (pas seulement ceux dont l'utilisateur est membre)
+      final activeGroups = _allGroups.length;
       
-      // Compter les balades de ce mois
-      final ridesThisMonth = _allRides.where((ride) {
-        return ride.date.isAfter(startOfMonth) || ride.date.isAtSameMomentAs(startOfMonth);
-      }).length;
-      
-      // Compter les groupes actifs (groupes dont l'utilisateur est membre)
-      final activeGroups = _myGroups.length;
-      
+      // Pour les balades de ce mois, on pourrait charger les données séparément si nécessaire
+      // Pour l'instant, on met 0 car on ne charge plus _allRides
       if (mounted) {
         setState(() {
-          _ridesThisMonth = ridesThisMonth;
+          _ridesThisMonth = 0; // Ne sera plus calculé ici car on ne charge plus toutes les balades
           _activeGroups = activeGroups;
         });
       }
@@ -383,43 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _toggleLike(String rideId, bool newLikeState) async {
-    if (!mounted) return;
-    
-    // Mise à jour optimiste
-    setState(() {
-      _likesState[rideId] = newLikeState;
-      _likesCount[rideId] = (_likesCount[rideId] ?? 0) + (newLikeState ? 1 : -1);
-    });
-
-    try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final token = await authService.storage.read(key: 'token');
-      _apiService.setToken(token);
-
-      final response = await _apiService.toggleLike(rideId);
-      
-      if (mounted) {
-        setState(() {
-          _likesState[rideId] = response['data']?['isLiked'] ?? newLikeState;
-          _likesCount[rideId] = response['data']?['totalLikes'] ?? _likesCount[rideId]!;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _likesState[rideId] = !newLikeState;
-          _likesCount[rideId] = (_likesCount[rideId] ?? 0) + (newLikeState ? -1 : 1);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
 
   @override
@@ -548,19 +502,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   getLocationText: _getLocationText,
                                   onDataReload: _loadData,
                                   onSeeMore: () {
-                                    if (_scrollController.hasClients) {
-                                      _scrollController.animateTo(
-                                        _scrollController.position.maxScrollExtent,
-                                        duration: const Duration(milliseconds: 300),
-                                        curve: Curves.easeOut,
-                                      );
-                                    }
+                                    // Rediriger vers la page balades (index 1 dans MainNavigation)
+                                    final navigationState = Provider.of<NavigationState>(context, listen: false);
+                                    navigationState.setIndex(1);
                                   },
                                 ),
-                                const SizedBox(height: 16),
-                                
-                                // Section: Toutes les balades
-                                _buildAllRidesSection(),
                                 // Padding pour éviter le chevauchement avec le FAB
                                 const SizedBox(height: 80),
                               ],
@@ -580,213 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
 
-  Widget _buildAllRidesSection() {
-    if (_allRides.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: HomeStyleConstants.cardPadding,
-      decoration: HomeStyleConstants.glassCardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.list, color: Colors.indigo.shade700),
-              const SizedBox(width: 8),
-              const Text(
-                'Toutes les balades',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ..._allRides.take(5).map((ride) => _RideCard(
-                ride: ride,
-                isLiked: _likesState[ride.id] ?? false,
-                totalLikes: _likesCount[ride.id] ?? 0,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RideDetailScreen(rideId: ride.id),
-                    ),
-                  ).then((_) => _loadData());
-                },
-                onLikeTap: (newLikeState) => _toggleLike(ride.id, newLikeState),
-              )),
-          if (_allRides.length > 5)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: TextButton(
-                  onPressed: () {
-                    // Scroll vers le bas pour voir plus
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  },
-                  child: Text(
-                    'Voir ${_allRides.length - 5} balade${_allRides.length - 5 > 1 ? 's' : ''} de plus',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
 }
 
 
-// Card pour les balades (réutilisée depuis l'ancien code)
-class _RideCard extends StatelessWidget {
-  final Ride ride;
-  final VoidCallback onTap;
-  final bool isLiked;
-  final int totalLikes;
-  final Function(bool) onLikeTap;
-
-  const _RideCard({
-    required this.ride,
-    required this.onTap,
-    required this.isLiked,
-    required this.totalLikes,
-    required this.onLikeTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateTime = DateTime(
-      ride.date.year,
-      ride.date.month,
-      ride.date.day,
-      int.parse(ride.heure.split(':')[0]),
-      int.parse(ride.heure.split(':')[1]),
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ride.titre,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: ride.typeVehicule == 'moto'
-                          ? Colors.orange.shade100
-                          : Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      ride.typeVehicule == 'moto' ? '🏍️ Moto' : '🚗 Voiture',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: ride.typeVehicule == 'moto'
-                            ? Colors.orange.shade900
-                            : Colors.blue.shade900,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (ride.description != null && ride.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  ride.description!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-              ],
-              const SizedBox(height: 12),
-              // Prévisualisation du trajet (plus petite)
-              SizedBox(
-                height: 100,
-                child: RideRoutePreview(ride: ride, height: 100),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${dateTime.day}/${dateTime.month}/${dateTime.year} à ${ride.heure}',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(Icons.people, size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${ride.participants.length} participant${ride.participants.length > 1 ? 's' : ''}',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                  ),
-                  const Spacer(),
-                  if (ride.noteMoyenne > 0) ...[
-                    Icon(Icons.star, size: 14, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      ride.noteMoyenne.toStringAsFixed(1),
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  LikeButton(
-                    isLiked: isLiked,
-                    totalLikes: totalLikes,
-                    onTap: onLikeTap,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

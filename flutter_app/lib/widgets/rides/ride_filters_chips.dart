@@ -367,9 +367,10 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
               leading: const Icon(Icons.calendar_month),
               title: const Text('Ce mois'),
               onTap: () {
-                final startOfMonth = DateTime(now.year, now.month, 1);
+                // Commencer à partir d'aujourd'hui, pas du 1er du mois
+                final today = DateTime(now.year, now.month, now.day);
                 final endOfMonth = DateTime(now.year, now.month + 1, 0);
-                widget.onDateDebutChanged(startOfMonth.toIso8601String());
+                widget.onDateDebutChanged(today.toIso8601String());
                 widget.onDateFinChanged(endOfMonth.toIso8601String());
                 Navigator.pop(context);
               },

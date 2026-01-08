@@ -31,7 +31,7 @@ class RideDetailScreen extends StatefulWidget {
   State<RideDetailScreen> createState() => _RideDetailScreenState();
 }
 
-class _RideDetailScreenState extends State<RideDetailScreen> {
+class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   Ride? _ride;
   bool _isLoading = true;
@@ -57,14 +57,25 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeLocale();
     _loadRide();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _mapController = null;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Quand l'app revient au premier plan, recharger les données si nécessaire
+    if (state == AppLifecycleState.resumed) {
+      // Recharger la balade pour avoir les dernières données
+      _loadRide();
+    }
   }
 
   Future<void> _initializeLocale() async {
@@ -152,7 +163,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     return rideDate.isBefore(DateTime.now());
   }
 
-  Future<void> _joinRide() async {
+  Future<void> _joinRide({bool forceRefresh = false}) async {
     if (_ride == null) return;
 
     try {
@@ -160,6 +171,89 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final token = await authService.storage.read(key: 'token');
       _apiService.setToken(token);
+      
+      // Si forceRefresh, attendre un peu pour laisser le temps au backend de créer le véhicule
+      if (forceRefresh) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        // Faire une première tentative de chargement
+        var vehicles = await _apiService.getVehicles(type: _ride!.typeVehicule);
+        // Si toujours vide, attendre encore un peu et réessayer (max 3 tentatives)
+        int retries = 0;
+        while (vehicles.isEmpty && retries < 3 && mounted) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          vehicles = await _apiService.getVehicles(type: _ride!.typeVehicule);
+          retries++;
+        }
+        // Utiliser les véhicules trouvés (peut être vide si le véhicule n'a pas encore été créé)
+        final finalVehicles = vehicles;
+        
+        String? selectedVehicleId;
+        
+        if (finalVehicles.isEmpty) {
+          // Aucun véhicule trouvé même après les tentatives : afficher une modal de conseil
+          final shouldContinue = await _showNoVehicleDialog();
+          if (!shouldContinue || !mounted) return;
+          // Continuer sans véhicule (vehicleId sera null)
+        } else if (finalVehicles.length == 1) {
+          // Un seul véhicule : sélection automatique
+          selectedVehicleId = finalVehicles.first.id;
+        } else {
+          // Plusieurs véhicules : afficher une modal de sélection
+          final result = await _showVehicleSelectionDialog(finalVehicles);
+          if (result == null || !mounted) return; // L'utilisateur a annulé
+          selectedVehicleId = result;
+        }
+        
+        // Rejoindre la balade avec le véhicule sélectionné (ou null)
+        final response = await _apiService.joinRide(_ride!.id, vehicleId: selectedVehicleId);
+        
+        if (mounted) {
+          final status = response['status'] ?? 'joined';
+          String message;
+          Color backgroundColor;
+          IconData icon;
+          
+          switch (status) {
+            case 'pending_approval':
+              message = 'Demande envoyée ! L\'organisateur doit approuver votre participation.';
+              backgroundColor = Colors.orange;
+              icon = Icons.hourglass_empty;
+              break;
+            case 'waitlisted':
+              final position = response['position'] ?? '?';
+              message = 'Vous êtes sur liste d\'attente (position $position).';
+              backgroundColor = Colors.blue;
+              icon = Icons.queue;
+              break;
+            default:
+              message = 'Vous avez rejoint la balade avec succès !';
+              backgroundColor = Colors.green;
+              icon = Icons.check_circle;
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(icon, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(message)),
+                ],
+              ),
+              backgroundColor: backgroundColor,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              margin: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+          
+          await _loadRide();
+        }
+        return;
+      }
       
       final vehicles = await _apiService.getVehicles(type: _ride!.typeVehicule);
       
@@ -299,19 +393,25 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               child: const Text('Continuer sans véhicule'),
             ),
             ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop(false);
                 // Naviguer vers l'écran d'ajout de véhicule
-                Navigator.of(context).push(
+                final result = await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const AddVehicleScreen(),
                   ),
-                ).then((result) {
-                  // Si un véhicule a été ajouté, relancer le join
-                  if (result == true && mounted) {
-                    _joinRide();
+                );
+                
+                // Si un véhicule a été ajouté, relancer le join avec forceRefresh
+                if (result == true && mounted) {
+                  // Attendre un peu pour laisser le temps au backend de créer le véhicule
+                  await Future.delayed(const Duration(milliseconds: 800));
+                  // Relancer le join qui va maintenant trouver le nouveau véhicule
+                  // forceRefresh va attendre un peu et recharger les véhicules
+                  if (mounted) {
+                    _joinRide(forceRefresh: true);
                   }
-                });
+                }
               },
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Ajouter un véhicule'),

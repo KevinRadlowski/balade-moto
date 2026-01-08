@@ -242,6 +242,7 @@ exports.deleteAccount = async (req, res) => {
     // Soft delete : anonymiser et marquer comme supprimé
     const now = new Date();
     const deletedEmail = `deleted+${userId.toString()}@invalid.local`;
+    const deletedPseudo = `deleted_user_${userId.toString().substring(0, 8)}`;
     
     // Anonymiser les données sensibles
     user.isDeleted = true;
@@ -250,23 +251,27 @@ exports.deleteAccount = async (req, res) => {
     
     // Anonymiser les informations personnelles
     user.email = deletedEmail;
-    user.pseudo = 'Utilisateur supprimé';
+    // Utiliser un pseudo valide (lettres, chiffres, tirets, underscores uniquement)
+    user.pseudo = deletedPseudo;
     user.firstName = null;
     user.lastName = null;
-    user.phoneE164 = null;
+    
+    // Pour phoneE164 : si requis (pas d'authProvider), mettre un placeholder valide
+    // Sinon, mettre null si OAuth
+    if (!user.authProvider) {
+      // Si pas d'OAuth, phoneE164 est requis, donc on met un placeholder
+      user.phoneE164 = '+33000000000'; // Placeholder valide
+    } else {
+      // Si OAuth, phoneE164 n'est pas requis, on peut mettre null
+      user.phoneE164 = null;
+    }
+    
     user.avatarUrl = null;
     
     // Invalider les tokens et sessions
     user.refreshToken = null;
     user.emailVerificationToken = null;
     user.resetPasswordToken = null;
-    
-    // Anonymiser le contact d'urgence
-    if (user.emergencyContact) {
-      user.emergencyContact.name = null;
-      user.emergencyContact.phone = null;
-      user.emergencyContact.notes = null;
-    }
     
     // Désactiver l'authentification à deux facteurs
     user.twoFactorEnabled = false;
@@ -280,7 +285,16 @@ exports.deleteAccount = async (req, res) => {
       user.checkInStatus.lastLocation = null;
     }
 
-    await user.save();
+    // Sauvegarder les modifications principales
+    await user.save({ validateBeforeSave: false });
+    
+    // Supprimer complètement emergencyContact avec $unset pour éviter les erreurs de validation
+    if (user.emergencyContact) {
+      await User.updateOne(
+        { _id: userId },
+        { $unset: { emergencyContact: '' } }
+      );
+    }
 
     res.status(200).json({
       success: true,

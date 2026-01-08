@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/biometric_service.dart';
 import '../../services/social_auth_service.dart';
+import '../../services/navigation_state.dart';
 import '../../utils/background_helper.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/resend_email_exception.dart';
@@ -19,9 +20,16 @@ import 'forgot_password_screen.dart';
 import '../main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
-  final String? message;
+  final String? message; // Message d'erreur (rouge) - pour compatibilité
+  final String? successMessage; // Message de succès (vert)
+  final bool showEmailWarning; // Afficher l'avertissement email (orange)
   
-  const LoginScreen({super.key, this.message});
+  const LoginScreen({
+    super.key, 
+    this.message,
+    this.successMessage,
+    this.showEmailWarning = false,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -40,6 +48,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _requiresPhoneVerification = false;
   String? _userPhoneForVerification;
   String? _errorMessage;
+  String? _successMessage;
+  bool _showEmailWarning = false;
   bool _showResendButton = false;
   bool _showContactSupportButton = false;
   bool _isResending = false;
@@ -61,18 +71,31 @@ class _LoginScreenState extends State<LoginScreen> {
     return '$masked$visible';
   }
 
+  /// Navigue vers MainNavigation en réinitialisant toujours l'index à 0 (page d'accueil)
+  void _navigateToHome() {
+    final navigationState = Provider.of<NavigationState>(context, listen: false);
+    navigationState.setIndex(0); // Toujours commencer sur la page d'accueil
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainNavigation()),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _initializeBiometric();
     _checkTermsStatus();
-    // Afficher le message si passé depuis l'inscription
-    if (widget.message != null) {
+    // Afficher les messages si passés depuis l'inscription
+    if (widget.successMessage != null || widget.message != null || widget.showEmailWarning) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
+            _successMessage = widget.successMessage;
             _errorMessage = widget.message;
-            _showResendButton = true;
+            _showEmailWarning = widget.showEmailWarning;
+            if (widget.message != null) {
+              _showResendButton = true;
+            }
           });
         }
       });
@@ -333,9 +356,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // Succès - rediriger vers l'accueil
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
+      _navigateToHome();
     } catch (e) {
       if (!mounted) return;
 
@@ -349,9 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final authServiceRetry = Provider.of<AuthService>(context, listen: false);
           await authServiceRetry.login(email, password);
           if (!mounted) return;
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
+          _navigateToHome();
           return;
         } catch (e2) {
           // Si ça échoue encore, afficher l'erreur
@@ -531,6 +550,8 @@ class _LoginScreenState extends State<LoginScreen> {
       // Connexion réussie
       setState(() {
         _errorMessage = null;
+        _successMessage = null;
+        _showEmailWarning = false;
         _showResendButton = false;
         _isLoggingIn = false;
       });
@@ -539,9 +560,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_biometricAvailable && !_biometricEnabled && !enableBiometric) {
         _showBiometricEnableDialog();
       } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
+        _navigateToHome();
       }
       return; // Sortir immédiatement après succès
     } catch (e) {
@@ -673,9 +692,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (authService.isAuthenticated) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
+        _navigateToHome();
       }
     } catch (e) {
       if (mounted) {
@@ -729,9 +746,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         
         if (authService.isAuthenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
+          _navigateToHome();
         }
       }
     } catch (e) {
@@ -783,9 +798,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         
         if (authService.isAuthenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
+          _navigateToHome();
         }
       }
     } catch (e) {
@@ -837,9 +850,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         
         if (authService.isAuthenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
+          _navigateToHome();
         }
       }
     } catch (e) {
@@ -881,15 +892,11 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _biometricEnabled = true;
         });
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
+        _navigateToHome();
       }
     } else if (mounted) {
       // L'utilisateur a choisi "Plus tard", naviguer quand même
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
+      _navigateToHome();
     }
   }
 
@@ -1088,6 +1095,62 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _login();
                               }
                             },
+                          ),
+                        ],
+                        // Message de succès (vert) - affiché en premier
+                        if (_successMessage != null) ...[
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.green.shade200, width: 1.5),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle_outline, size: 20, color: Colors.green.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _successMessage!,
+                                    style: TextStyle(
+                                      color: Colors.green.shade700,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        // Message d'avertissement email (orange) - affiché après le succès
+                        if (_showEmailWarning) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.orange.shade200, width: 1.5),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 20, color: Colors.orange.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'N\'oubliez pas de valider votre email via le lien reçu par email.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade700,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                         if (_errorMessage != null) ...[

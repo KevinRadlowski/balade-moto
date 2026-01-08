@@ -293,6 +293,7 @@ class _RidePreviewCardState extends State<RidePreviewCard> {
               child: SizedBox(
                 height: 200,
                 child: RideRoutePreview(
+                  key: RideRoutePreview.getKey(ride.id),
                   ride: ride,
                   height: 200,
                 ),

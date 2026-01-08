@@ -107,9 +107,17 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
       _apiService.setToken(token);
 
       final now = DateTime.now();
+      // S'assurer que dateDebut est toujours >= aujourd'hui pour exclure les balades passées
+      final today = DateTime(now.year, now.month, now.day);
+      final effectiveDateDebut = _upcomingDateDebut != null
+          ? DateTime.parse(_upcomingDateDebut!)
+          : today;
+      // Utiliser la date la plus récente entre celle du filtre et aujourd'hui
+      final finalDateDebut = effectiveDateDebut.isBefore(today) ? today : effectiveDateDebut;
+      
       final rides = await _apiService.getRides(
         typeVehicule: _upcomingTypeVehicule,
-        dateDebut: _upcomingDateDebut ?? now.toIso8601String(),
+        dateDebut: finalDateDebut.toIso8601String(),
         dateFin: _upcomingDateFin,
         search: _upcomingSearch,
         latitude: _upcomingLatitude,
@@ -118,18 +126,30 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         sortBy: _upcomingSortBy,
         sortOrder: _upcomingSortOrder,
       );
+      
+      // Filtrer une deuxième fois côté client pour s'assurer qu'aucune balade passée ne remonte
+      final filteredRides = rides.where((ride) {
+        final rideDate = DateTime(
+          ride.date.year,
+          ride.date.month,
+          ride.date.day,
+          int.parse(ride.heure.split(':')[0]),
+          int.parse(ride.heure.split(':')[1]),
+        );
+        return rideDate.isAfter(now) || rideDate.isAtSameMomentAs(now);
+      }).toList();
 
-      // Initialiser l'état des likes
+      // Initialiser l'état des likes (utiliser filteredRides)
       final likesState = <String, bool>{};
       final likesCount = <String, int>{};
-      for (final ride in rides) {
+      for (final ride in filteredRides) {
         likesState[ride.id] = ride.hasUserLiked ?? false;
         likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
       }
 
       if (mounted) {
         setState(() {
-          _upcomingRides = rides;
+          _upcomingRides = filteredRides;
           _likesState.addAll(likesState);
           _likesCount.addAll(likesCount);
           _isLoadingUpcoming = false;
@@ -933,7 +953,11 @@ class _RideCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 12),
-              RideRoutePreview(ride: ride, height: 150),
+              RideRoutePreview(
+                key: RideRoutePreview.getKey(ride.id),
+                ride: ride,
+                height: 150,
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [

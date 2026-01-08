@@ -13,6 +13,7 @@ import '../config/api_config.dart';
 import '../exceptions/auth_exception.dart';
 import '../exceptions/resend_email_exception.dart';
 import '../exceptions/plan_limit_exception.dart';
+import 'route_cache_service.dart';
 
 class ApiService {
   static const String baseUrl = ApiConfig.apiUrl;
@@ -1128,8 +1129,8 @@ class ApiService {
     int limit = 20,
   }) async {
     final queryParams = <String, String>{
-      'lat': latitude.toString(),
-      'lng': longitude.toString(),
+      'latitude': latitude.toString(),
+      'longitude': longitude.toString(),
       'rayon': rayon.toString(),
       'limit': limit.toString(),
       if (typeVehicule != null) 'typeVehicule': typeVehicule,
@@ -2050,6 +2051,20 @@ class ApiService {
     bool? avoidTolls,
     bool? avoidHighways,
   }) async {
+    // Vérifier d'abord le cache côté client
+    final routeCacheService = RouteCacheService();
+    final cached = routeCacheService.get(
+      origin: origin,
+      destination: destination,
+      waypoints: waypoints,
+      avoidTolls: avoidTolls,
+      avoidHighways: avoidHighways,
+    );
+    
+    if (cached != null) {
+      return cached;
+    }
+
     final queryParams = <String, String>{
       'origin': origin,
       'destination': destination,
@@ -2074,7 +2089,19 @@ class ApiService {
     });
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final data = jsonDecode(response.body);
+      
+      // Mettre en cache la réponse
+      routeCacheService.set(
+        origin: origin,
+        destination: destination,
+        waypoints: waypoints,
+        avoidTolls: avoidTolls,
+        avoidHighways: avoidHighways,
+        data: data,
+      );
+      
+      return data;
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors du calcul de l\'itinéraire');

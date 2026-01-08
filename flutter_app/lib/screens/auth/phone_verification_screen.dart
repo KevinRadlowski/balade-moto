@@ -121,11 +121,12 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
 
       // Rediriger selon le contexte
       if (widget.isRegistration) {
-        // Après inscription, rediriger vers login
+        // Après inscription, rediriger vers login avec message de succès
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => LoginScreen(
-              message: 'Votre téléphone a été vérifié avec succès. Vous pouvez maintenant vous connecter.',
+              successMessage: 'Votre téléphone a été vérifié avec succès. Vous pouvez maintenant vous connecter.',
+              showEmailWarning: true, // Après inscription, l'email n'est probablement pas encore vérifié
             ),
           ),
         );

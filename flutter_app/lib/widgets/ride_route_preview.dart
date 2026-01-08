@@ -17,6 +17,12 @@ class RideRoutePreview extends StatefulWidget {
 
   @override
   State<RideRoutePreview> createState() => _RideRoutePreviewState();
+  
+  // Clé unique basée sur l'ID de la balade pour éviter les recréations inutiles
+  static Key getKey(String rideId) {
+    return ValueKey('route_preview_$rideId');
+  }
+
 }
 
 class _RideRoutePreviewState extends State<RideRoutePreview> {

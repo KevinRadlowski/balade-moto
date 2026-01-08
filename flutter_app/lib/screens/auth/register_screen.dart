@@ -151,7 +151,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ? _referralCodeController.text.trim().toUpperCase()
           : _referralCode;
       
-      final result = await authService.register(
+      // Inscription : le backend crée le compte et envoie automatiquement l'OTP SMS
+      await authService.register(
         email,
         password,
         pseudo,
@@ -161,40 +162,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      // Déterminer le message selon si l'email a été envoyé ou non et si le parrainage a fonctionné
-      final emailSent = result['emailSent'] ?? true;
-      final referralRewardGranted = result['referralRewardGranted'] ?? false;
-      final phoneRequiresVerification = result['phoneRequiresVerification'] ?? false;
-      
-      // Rediriger vers la vérification OTP (téléphone obligatoire maintenant)
-      if (phoneRequiresVerification) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => PhoneVerificationScreen(
-              phone: normalizedPhone,
-              isRegistration: true,
-            ),
-          ),
-        );
-        return;
-      }
-      
-      String message;
-      if (referralRewardGranted) {
-        message = emailSent
-            ? 'Inscription réussie ! Vous avez reçu 1 mois d\'abonnement Premium gratuit grâce au parrainage. Un email de validation a été envoyé à votre adresse.'
-            : 'Inscription réussie ! Vous avez reçu 1 mois d\'abonnement Premium gratuit grâce au parrainage. Cependant, l\'email de vérification n\'a pas pu être envoyé. Veuillez utiliser le bouton "Renvoyer l\'email de vérification" ci-dessous.';
-      } else {
-        message = emailSent
-            ? 'Un email de validation a été envoyé à votre adresse. Veuillez vérifier votre boîte mail et cliquer sur le lien pour activer votre compte.'
-            : 'Votre compte a été créé avec succès. Cependant, l\'email de vérification n\'a pas pu être envoyé (le service email n\'est pas configuré). Veuillez utiliser le bouton "Renvoyer l\'email de vérification" ci-dessous pour recevoir votre lien de validation.';
-      }
-
-      // Retourner immédiatement à la page de connexion avec un message
+      // Le téléphone est maintenant obligatoire, donc on redirige TOUJOURS vers la vérification SMS
+      // Le backend envoie automatiquement l'OTP lors de l'inscription
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => LoginScreen(
-            message: message,
+          builder: (_) => PhoneVerificationScreen(
+            phone: normalizedPhone,
+            isRegistration: true,
           ),
         ),
       );

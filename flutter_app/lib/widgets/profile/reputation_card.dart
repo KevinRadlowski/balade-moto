@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/reputation.dart';
@@ -18,15 +19,34 @@ class ReputationCard extends StatefulWidget {
   State<ReputationCard> createState() => _ReputationCardState();
 }
 
-class _ReputationCardState extends State<ReputationCard> {
+class _ReputationCardState extends State<ReputationCard> with WidgetsBindingObserver {
   Reputation? _reputation;
   bool _isLoading = true;
   String? _errorMessage;
+  int _earnedBadgesCount = 0;
+  int _totalBadgesCount = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadReputation();
+    _loadBadgesCount();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Rafraîchir les badges quand l'app revient au premier plan
+    if (state == AppLifecycleState.resumed) {
+      _loadBadgesCount();
+    }
   }
 
   Future<void> _loadReputation() async {
@@ -59,6 +79,47 @@ class _ReputationCardState extends State<ReputationCard> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadBadgesCount() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = authService.apiService;
+      final token = await authService.storage.read(key: 'token');
+      apiService.setToken(token);
+
+      final uri = Uri.parse('${ApiConfig.apiUrl}/reputation/${widget.userId}/achievements');
+      final response = await apiService.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final achievements = (data['data']['achievements'] as List);
+        // Le backend retourne earnedAt (null ou date), pas isEarned directement
+        // Un badge est obtenu si earnedAt n'est pas null
+        final earnedCount = achievements.where((a) {
+          final earnedAt = a['earnedAt'];
+          return earnedAt != null && earnedAt.toString().isNotEmpty;
+        }).length;
+        
+        debugPrint('[ReputationCard] Badges chargés: $earnedCount/${achievements.length}');
+        debugPrint('[ReputationCard] Détail des badges: ${achievements.map((a) => '${a['name']}: earnedAt=${a['earnedAt']}').join(', ')}');
+        
+        if (mounted) {
+          setState(() {
+            _earnedBadgesCount = earnedCount;
+            _totalBadgesCount = achievements.length;
+          });
+        }
+      }
+    } catch (e) {
+      // Ignorer les erreurs silencieusement pour ne pas bloquer l'affichage
+      debugPrint('Erreur lors du chargement du nombre de badges: $e');
+    }
+  }
+
+  /// Méthode publique pour rafraîchir le compteur de badges
+  void refresh() {
+    _loadBadgesCount();
   }
 
   Color _getLevelColor(String level) {
@@ -130,12 +191,18 @@ class _ReputationCardState extends State<ReputationCard> {
     return Card(
       elevation: 2,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => AchievementsScreen(userId: widget.userId),
             ),
           );
+          // Rafraîchir le compteur de badges quand l'utilisateur revient
+          // Ajouter un petit délai pour laisser le backend se mettre à jour si nécessaire
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (mounted) {
+            _loadBadgesCount();
+          }
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -227,16 +294,42 @@ class _ReputationCardState extends State<ReputationCard> {
                 ],
               ),
               const SizedBox(height: 12),
+              // Compteur de badges (toujours affiché une fois chargé)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.emoji_events, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      _totalBadgesCount > 0
+                          ? 'Badges: $_earnedBadgesCount/$_totalBadgesCount'
+                          : 'Badges: ...',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
               // Lien vers les badges
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => AchievementsScreen(userId: widget.userId),
                       ),
                     );
+                    // Rafraîchir le compteur de badges quand l'utilisateur revient
+                    // Ajouter un petit délai pour laisser le backend se mettre à jour si nécessaire
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (mounted) {
+                      _loadBadgesCount();
+                    }
                   },
                   icon: const Icon(Icons.emoji_events),
                   label: const Text('Voir mes badges'),

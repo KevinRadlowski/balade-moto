@@ -166,9 +166,22 @@ class _RideChatScreenState extends State<RideChatScreen> {
     }
   }
 
+  // Helper pour vérifier si le texte contient du contenu valide (y compris les emojis)
+  bool _hasValidContent(String text) {
+    if (text.isEmpty) return false;
+    // Enlever uniquement les espaces blancs (whitespace) en début et fin
+    // Les emojis sont des caractères Unicode valides et ne sont pas considérés comme des espaces
+    final trimmed = text.trim();
+    // Vérifier que le texte trimmé n'est pas vide
+    // Cela fonctionne correctement avec les emojis car ils ne sont pas des espaces
+    return trimmed.isNotEmpty;
+  }
+
   Future<void> _sendMessage() async {
-    final messageText = _messageController.text.trim();
-    if (messageText.isEmpty) return;
+    final messageText = _messageController.text;
+    if (!_hasValidContent(messageText)) return;
+    
+    final trimmedMessage = messageText.trim();
 
     if (!_socketService.isConnected) {
       if (mounted) {
@@ -189,7 +202,7 @@ class _RideChatScreenState extends State<RideChatScreen> {
 
     try {
       // Envoyer le message via Socket.io
-      _socketService.sendRideMessage(widget.rideId, messageText);
+      _socketService.sendRideMessage(widget.rideId, trimmedMessage);
       
       // Le message sera ajouté automatiquement via le listener 'new-message'
     } catch (e) {

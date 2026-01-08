@@ -127,11 +127,16 @@ exports.sendMessage = async (req, res) => {
     // Pour les messages de type 'poll' ou 'ride', le contenu peut être optionnel
     const isPollOrRide = messageType === 'poll' || messageType === 'ride';
     
-    if (!hasFile && !isPollOrRide && (!content || content.trim().length === 0)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Le contenu du message est requis'
-      });
+    // Vérifier si le contenu est valide (y compris les emojis)
+    // Les emojis sont des caractères Unicode valides, donc on vérifie juste que le texte trimmé n'est pas vide
+    if (!hasFile && !isPollOrRide) {
+      const trimmedContent = content ? content.trim() : '';
+      if (trimmedContent.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le contenu du message est requis'
+        });
+      }
     }
 
     let filter = {};

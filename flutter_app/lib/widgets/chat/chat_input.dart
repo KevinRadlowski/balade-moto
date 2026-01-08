@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'reply_preview_bar.dart';
 import '../../models/message_extended.dart';
 import 'attachment_menu.dart';
@@ -41,6 +42,7 @@ class ChatInput extends StatefulWidget {
 class _ChatInputState extends State<ChatInput> {
   bool _isExpanded = false;
   bool _showEmojiPicker = false;
+  final FocusNode _focusNode = FocusNode();
 
   void _showAttachmentMenu() {
     showModalBottomSheet(
@@ -81,6 +83,40 @@ class _ChatInputState extends State<ChatInput> {
     });
   }
 
+  void _insertEmoji(String emoji) {
+    final text = widget.controller.text;
+    final selection = widget.controller.selection;
+    
+    // Vérifier que la sélection est valide, sinon utiliser la fin du texte
+    int start = selection.isValid && selection.start >= 0 ? selection.start : text.length;
+    int end = selection.isValid && selection.end >= 0 ? selection.end : text.length;
+    
+    // S'assurer que start et end sont dans les limites valides
+    if (start < 0) start = 0;
+    if (end < 0) end = 0;
+    if (start > text.length) start = text.length;
+    if (end > text.length) end = text.length;
+    
+    final newText = text.replaceRange(
+      start,
+      end,
+      emoji,
+    );
+    widget.controller.text = newText;
+    widget.controller.selection = TextSelection.collapsed(
+      offset: start + emoji.length,
+    );
+    if (widget.onEmojiSelected != null) {
+      widget.onEmojiSelected!(emoji);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -94,19 +130,15 @@ class _ChatInputState extends State<ChatInput> {
         if (_showEmojiPicker)
           EmojiPicker(
             onEmojiSelected: (emoji) {
-              final text = widget.controller.text;
-              final selection = widget.controller.selection;
-              final newText = text.replaceRange(
-                selection.start,
-                selection.end,
-                emoji,
-              );
-              widget.controller.text = newText;
-              widget.controller.selection = TextSelection.collapsed(
-                offset: selection.start + emoji.length,
-              );
-              if (widget.onEmojiSelected != null) {
-                widget.onEmojiSelected!(emoji);
+              // S'assurer que le TextField a le focus pour avoir une sélection valide
+              if (!_focusNode.hasFocus) {
+                _focusNode.requestFocus();
+                // Attendre que le focus soit établi avant d'insérer l'emoji
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  _insertEmoji(emoji);
+                });
+              } else {
+                _insertEmoji(emoji);
               }
             },
           ),
@@ -139,6 +171,7 @@ class _ChatInputState extends State<ChatInput> {
               Expanded(
                 child: TextField(
                   controller: widget.controller,
+                  focusNode: _focusNode,
                   enabled: widget.isEnabled,
                   maxLines: null,
                   textInputAction: TextInputAction.newline,
@@ -181,13 +214,23 @@ class _ChatInputState extends State<ChatInput> {
               ),
               const SizedBox(width: 4),
               // Bouton envoyer
-              IconButton(
-                icon: const Icon(Icons.send),
-                onPressed: widget.isEnabled &&
-                        widget.controller.text.trim().isNotEmpty
-                    ? widget.onSend
-                    : null,
-                color: Theme.of(context).primaryColor,
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: widget.controller,
+                builder: (context, value, child) {
+                  // Helper pour vérifier si le texte contient du contenu valide (y compris les emojis)
+                  final hasValidContent = () {
+                    final trimmed = value.text.trim();
+                    return trimmed.isNotEmpty;
+                  };
+                  
+                  final canSend = widget.isEnabled && hasValidContent();
+                  
+                  return IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: canSend ? widget.onSend : null,
+                    color: Theme.of(context).primaryColor,
+                  );
+                },
               ),
             ],
           ),

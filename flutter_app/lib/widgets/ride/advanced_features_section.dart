@@ -2,12 +2,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/ride.dart';
 import '../../services/api_service.dart';
 import '../../constants/app_theme.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../config/api_config.dart';
+import '../../providers/plan_provider.dart';
+import '../../screens/premium/premium_screen.dart';
 
 // Imports conditionnels
 import 'dart:io' if (dart.library.html) 'dart_io_stub.dart' show File;
@@ -94,115 +97,67 @@ class _AdvancedFeaturesSectionState extends State<AdvancedFeaturesSection> {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // 1. Export GPX
-                  _buildFeatureItem(
-                    icon: Icons.map_outlined,
-                    title: 'Export GPX',
-                    subtitle: 'Télécharge le tracé de tes balades au format GPX',
-                    onTap: _exportGPX,
-                    isLoading: _isExportingGPX,
-                  ),
-
-                  const Divider(height: 24),
-
-                  // 2. Export PDF
-                  _buildFeatureItem(
-                    icon: Icons.picture_as_pdf,
-                    title: 'Export PDF',
-                    subtitle: 'Génère un PDF détaillé de tes balades',
-                    onTap: _exportPDF,
-                    isLoading: _isExportingPDF,
-                  ),
-
-                  const Divider(height: 24),
-
-                  // 3. Partage externe
-                  _buildFeatureItem(
-                    icon: Icons.share,
-                    title: 'Partage externe',
-                    subtitle: 'Partage tes balades sur WhatsApp, Maps et autres apps',
-                    onTap: _shareRide,
-                  ),
-
-                  const Divider(height: 24),
-
-                  // 4. Mode "balade privée secrète"
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildFeatureItem(
-                        icon: Icons.lock_outline,
-                        title: 'Mode "balade privée secrète"',
-                        subtitle: 'Crée des balades invisibles, accessibles uniquement par lien',
-                        onTap: _toggleSecretMode,
-                        trailing: widget.ride.visibilite == 'secrete' 
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'ACTIF',
-                                  style: TextStyle(
-                                    color: Colors.orange.shade800,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              )
-                            : null,
-                      ),
-                      if (widget.ride.visibilite == 'secrete' && widget.ride.secretLink != null) ...[
-                        const SizedBox(height: 8),
+              child: Consumer<PlanProvider>(
+                builder: (context, planProvider, child) {
+                  final isPremium = planProvider.isPremium;
+                  
+                  if (!isPremium) {
+                    // Afficher un message premium pour les utilisateurs non premium
+                    return Column(
+                      children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.orange.shade200),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.link, size: 16, color: Colors.orange.shade800),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Lien secret:',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.orange.shade800,
-                                    ),
-                                  ),
-                                ],
+                              Icon(
+                                Icons.star,
+                                color: Colors.orange.shade700,
+                                size: 48,
                               ),
-                              const SizedBox(height: 4),
-                              SelectableText(
-                                _getFullSecretLink(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
+                              const SizedBox(height: 12),
+                              Text(
+                                'Fonctionnalités Premium',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade900,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _copySecretLink(),
-                                  icon: const Icon(Icons.copy, size: 16),
-                                  label: const Text('Copier le lien'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange.shade700,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                              Text(
+                                'Les fonctions avancées sont réservées aux membres premium.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.orange.shade800,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const PremiumScreen(),
                                     ),
+                                  );
+                                },
+                                icon: const Icon(Icons.star),
+                                label: const Text('Passer à Premium'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                               ),
@@ -210,9 +165,131 @@ class _AdvancedFeaturesSectionState extends State<AdvancedFeaturesSection> {
                           ),
                         ),
                       ],
+                    );
+                  }
+                  
+                  // Contenu pour les membres premium
+                  return Column(
+                    children: [
+                      // 1. Export GPX
+                      _buildFeatureItem(
+                        icon: Icons.map_outlined,
+                        title: 'Export GPX',
+                        subtitle: 'Télécharge le tracé de tes balades au format GPX',
+                        onTap: _exportGPX,
+                        isLoading: _isExportingGPX,
+                      ),
+
+                      const Divider(height: 24),
+
+                      // 2. Export PDF
+                      _buildFeatureItem(
+                        icon: Icons.picture_as_pdf,
+                        title: 'Export PDF',
+                        subtitle: 'Génère un PDF détaillé de tes balades',
+                        onTap: _exportPDF,
+                        isLoading: _isExportingPDF,
+                      ),
+
+                      const Divider(height: 24),
+
+                      // 3. Partage externe
+                      _buildFeatureItem(
+                        icon: Icons.share,
+                        title: 'Partage externe',
+                        subtitle: 'Partage tes balades sur WhatsApp, Maps et autres apps',
+                        onTap: _shareRide,
+                      ),
+
+                      const Divider(height: 24),
+
+                      // 4. Mode "balade privée secrète"
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildFeatureItem(
+                            icon: Icons.lock_outline,
+                            title: 'Mode "balade privée secrète"',
+                            subtitle: 'Crée des balades invisibles, accessibles uniquement par lien',
+                            onTap: _toggleSecretMode,
+                            trailing: widget.ride.visibilite == 'secrete' 
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'ACTIF',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade800,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          if (widget.ride.visibilite == 'secrete' && widget.ride.secretLink != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.link, size: 16, color: Colors.orange.shade800),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Lien secret:',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.orange.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SelectableText(
+                                    _getFullSecretLink(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _copySecretLink(),
+                                      icon: const Icon(Icons.copy, size: 16),
+                                      label: const Text('Copier le lien'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange.shade700,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ],
