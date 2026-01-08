@@ -112,8 +112,6 @@ const rideSchema = new mongoose.Schema({
   secretLink: {
     type: String,
     default: null,
-    unique: true,
-    sparse: true // Permet plusieurs null
   },
   participants: [{
     userId: {
@@ -382,7 +380,7 @@ rideSchema.index({ 'waitlist.userId': 1 });
 rideSchema.index({ 'recurrence.parentRideId': 1 });
 rideSchema.index({ 'recurrence.nextOccurrence': 1 });
 rideSchema.index({ 'autoReminder.enabled': 1, 'autoReminder.sentAt': 1, date: 1 });
-rideSchema.index({ secretLink: 1 }); // Pour rechercher par lien secret
+rideSchema.index({ secretLink: 1 }, { unique: true, sparse: true });
 
 // Méthode pour calculer la note moyenne
 rideSchema.methods.calculateAverageRating = function() {
