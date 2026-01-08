@@ -95,3 +95,4 @@ async function migrateVehicleTypes() {
 // Exécuter la migration
 migrateVehicleTypes();
 
+
