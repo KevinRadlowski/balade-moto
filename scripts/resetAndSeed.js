@@ -767,7 +767,7 @@ async function resetAndSeed() {
       },
       {
         vehicleId: v._id,
-        category: "ct", // <-- très souvent l'enum est en minuscule
+        category: "autre",
         label: "Contrôle technique (voitures)",
         intervalKm: null,
         intervalMonths: 24,
