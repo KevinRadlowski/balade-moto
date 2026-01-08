@@ -542,7 +542,6 @@ async function resetAndSeed() {
 
   console.log(`✅ ${createdVehicles.length} véhicules créés`);
 
-
   // ---------- VEHICLE DOCUMENTS ----------
   console.log(
     "\n📄 Création des documents véhicules (assurance + carte grise + facture/CT)..."
@@ -552,7 +551,6 @@ async function resetAndSeed() {
   createdUsers.forEach((user, idx) => {
     const motoV = vehiclesByUser[user.pseudo]?.moto?.[0] || null;
     const carV = vehiclesByUser[user.pseudo]?.voiture?.[0] || null;
-    
 
     // Moto: assurance + carte grise (AUTRE) + facture
     if (motoV) {
@@ -769,7 +767,7 @@ async function resetAndSeed() {
       },
       {
         vehicleId: v._id,
-        category: "CT",
+        category: "ct", // <-- très souvent l'enum est en minuscule
         label: "Contrôle technique (voitures)",
         intervalKm: null,
         intervalMonths: 24,
@@ -786,6 +784,10 @@ async function resetAndSeed() {
     );
   });
 
+  console.log(
+    "MaintenanceItem.category enumValues =",
+    MaintenanceItem.schema.path("category")?.enumValues
+  );
   await MaintenanceLog.insertMany(maintenanceLogsPayload);
   await MaintenanceItem.insertMany(maintenanceItemsPayload);
 
@@ -824,9 +826,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.paris_car._id,
-      participants: participantsFromPseudos(["paris_car", "lyon_moto"], "moto", {
-        organizerPseudo: "paris_car",
-      }),
+      participants: participantsFromPseudos(
+        ["paris_car", "lyon_moto"],
+        "moto",
+        {
+          organizerPseudo: "paris_car",
+        }
+      ),
       localisation: point(cities.paris.lng, cities.paris.lat),
       waypoints: rideWaypoints({
         departAddress: "Paris - Bastille",
@@ -841,7 +847,7 @@ async function resetAndSeed() {
         arriveeLat: 48.706,
       }),
     },
-  
+
     // LYON (publique, sans checkpoints)
     {
       titre: "Lyon → Monts du Lyonnais",
@@ -854,9 +860,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "modere",
       organisateur: U.lyon_moto._id,
-      participants: participantsFromPseudos(["lyon_moto", "admin_ride"], "moto", {
-        organizerPseudo: "lyon_moto",
-      }),
+      participants: participantsFromPseudos(
+        ["lyon_moto", "admin_ride"],
+        "moto",
+        {
+          organizerPseudo: "lyon_moto",
+        }
+      ),
       localisation: point(cities.lyon.lng, cities.lyon.lat),
       waypoints: rideWaypoints({
         departAddress: "Lyon - Bellecour",
@@ -868,7 +878,7 @@ async function resetAndSeed() {
         arriveeLat: 45.72,
       }),
     },
-  
+
     // MARSEILLE (privée, checkpoints)
     {
       titre: "Marseille → Calanques (Privé)",
@@ -889,13 +899,15 @@ async function resetAndSeed() {
         departAddress: "Marseille - Vieux Port",
         departLng: 5.3764,
         departLat: 43.2964,
-        checkpoints: [{ address: "Goudes - belvédère", lng: 5.344, lat: 43.212 }],
+        checkpoints: [
+          { address: "Goudes - belvédère", lng: 5.344, lat: 43.212 },
+        ],
         arriveeAddress: "Cassis - Port",
         arriveeLng: 5.538,
         arriveeLat: 43.214,
       }),
     },
-  
+
     // BORDEAUX (publique, checkpoints)
     {
       titre: "Bordeaux → Route des vins",
@@ -908,9 +920,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.bordeaux_moto._id,
-      participants: participantsFromPseudos(["bordeaux_moto", "paris_car"], "moto", {
-        organizerPseudo: "bordeaux_moto",
-      }),
+      participants: participantsFromPseudos(
+        ["bordeaux_moto", "paris_car"],
+        "moto",
+        {
+          organizerPseudo: "bordeaux_moto",
+        }
+      ),
       localisation: point(cities.bordeaux.lng, cities.bordeaux.lat),
       waypoints: rideWaypoints({
         departAddress: "Bordeaux - Quinconces",
@@ -922,7 +938,7 @@ async function resetAndSeed() {
         arriveeLat: 44.894,
       }),
     },
-  
+
     // LILLE (publique)
     {
       titre: "Lille → Belgique (frontière)",
@@ -935,9 +951,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "modere",
       organisateur: U.lille_car._id,
-      participants: participantsFromPseudos(["lille_car", "admin_ride"], "voiture", {
-        organizerPseudo: "lille_car",
-      }),
+      participants: participantsFromPseudos(
+        ["lille_car", "admin_ride"],
+        "voiture",
+        {
+          organizerPseudo: "lille_car",
+        }
+      ),
       localisation: point(cities.lille.lng, cities.lille.lat),
       waypoints: rideWaypoints({
         departAddress: "Lille - Grand Place",
@@ -949,7 +969,7 @@ async function resetAndSeed() {
         arriveeLat: 50.607,
       }),
     },
-  
+
     // TOULOUSE (privée)
     {
       titre: "Toulouse → Lac (Privé)",
@@ -970,13 +990,15 @@ async function resetAndSeed() {
         departAddress: "Toulouse - Capitole",
         departLng: 1.444,
         departLat: 43.6045,
-        checkpoints: [{ address: "Castelnaudary - pause", lng: 1.952, lat: 43.318 }],
+        checkpoints: [
+          { address: "Castelnaudary - pause", lng: 1.952, lat: 43.318 },
+        ],
         arriveeAddress: "Lac de Saint-Ferréol",
         arriveeLng: 2.01,
         arriveeLat: 43.454,
       }),
     },
-  
+
     // NICE (publique, sportif)
     {
       titre: "Nice → Col de Turini",
@@ -989,9 +1011,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "sportif",
       organisateur: U.nice_moto._id,
-      participants: participantsFromPseudos(["nice_moto", "marseille_mix"], "moto", {
-        organizerPseudo: "nice_moto",
-      }),
+      participants: participantsFromPseudos(
+        ["nice_moto", "marseille_mix"],
+        "moto",
+        {
+          organizerPseudo: "nice_moto",
+        }
+      ),
       localisation: point(cities.nice.lng, cities.nice.lat),
       waypoints: rideWaypoints({
         departAddress: "Nice - Promenade des Anglais",
@@ -1003,7 +1029,7 @@ async function resetAndSeed() {
         arriveeLat: 43.992,
       }),
     },
-  
+
     // NANTES (publique)
     {
       titre: "Nantes → Côte (Pornic)",
@@ -1016,9 +1042,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.admin_ride._id,
-      participants: participantsFromPseudos(["admin_ride", "bordeaux_moto"], "moto", {
-        organizerPseudo: "admin_ride",
-      }),
+      participants: participantsFromPseudos(
+        ["admin_ride", "bordeaux_moto"],
+        "moto",
+        {
+          organizerPseudo: "admin_ride",
+        }
+      ),
       localisation: point(cities.nantes.lng, cities.nantes.lat),
       waypoints: rideWaypoints({
         departAddress: "Nantes - Centre",
@@ -1030,7 +1060,7 @@ async function resetAndSeed() {
         arriveeLat: 47.115,
       }),
     },
-  
+
     // Une balade passée (pour tester historique)
     {
       titre: "Balade test passée (Lyon)",
@@ -1060,7 +1090,7 @@ async function resetAndSeed() {
         arriveeLat: 45.76,
       }),
     },
-  
+
     // ====== AJOUT : +15 balades ======
     // PARIS / IDF
     {
@@ -1099,9 +1129,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "mixte",
       organisateur: U.admin_ride._id,
-      participants: participantsFromPseudos(["admin_ride", "paris_car"], "moto", {
-        organizerPseudo: "admin_ride",
-      }),
+      participants: participantsFromPseudos(
+        ["admin_ride", "paris_car"],
+        "moto",
+        {
+          organizerPseudo: "admin_ride",
+        }
+      ),
       localisation: point(cities.paris.lng, cities.paris.lat),
       waypoints: rideWaypoints({
         departAddress: "Paris - Porte d'Italie",
@@ -1113,7 +1147,7 @@ async function resetAndSeed() {
         arriveeLat: 48.404,
       }),
     },
-  
+
     // LYON / AURA
     {
       titre: "Lyon → Pérouges",
@@ -1126,9 +1160,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.lyon_moto._id,
-      participants: participantsFromPseudos(["lyon_moto", "lille_car"], "moto", {
-        organizerPseudo: "lyon_moto",
-      }),
+      participants: participantsFromPseudos(
+        ["lyon_moto", "lille_car"],
+        "moto",
+        {
+          organizerPseudo: "lyon_moto",
+        }
+      ),
       localisation: point(cities.lyon.lng, cities.lyon.lat),
       waypoints: rideWaypoints({
         departAddress: "Lyon - Confluence",
@@ -1165,7 +1203,7 @@ async function resetAndSeed() {
         arriveeLat: 45.989,
       }),
     },
-  
+
     // MARSEILLE / PACA
     {
       titre: "PACA - Marseille → La Ciotat",
@@ -1178,9 +1216,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.marseille_mix._id,
-      participants: participantsFromPseudos(["marseille_mix", "nice_moto"], "moto", {
-        organizerPseudo: "marseille_mix",
-      }),
+      participants: participantsFromPseudos(
+        ["marseille_mix", "nice_moto"],
+        "moto",
+        {
+          organizerPseudo: "marseille_mix",
+        }
+      ),
       localisation: point(cities.marseille.lng, cities.marseille.lat),
       waypoints: rideWaypoints({
         departAddress: "Marseille - Prado",
@@ -1211,13 +1253,15 @@ async function resetAndSeed() {
         departAddress: "Cassis",
         departLng: 5.539,
         departLat: 43.214,
-        checkpoints: [{ address: "Belvédère Route des Crêtes", lng: 5.56, lat: 43.19 }],
+        checkpoints: [
+          { address: "Belvédère Route des Crêtes", lng: 5.56, lat: 43.19 },
+        ],
         arriveeAddress: "La Ciotat",
         arriveeLng: 5.604,
         arriveeLat: 43.175,
       }),
     },
-  
+
     // BORDEAUX / NOUVELLE-AQUITAINE
     {
       titre: "Bordeaux → Arcachon",
@@ -1255,9 +1299,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "mixte",
       organisateur: U.bordeaux_moto._id,
-      participants: participantsFromPseudos(["bordeaux_moto", "admin_ride"], "moto", {
-        organizerPseudo: "bordeaux_moto",
-      }),
+      participants: participantsFromPseudos(
+        ["bordeaux_moto", "admin_ride"],
+        "moto",
+        {
+          organizerPseudo: "bordeaux_moto",
+        }
+      ),
       localisation: point(cities.bordeaux.lng, cities.bordeaux.lat),
       waypoints: rideWaypoints({
         departAddress: "Bordeaux - Lac",
@@ -1269,7 +1317,7 @@ async function resetAndSeed() {
         arriveeLat: 45.201,
       }),
     },
-  
+
     // NICE / arrière-pays
     {
       titre: "Nice → Gorges du Loup",
@@ -1296,7 +1344,7 @@ async function resetAndSeed() {
         arriveeLat: 43.745,
       }),
     },
-  
+
     // TOULOUSE / OCCITANIE
     {
       titre: "Toulouse → Albi",
@@ -1309,9 +1357,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.toulouse_car._id,
-      participants: participantsFromPseudos(["toulouse_car", "bordeaux_moto"], "voiture", {
-        organizerPseudo: "toulouse_car",
-      }),
+      participants: participantsFromPseudos(
+        ["toulouse_car", "bordeaux_moto"],
+        "voiture",
+        {
+          organizerPseudo: "toulouse_car",
+        }
+      ),
       localisation: point(cities.toulouse.lng, cities.toulouse.lat),
       waypoints: rideWaypoints({
         departAddress: "Toulouse - Matabiau",
@@ -1323,7 +1375,7 @@ async function resetAndSeed() {
         arriveeLat: 43.929,
       }),
     },
-  
+
     // LILLE / HAUTS-DE-FRANCE (autres)
     {
       titre: "Lille → Côte d’Opale",
@@ -1350,7 +1402,7 @@ async function resetAndSeed() {
         arriveeLat: 50.725,
       }),
     },
-  
+
     // NANTES / PDL
     {
       titre: "Nantes → Angers",
@@ -1363,9 +1415,13 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.admin_ride._id,
-      participants: participantsFromPseudos(["admin_ride", "lille_car"], "moto", {
-        organizerPseudo: "admin_ride",
-      }),
+      participants: participantsFromPseudos(
+        ["admin_ride", "lille_car"],
+        "moto",
+        {
+          organizerPseudo: "admin_ride",
+        }
+      ),
       localisation: point(cities.nantes.lng, cities.nantes.lat),
       waypoints: rideWaypoints({
         departAddress: "Nantes - Beaulieu",
@@ -1377,7 +1433,7 @@ async function resetAndSeed() {
         arriveeLat: 47.478,
       }),
     },
-  
+
     // 2 balades "secretes" pour tester les liens
     {
       titre: "Secret - Spot IDF (lien)",
@@ -1432,7 +1488,6 @@ async function resetAndSeed() {
       }),
     },
   ];
-  
 
   const createdRides = await Ride.insertMany(
     ridesPayload.map((r) => {
