@@ -18,6 +18,8 @@ const MONGO_URI =
 
 // Mot de passe UNIQUE pour tous les comptes mock (simple pour tester)
 const PLAIN_PASSWORD = "RideTogether123!";
+let U = {}; // rempli après insertMany(User)
+let vehiclesByUser = {}; // rempli après insertMany(Vehicle)
 
 // Helpers
 function point(lng, lat) {
@@ -31,15 +33,68 @@ function addDays(base, days, hour, minute) {
   return d;
 }
 
-function participantsFromUserIds(userIds) {
-  return userIds.map((id) => ({
-    userId: id,
-    vehicleId: null,
-    arrivalTime: null,
-    isOnTime: null,
-    validatedBy: null,
-    validatedAt: null,
-  }));
+function addHours(base, hours) {
+  const d = new Date(base);
+  d.setHours(d.getHours() + hours);
+  return d;
+}
+
+function addMinutes(base, minutes) {
+  const d = new Date(base);
+  d.setMinutes(d.getMinutes() + minutes);
+  return d;
+}
+
+function pickRandom(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Retourne un vehicleId cohérent pour un pseudo et un type de balade.
+ * - typeVehicule attendu: "moto" | "voiture"
+ * - fallback: si pas trouvé, renvoie null
+ */
+function vehicleIdForUser(pseudo, typeVehicule) {
+  const bucket = vehiclesByUser[pseudo];
+  if (!bucket) return null;
+
+  if (typeVehicule === "moto") return pickRandom(bucket.moto)?._id || null;
+  if (typeVehicule === "voiture")
+    return pickRandom(bucket.voiture)?._id || null;
+
+  return null;
+}
+
+/**
+ * Participants réalistes basés sur les pseudos.
+ * Auto-assigne un véhicule compatible avec le typeVehicule de la balade.
+ */
+function participantsFromPseudos(pseudos, typeVehicule, options = {}) {
+  const { organizerPseudo = null } = options;
+
+  return pseudos
+    .map((p) => {
+      const user = U[p];
+      if (!user) {
+        // si un pseudo est invalide, on ne casse pas le seed
+        return null;
+      }
+
+      const vehicleId = vehicleIdForUser(p, typeVehicule);
+
+      return {
+        userId: user._id,
+        vehicleId,
+        arrivalTime: null,
+        isOnTime: null,
+        validatedBy: null,
+        validatedAt: null,
+        // Optionnel : tu peux rajouter un statut si ton schema le supporte
+        // status: p === organizerPseudo ? "accepted" : "invited",
+      };
+    })
+    .filter(Boolean);
 }
 
 function rideWaypoints({
@@ -191,7 +246,7 @@ async function resetAndSeed() {
     { ordered: true }
   );
 
-  const U = Object.fromEntries(createdUsers.map((u) => [u.pseudo, u]));
+  U = Object.fromEntries(createdUsers.map((u) => [u.pseudo, u]));
   console.log(`✅ ${createdUsers.length} utilisateurs créés`);
 
   // ---------- VEHICLES ----------
@@ -358,19 +413,135 @@ async function resetAndSeed() {
     });
   });
 
-  const createdVehicles = await Vehicle.insertMany(vehiclesPayload);
-  console.log(`✅ ${createdVehicles.length} véhicules créés`);
+  // Ajout d’un 3ème véhicule pour 4 utilisateurs (pour tester multi-vehicules)
+  const extraVehicles = [
+    {
+      pseudo: "admin_ride",
+      type: "moto",
+      make: "Ducati",
+      model: "Monster 821",
+      year: 2020,
+      fuel: "essence",
+      displacementCc: 821,
+      powerHp: 109,
+      transmission: "manuelle",
+    },
+    {
+      pseudo: "lyon_moto",
+      type: "moto",
+      make: "Triumph",
+      model: "Street Triple 765",
+      year: 2021,
+      fuel: "essence",
+      displacementCc: 765,
+      powerHp: 118,
+      transmission: "manuelle",
+    },
+    {
+      pseudo: "paris_car",
+      type: "voiture",
+      make: "BMW",
+      model: "Série 1",
+      year: 2018,
+      fuel: "diesel",
+      powerHp: 150,
+      transmission: "automatique",
+    },
+    {
+      pseudo: "marseille_mix",
+      type: "voiture",
+      make: "Audi",
+      model: "A3",
+      year: 2019,
+      fuel: "essence",
+      powerHp: 150,
+      transmission: "automatique",
+    },
+  ];
 
-  // Map rapide: { pseudo: { moto: vehicle, voiture: vehicle } }
-  const vehiclesByUser = {};
+  extraVehicles.forEach((ev, idx) => {
+    const user = createdUsers.find((u) => u.pseudo === ev.pseudo);
+    if (!user) return;
+
+    vehiclesPayload.push({
+      ownerUserId: user._id,
+      type: ev.type,
+      nickname: `${ev.make} ${ev.model} (2)`,
+      make: ev.make,
+      model: ev.model,
+      year: ev.year,
+      engine: {
+        fuel: ev.fuel,
+        displacementCc: ev.displacementCc ?? null,
+        powerHp: ev.powerHp ?? null,
+        transmission: ev.transmission ?? "manuelle",
+      },
+      odometerCurrentKm: randomKm(5000, 90000),
+      purchase: {
+        date: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+        price: 9000 + idx * 800,
+        sellerType: "particulier",
+      },
+      insurance: {
+        company: "Groupama",
+        policyNumber: `EXTRA-${300000 + idx}`,
+        renewalDate: new Date(new Date().setMonth(new Date().getMonth() + 5)),
+      },
+      photos: [
+        { url: photoUrl(`extra_${user.pseudo}_1`), order: 0 },
+        { url: photoUrl(`extra_${user.pseudo}_2`), order: 1 },
+        { url: photoUrl(`extra_${user.pseudo}_3`), order: 2 },
+      ],
+      active: true,
+    });
+  });
+
+  const createdVehicles = await Vehicle.insertMany(vehiclesPayload);
+  // Map robuste: { pseudo: { moto: [v1,v2], voiture: [v1,...] } }
+  vehiclesByUser = {};
+
   createdVehicles.forEach((v) => {
     const owner = createdUsers.find(
       (u) => u._id.toString() === v.ownerUserId.toString()
     );
     if (!owner) return;
-    vehiclesByUser[owner.pseudo] = vehiclesByUser[owner.pseudo] || {};
-    vehiclesByUser[owner.pseudo][v.type] = v;
+
+    vehiclesByUser[owner.pseudo] = vehiclesByUser[owner.pseudo] || {
+      moto: [],
+      voiture: [],
+    };
+
+    if (v.type === "moto") vehiclesByUser[owner.pseudo].moto.push(v);
+    if (v.type === "voiture") vehiclesByUser[owner.pseudo].voiture.push(v);
   });
+
+  // Bonus documents : 2 docs supplémentaires par véhicule (pour plus de variété)
+  const extraDocsPayload = createdVehicles.flatMap((v, idx) => [
+    {
+      vehicleId: v._id,
+      ownerUserId: v.ownerUserId,
+      type: "FACTURE",
+      label: "Facture pneus (mock)",
+      fileUrl: fileUrl(`facture_pneus_${v._id}`),
+      date: new Date(new Date().setMonth(new Date().getMonth() - 4)),
+      notes: "Facture mock",
+    },
+    {
+      vehicleId: v._id,
+      ownerUserId: v.ownerUserId,
+      type: "AUTRE",
+      label: "Scan document (mock)",
+      fileUrl: fileUrl(`scan_${v._id}`),
+      date: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+      notes: "Scan mock",
+    },
+  ]);
+
+  await VehicleDocument.insertMany(extraDocsPayload);
+  console.log(`✅ ${extraDocsPayload.length} documents bonus créés`);
+
+  console.log(`✅ ${createdVehicles.length} véhicules créés`);
+
 
   // ---------- VEHICLE DOCUMENTS ----------
   console.log(
@@ -379,8 +550,9 @@ async function resetAndSeed() {
 
   const documentsPayload = [];
   createdUsers.forEach((user, idx) => {
-    const motoV = vehiclesByUser[user.pseudo]?.moto;
-    const carV = vehiclesByUser[user.pseudo]?.voiture;
+    const motoV = vehiclesByUser[user.pseudo]?.moto?.[0] || null;
+    const carV = vehiclesByUser[user.pseudo]?.voiture?.[0] || null;
+    
 
     // Moto: assurance + carte grise (AUTRE) + facture
     if (motoV) {
@@ -413,6 +585,12 @@ async function resetAndSeed() {
           notes: "Facture mock",
         }
       );
+
+      // Bonus docs : 1 facture + 1 autre doc si l'utilisateur a un 3ème véhicule
+      const extraMoto =
+        vehiclesByUser[user.pseudo]?.moto &&
+        vehiclesByUser[user.pseudo]?.moto._id;
+      // NOTE: vehiclesByUser ne stocke qu’un seul véhicule par type. Si tu veux viser le 3ème, le plus simple est de générer bonus docs "par véhicule" après insertMany.
     }
 
     // Voiture: assurance + carte grise (AUTRE) + CT
@@ -471,6 +649,7 @@ async function resetAndSeed() {
     const baseKm = v.odometerCurrentKm || 0;
 
     // 2 logs passés
+    // 4 logs passés
     maintenanceLogsPayload.push(
       {
         vehicleId: v._id,
@@ -493,6 +672,28 @@ async function resetAndSeed() {
         garageName: "Garage Mock Center",
         invoiceFileUrl: null,
         notes: "Contrôle mock",
+      },
+      {
+        vehicleId: v._id,
+        category: "pneus",
+        label: "Permutation / contrôle pneus",
+        date: new Date(new Date().setMonth(new Date().getMonth() - 5)),
+        kmAtService: Math.max(0, baseKm - 6000),
+        cost: 60 + (idx % 4) * 15,
+        garageName: "Pneus Express",
+        invoiceFileUrl: fileUrl(`invoice_pneus_${v._id}`),
+        notes: "Service mock",
+      },
+      {
+        vehicleId: v._id,
+        category: "revision",
+        label: "Révision",
+        date: new Date(new Date().setMonth(new Date().getMonth() - 11)),
+        kmAtService: Math.max(0, baseKm - 14000),
+        cost: 250 + (idx % 5) * 30,
+        garageName: "Garage Mock Center",
+        invoiceFileUrl: fileUrl(`invoice_revision_${v._id}`),
+        notes: "Révision mock",
       }
     );
 
@@ -548,6 +749,41 @@ async function resetAndSeed() {
         active: true,
       }
     );
+
+    maintenanceItemsPayload.push(
+      {
+        vehicleId: v._id,
+        category: "freins",
+        label: "Contrôle plaquettes",
+        intervalKm: 12000,
+        intervalMonths: 18,
+        lastDoneAtKm: Math.max(0, baseKm - 9000),
+        lastDoneAtDate: new Date(
+          new Date().setMonth(new Date().getMonth() - 8)
+        ),
+        dueAtKm: baseKm + 6000,
+        dueAtDate: new Date(new Date().setMonth(new Date().getMonth() + 10)),
+        status: "UPCOMING",
+        notes: "Planifié (mock)",
+        active: true,
+      },
+      {
+        vehicleId: v._id,
+        category: "CT",
+        label: "Contrôle technique (voitures)",
+        intervalKm: null,
+        intervalMonths: 24,
+        lastDoneAtKm: null,
+        lastDoneAtDate: new Date(
+          new Date().setMonth(new Date().getMonth() - 14)
+        ),
+        dueAtKm: null,
+        dueAtDate: new Date(new Date().setMonth(new Date().getMonth() + 10)),
+        status: v.type === "voiture" ? "UPCOMING" : "SKIPPED",
+        notes: "Applicable voitures seulement (mock)",
+        active: v.type === "voiture",
+      }
+    );
   });
 
   await MaintenanceLog.insertMany(maintenanceLogsPayload);
@@ -588,7 +824,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.paris_car._id,
-      participants: participantsFromUserIds([U.paris_car._id, U.lyon_moto._id]),
+      participants: participantsFromPseudos(["paris_car", "lyon_moto"], "moto", {
+        organizerPseudo: "paris_car",
+      }),
       localisation: point(cities.paris.lng, cities.paris.lat),
       waypoints: rideWaypoints({
         departAddress: "Paris - Bastille",
@@ -603,7 +841,7 @@ async function resetAndSeed() {
         arriveeLat: 48.706,
       }),
     },
-
+  
     // LYON (publique, sans checkpoints)
     {
       titre: "Lyon → Monts du Lyonnais",
@@ -616,10 +854,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "modere",
       organisateur: U.lyon_moto._id,
-      participants: participantsFromUserIds([
-        U.lyon_moto._id,
-        U.admin_ride._id,
-      ]),
+      participants: participantsFromPseudos(["lyon_moto", "admin_ride"], "moto", {
+        organizerPseudo: "lyon_moto",
+      }),
       localisation: point(cities.lyon.lng, cities.lyon.lat),
       waypoints: rideWaypoints({
         departAddress: "Lyon - Bellecour",
@@ -631,7 +868,7 @@ async function resetAndSeed() {
         arriveeLat: 45.72,
       }),
     },
-
+  
     // MARSEILLE (privée, checkpoints)
     {
       titre: "Marseille → Calanques (Privé)",
@@ -644,21 +881,21 @@ async function resetAndSeed() {
       visibilite: "privee",
       ridingStyle: "calme",
       organisateur: U.marseille_mix._id,
-      participants: participantsFromUserIds([U.marseille_mix._id]),
+      participants: participantsFromPseudos(["marseille_mix"], "voiture", {
+        organizerPseudo: "marseille_mix",
+      }),
       localisation: point(cities.marseille.lng, cities.marseille.lat),
       waypoints: rideWaypoints({
         departAddress: "Marseille - Vieux Port",
         departLng: 5.3764,
         departLat: 43.2964,
-        checkpoints: [
-          { address: "Goudes - belvédère", lng: 5.344, lat: 43.212 },
-        ],
+        checkpoints: [{ address: "Goudes - belvédère", lng: 5.344, lat: 43.212 }],
         arriveeAddress: "Cassis - Port",
         arriveeLng: 5.538,
         arriveeLat: 43.214,
       }),
     },
-
+  
     // BORDEAUX (publique, checkpoints)
     {
       titre: "Bordeaux → Route des vins",
@@ -671,10 +908,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.bordeaux_moto._id,
-      participants: participantsFromUserIds([
-        U.bordeaux_moto._id,
-        U.paris_car._id,
-      ]),
+      participants: participantsFromPseudos(["bordeaux_moto", "paris_car"], "moto", {
+        organizerPseudo: "bordeaux_moto",
+      }),
       localisation: point(cities.bordeaux.lng, cities.bordeaux.lat),
       waypoints: rideWaypoints({
         departAddress: "Bordeaux - Quinconces",
@@ -686,7 +922,7 @@ async function resetAndSeed() {
         arriveeLat: 44.894,
       }),
     },
-
+  
     // LILLE (publique)
     {
       titre: "Lille → Belgique (frontière)",
@@ -699,10 +935,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "modere",
       organisateur: U.lille_car._id,
-      participants: participantsFromUserIds([
-        U.lille_car._id,
-        U.admin_ride._id,
-      ]),
+      participants: participantsFromPseudos(["lille_car", "admin_ride"], "voiture", {
+        organizerPseudo: "lille_car",
+      }),
       localisation: point(cities.lille.lng, cities.lille.lat),
       waypoints: rideWaypoints({
         departAddress: "Lille - Grand Place",
@@ -714,7 +949,7 @@ async function resetAndSeed() {
         arriveeLat: 50.607,
       }),
     },
-
+  
     // TOULOUSE (privée)
     {
       titre: "Toulouse → Lac (Privé)",
@@ -727,21 +962,21 @@ async function resetAndSeed() {
       visibilite: "privee",
       ridingStyle: "calme",
       organisateur: U.toulouse_car._id,
-      participants: participantsFromUserIds([U.toulouse_car._id]),
+      participants: participantsFromPseudos(["toulouse_car"], "voiture", {
+        organizerPseudo: "toulouse_car",
+      }),
       localisation: point(cities.toulouse.lng, cities.toulouse.lat),
       waypoints: rideWaypoints({
         departAddress: "Toulouse - Capitole",
         departLng: 1.444,
         departLat: 43.6045,
-        checkpoints: [
-          { address: "Castelnaudary - pause", lng: 1.952, lat: 43.318 },
-        ],
+        checkpoints: [{ address: "Castelnaudary - pause", lng: 1.952, lat: 43.318 }],
         arriveeAddress: "Lac de Saint-Ferréol",
         arriveeLng: 2.01,
         arriveeLat: 43.454,
       }),
     },
-
+  
     // NICE (publique, sportif)
     {
       titre: "Nice → Col de Turini",
@@ -754,10 +989,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "sportif",
       organisateur: U.nice_moto._id,
-      participants: participantsFromUserIds([
-        U.nice_moto._id,
-        U.marseille_mix._id,
-      ]),
+      participants: participantsFromPseudos(["nice_moto", "marseille_mix"], "moto", {
+        organizerPseudo: "nice_moto",
+      }),
       localisation: point(cities.nice.lng, cities.nice.lat),
       waypoints: rideWaypoints({
         departAddress: "Nice - Promenade des Anglais",
@@ -769,7 +1003,7 @@ async function resetAndSeed() {
         arriveeLat: 43.992,
       }),
     },
-
+  
     // NANTES (publique)
     {
       titre: "Nantes → Côte (Pornic)",
@@ -782,10 +1016,9 @@ async function resetAndSeed() {
       visibilite: "publique",
       ridingStyle: "calme",
       organisateur: U.admin_ride._id,
-      participants: participantsFromUserIds([
-        U.admin_ride._id,
-        U.bordeaux_moto._id,
-      ]),
+      participants: participantsFromPseudos(["admin_ride", "bordeaux_moto"], "moto", {
+        organizerPseudo: "admin_ride",
+      }),
       localisation: point(cities.nantes.lng, cities.nantes.lat),
       waypoints: rideWaypoints({
         departAddress: "Nantes - Centre",
@@ -797,7 +1030,7 @@ async function resetAndSeed() {
         arriveeLat: 47.115,
       }),
     },
-
+  
     // Une balade passée (pour tester historique)
     {
       titre: "Balade test passée (Lyon)",
@@ -811,11 +1044,11 @@ async function resetAndSeed() {
       ridingStyle: "mixte",
       status: "completed",
       organisateur: U.lyon_moto._id,
-      participants: participantsFromUserIds([
-        U.lyon_moto._id,
-        U.paris_car._id,
-        U.admin_ride._id,
-      ]),
+      participants: participantsFromPseudos(
+        ["lyon_moto", "paris_car", "admin_ride"],
+        "moto",
+        { organizerPseudo: "lyon_moto" }
+      ),
       localisation: point(cities.lyon.lng, cities.lyon.lat),
       waypoints: rideWaypoints({
         departAddress: "Lyon - Part-Dieu",
@@ -827,7 +1060,379 @@ async function resetAndSeed() {
         arriveeLat: 45.76,
       }),
     },
+  
+    // ====== AJOUT : +15 balades ======
+    // PARIS / IDF
+    {
+      titre: "IDF - Paris → Chantilly",
+      description: "Sortie matinale, route rapide et propre.",
+      typeVehicule: "voiture",
+      date: addDays(now, 2, 9, 15),
+      heure: "09:15",
+      lieuDepart: "Paris - Porte de la Chapelle",
+      lieuArrivee: "Chantilly",
+      visibilite: "publique",
+      ridingStyle: "modere",
+      organisateur: U.paris_car._id,
+      participants: participantsFromPseudos(["paris_car"], "voiture", {
+        organizerPseudo: "paris_car",
+      }),
+      localisation: point(cities.paris.lng, cities.paris.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Paris - Porte de la Chapelle",
+        departLng: 2.359,
+        departLat: 48.899,
+        checkpoints: [{ address: "St-Denis - pause", lng: 2.357, lat: 48.936 }],
+        arriveeAddress: "Chantilly",
+        arriveeLng: 2.472,
+        arriveeLat: 49.193,
+      }),
+    },
+    {
+      titre: "IDF - Boucle Fontainebleau",
+      description: "Routes forêt, photos au spot.",
+      typeVehicule: "moto",
+      date: addDays(now, 4, 9, 45),
+      heure: "09:45",
+      lieuDepart: "Paris - Porte d'Italie",
+      lieuArrivee: "Fontainebleau",
+      visibilite: "publique",
+      ridingStyle: "mixte",
+      organisateur: U.admin_ride._id,
+      participants: participantsFromPseudos(["admin_ride", "paris_car"], "moto", {
+        organizerPseudo: "admin_ride",
+      }),
+      localisation: point(cities.paris.lng, cities.paris.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Paris - Porte d'Italie",
+        departLng: 2.362,
+        departLat: 48.817,
+        checkpoints: [{ address: "Melun - pause", lng: 2.653, lat: 48.54 }],
+        arriveeAddress: "Fontainebleau",
+        arriveeLng: 2.701,
+        arriveeLat: 48.404,
+      }),
+    },
+  
+    // LYON / AURA
+    {
+      titre: "Lyon → Pérouges",
+      description: "Balade courte + arrêt dans la cité médiévale.",
+      typeVehicule: "moto",
+      date: addDays(now, 3, 10, 30),
+      heure: "10:30",
+      lieuDepart: "Lyon - Confluence",
+      lieuArrivee: "Pérouges",
+      visibilite: "publique",
+      ridingStyle: "calme",
+      organisateur: U.lyon_moto._id,
+      participants: participantsFromPseudos(["lyon_moto", "lille_car"], "moto", {
+        organizerPseudo: "lyon_moto",
+      }),
+      localisation: point(cities.lyon.lng, cities.lyon.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Lyon - Confluence",
+        departLng: 4.819,
+        departLat: 45.74,
+        checkpoints: [],
+        arriveeAddress: "Pérouges",
+        arriveeLng: 5.178,
+        arriveeLat: 45.904,
+      }),
+    },
+    {
+      titre: "AURA - Lyon → Beaujolais (Privé)",
+      description: "Balade privée, groupe restreint.",
+      typeVehicule: "voiture",
+      date: addDays(now, 6, 13, 0),
+      heure: "13:00",
+      lieuDepart: "Lyon - Part-Dieu",
+      lieuArrivee: "Villefranche-sur-Saône",
+      visibilite: "privee",
+      ridingStyle: "modere",
+      organisateur: U.admin_ride._id,
+      participants: participantsFromPseudos(["admin_ride"], "voiture", {
+        organizerPseudo: "admin_ride",
+      }),
+      localisation: point(cities.lyon.lng, cities.lyon.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Lyon - Part-Dieu",
+        departLng: 4.86,
+        departLat: 45.76,
+        checkpoints: [{ address: "Limonest - pause", lng: 4.772, lat: 45.834 }],
+        arriveeAddress: "Villefranche-sur-Saône",
+        arriveeLng: 4.719,
+        arriveeLat: 45.989,
+      }),
+    },
+  
+    // MARSEILLE / PACA
+    {
+      titre: "PACA - Marseille → La Ciotat",
+      description: "Côte + panorama, rythme cool.",
+      typeVehicule: "moto",
+      date: addDays(now, 5, 9, 0),
+      heure: "09:00",
+      lieuDepart: "Marseille - Prado",
+      lieuArrivee: "La Ciotat",
+      visibilite: "publique",
+      ridingStyle: "calme",
+      organisateur: U.marseille_mix._id,
+      participants: participantsFromPseudos(["marseille_mix", "nice_moto"], "moto", {
+        organizerPseudo: "marseille_mix",
+      }),
+      localisation: point(cities.marseille.lng, cities.marseille.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Marseille - Prado",
+        departLng: 5.372,
+        departLat: 43.261,
+        checkpoints: [{ address: "Cassis - photo", lng: 5.539, lat: 43.214 }],
+        arriveeAddress: "La Ciotat",
+        arriveeLng: 5.604,
+        arriveeLat: 43.175,
+      }),
+    },
+    {
+      titre: "PACA - Route des Crêtes (Privé)",
+      description: "Privé: invitation requise.",
+      typeVehicule: "voiture",
+      date: addDays(now, 7, 7, 45),
+      heure: "07:45",
+      lieuDepart: "Cassis",
+      lieuArrivee: "La Ciotat",
+      visibilite: "privee",
+      ridingStyle: "sportif",
+      organisateur: U.marseille_mix._id,
+      participants: participantsFromPseudos(["marseille_mix"], "voiture", {
+        organizerPseudo: "marseille_mix",
+      }),
+      localisation: point(cities.marseille.lng, cities.marseille.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Cassis",
+        departLng: 5.539,
+        departLat: 43.214,
+        checkpoints: [{ address: "Belvédère Route des Crêtes", lng: 5.56, lat: 43.19 }],
+        arriveeAddress: "La Ciotat",
+        arriveeLng: 5.604,
+        arriveeLat: 43.175,
+      }),
+    },
+  
+    // BORDEAUX / NOUVELLE-AQUITAINE
+    {
+      titre: "Bordeaux → Arcachon",
+      description: "Sortie mer, pause au port.",
+      typeVehicule: "voiture",
+      date: addDays(now, 3, 8, 30),
+      heure: "08:30",
+      lieuDepart: "Bordeaux - Gare",
+      lieuArrivee: "Arcachon",
+      visibilite: "publique",
+      ridingStyle: "calme",
+      organisateur: U.bordeaux_moto._id,
+      participants: participantsFromPseudos(["bordeaux_moto"], "voiture", {
+        organizerPseudo: "bordeaux_moto",
+      }),
+      localisation: point(cities.bordeaux.lng, cities.bordeaux.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Bordeaux - Gare",
+        departLng: -0.556,
+        departLat: 44.826,
+        checkpoints: [{ address: "Biganos - pause", lng: -0.979, lat: 44.642 }],
+        arriveeAddress: "Arcachon",
+        arriveeLng: -1.172,
+        arriveeLat: 44.661,
+      }),
+    },
+    {
+      titre: "Bordeaux - Boucle Médoc",
+      description: "Châteaux + routes longues.",
+      typeVehicule: "moto",
+      date: addDays(now, 9, 9, 0),
+      heure: "09:00",
+      lieuDepart: "Bordeaux - Lac",
+      lieuArrivee: "Pauillac",
+      visibilite: "publique",
+      ridingStyle: "mixte",
+      organisateur: U.bordeaux_moto._id,
+      participants: participantsFromPseudos(["bordeaux_moto", "admin_ride"], "moto", {
+        organizerPseudo: "bordeaux_moto",
+      }),
+      localisation: point(cities.bordeaux.lng, cities.bordeaux.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Bordeaux - Lac",
+        departLng: -0.58,
+        departLat: 44.89,
+        checkpoints: [{ address: "Blanquefort", lng: -0.637, lat: 44.91 }],
+        arriveeAddress: "Pauillac",
+        arriveeLng: -0.748,
+        arriveeLat: 45.201,
+      }),
+    },
+  
+    // NICE / arrière-pays
+    {
+      titre: "Nice → Gorges du Loup",
+      description: "Routes sinueuses, photo spot.",
+      typeVehicule: "moto",
+      date: addDays(now, 10, 9, 0),
+      heure: "09:00",
+      lieuDepart: "Nice - Centre",
+      lieuArrivee: "Pont du Loup",
+      visibilite: "publique",
+      ridingStyle: "modere",
+      organisateur: U.nice_moto._id,
+      participants: participantsFromPseudos(["nice_moto"], "moto", {
+        organizerPseudo: "nice_moto",
+      }),
+      localisation: point(cities.nice.lng, cities.nice.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Nice - Centre",
+        departLng: 7.262,
+        departLat: 43.71,
+        checkpoints: [{ address: "Vence - pause", lng: 7.111, lat: 43.722 }],
+        arriveeAddress: "Pont du Loup",
+        arriveeLng: 7.0,
+        arriveeLat: 43.745,
+      }),
+    },
+  
+    // TOULOUSE / OCCITANIE
+    {
+      titre: "Toulouse → Albi",
+      description: "Sortie journée, patrimoine et routes.",
+      typeVehicule: "voiture",
+      date: addDays(now, 11, 10, 0),
+      heure: "10:00",
+      lieuDepart: "Toulouse - Matabiau",
+      lieuArrivee: "Albi",
+      visibilite: "publique",
+      ridingStyle: "calme",
+      organisateur: U.toulouse_car._id,
+      participants: participantsFromPseudos(["toulouse_car", "bordeaux_moto"], "voiture", {
+        organizerPseudo: "toulouse_car",
+      }),
+      localisation: point(cities.toulouse.lng, cities.toulouse.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Toulouse - Matabiau",
+        departLng: 1.454,
+        departLat: 43.611,
+        checkpoints: [{ address: "Gaillac - pause", lng: 1.898, lat: 43.901 }],
+        arriveeAddress: "Albi",
+        arriveeLng: 2.148,
+        arriveeLat: 43.929,
+      }),
+    },
+  
+    // LILLE / HAUTS-DE-FRANCE (autres)
+    {
+      titre: "Lille → Côte d’Opale",
+      description: "Longue route, arrivée mer.",
+      typeVehicule: "voiture",
+      date: addDays(now, 12, 8, 0),
+      heure: "08:00",
+      lieuDepart: "Lille - Euratechnologies",
+      lieuArrivee: "Boulogne-sur-Mer",
+      visibilite: "publique",
+      ridingStyle: "modere",
+      organisateur: U.lille_car._id,
+      participants: participantsFromPseudos(["lille_car"], "voiture", {
+        organizerPseudo: "lille_car",
+      }),
+      localisation: point(cities.lille.lng, cities.lille.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Lille - Euratechnologies",
+        departLng: 3.035,
+        departLat: 50.634,
+        checkpoints: [{ address: "Arras - pause", lng: 2.778, lat: 50.291 }],
+        arriveeAddress: "Boulogne-sur-Mer",
+        arriveeLng: 1.614,
+        arriveeLat: 50.725,
+      }),
+    },
+  
+    // NANTES / PDL
+    {
+      titre: "Nantes → Angers",
+      description: "Sortie facile, rythme cool.",
+      typeVehicule: "moto",
+      date: addDays(now, 13, 9, 30),
+      heure: "09:30",
+      lieuDepart: "Nantes - Beaulieu",
+      lieuArrivee: "Angers",
+      visibilite: "publique",
+      ridingStyle: "calme",
+      organisateur: U.admin_ride._id,
+      participants: participantsFromPseudos(["admin_ride", "lille_car"], "moto", {
+        organizerPseudo: "admin_ride",
+      }),
+      localisation: point(cities.nantes.lng, cities.nantes.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Nantes - Beaulieu",
+        departLng: -1.529,
+        departLat: 47.206,
+        checkpoints: [{ address: "Ancenis - pause", lng: -1.173, lat: 47.366 }],
+        arriveeAddress: "Angers",
+        arriveeLng: -0.553,
+        arriveeLat: 47.478,
+      }),
+    },
+  
+    // 2 balades "secretes" pour tester les liens
+    {
+      titre: "Secret - Spot IDF (lien)",
+      description: "Balade secrète via lien.",
+      typeVehicule: "moto",
+      date: addDays(now, 6, 23, 0),
+      heure: "23:00",
+      lieuDepart: "Paris (spot secret)",
+      lieuArrivee: "IDF (spot secret)",
+      visibilite: "secrete",
+      ridingStyle: "mixte",
+      organisateur: U.admin_ride._id,
+      participants: participantsFromPseudos(["admin_ride"], "moto", {
+        organizerPseudo: "admin_ride",
+      }),
+      secretLink: `secret-${Date.now()}-idf`,
+      localisation: point(cities.paris.lng, cities.paris.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Paris (spot secret)",
+        departLng: 2.3522,
+        departLat: 48.8566,
+        checkpoints: [],
+        arriveeAddress: "IDF (spot secret)",
+        arriveeLng: 2.5,
+        arriveeLat: 48.9,
+      }),
+    },
+    {
+      titre: "Secret - Turini Night (lien)",
+      description: "Balade secrète via lien.",
+      typeVehicule: "moto",
+      date: addDays(now, 9, 22, 15),
+      heure: "22:15",
+      lieuDepart: "Nice (spot secret)",
+      lieuArrivee: "Col de Turini (spot secret)",
+      visibilite: "secrete",
+      ridingStyle: "sportif",
+      organisateur: U.nice_moto._id,
+      participants: participantsFromPseudos(["nice_moto"], "moto", {
+        organizerPseudo: "nice_moto",
+      }),
+      secretLink: `secret-${Date.now()}-turini`,
+      localisation: point(cities.nice.lng, cities.nice.lat),
+      waypoints: rideWaypoints({
+        departAddress: "Nice (spot secret)",
+        departLng: 7.262,
+        departLat: 43.71,
+        checkpoints: [{ address: "Sospel (spot)", lng: 7.449, lat: 43.878 }],
+        arriveeAddress: "Col de Turini (spot secret)",
+        arriveeLng: 7.395,
+        arriveeLat: 43.992,
+      }),
+    },
   ];
+  
 
   const createdRides = await Ride.insertMany(
     ridesPayload.map((r) => {
@@ -837,21 +1442,20 @@ async function resetAndSeed() {
         notes: [],
         noteMoyenne: 0,
       };
-  
+
       // IMPORTANT: ne jamais insérer secretLink: null
       if (doc.secretLink == null) {
         delete doc.secretLink;
       }
-  
+
       // Optionnel: si visibilite n'est pas 'secrete', on supprime aussi
       if (doc.visibilite !== "secrete") {
         delete doc.secretLink;
       }
-  
+
       return doc;
     })
   );
-  
 
   console.log(`✅ ${createdRides.length} balades créées`);
 
@@ -909,6 +1513,50 @@ async function resetAndSeed() {
         { userId: U.paris_car._id, role: "membre" },
       ],
     },
+    {
+      nom: "Paris & IDF Riders",
+      description: "Balades autour de Paris / IDF.",
+      visibilite: "publique",
+      createur: U.paris_car._id,
+      membres: [
+        { userId: U.paris_car._id, role: "admin" },
+        { userId: U.admin_ride._id, role: "membre" },
+        { userId: U.lyon_moto._id, role: "membre" },
+      ],
+    },
+    {
+      nom: "PACA Riders",
+      description: "Marseille / Nice / cols / calanques.",
+      visibilite: "publique",
+      createur: U.marseille_mix._id,
+      membres: [
+        { userId: U.marseille_mix._id, role: "admin" },
+        { userId: U.nice_moto._id, role: "membre" },
+      ],
+    },
+    {
+      nom: "Moto Only",
+      description: "Discussions 100% moto, équipement, routes, conseils.",
+      visibilite: "publique",
+      createur: U.lyon_moto._id,
+      membres: [
+        { userId: U.lyon_moto._id, role: "admin" },
+        { userId: U.bordeaux_moto._id, role: "membre" },
+        { userId: U.nice_moto._id, role: "membre" },
+        { userId: U.admin_ride._id, role: "membre" },
+      ],
+    },
+    {
+      nom: "Privé - Spots & Secrets",
+      description: "Groupe privé, partage de spots (lien secret).",
+      visibilite: "privee",
+      createur: U.admin_ride._id,
+      membres: [
+        { userId: U.admin_ride._id, role: "admin" },
+        { userId: U.nice_moto._id, role: "membre" },
+        { userId: U.marseille_mix._id, role: "membre" },
+      ],
+    },
   ];
 
   const createdGroups = await Group.insertMany(groupsPayload);
@@ -918,72 +1566,188 @@ async function resetAndSeed() {
   console.log("\n✉️  Création de messages mock...");
   const groupByName = Object.fromEntries(createdGroups.map((g) => [g.nom, g]));
 
+  // Base: il y a 2 jours à 18:00 (heure locale serveur)
+  const baseMsgTime = addDays(new Date(), -2, 18, 0);
+
+  // Helper interne pour éviter de répéter addMinutes(baseMsgTime, x)
+  const t = (mins) => addMinutes(baseMsgTime, mins);
+
   const messagesPayload = [
-    // Accueil
+    // ===== RideTogether - Accueil =====
     {
       idGroupe: groupByName["RideTogether - Accueil"]._id,
       auteur: U.admin_ride._id,
       contenu:
         "Bienvenue sur RideTogether. Présentez-vous (moto/voiture + région) !",
-    },
-    {
-      idGroupe: groupByName["RideTogether - Accueil"]._id,
-      auteur: U.lyon_moto._id,
-      contenu: "Salut, Lyonnais ici, plutôt moto et sorties week-end.",
+      date: t(0),
     },
     {
       idGroupe: groupByName["RideTogether - Accueil"]._id,
       auteur: U.paris_car._id,
       contenu:
         "Hello, Paris côté voiture, je teste les balades autour de l’IDF.",
+      date: t(6),
+    },
+    {
+      idGroupe: groupByName["RideTogether - Accueil"]._id,
+      auteur: U.lyon_moto._id,
+      contenu: "Salut, Lyonnais ici, plutôt moto et sorties week-end.",
+      date: t(14),
+    },
+    {
+      idGroupe: groupByName["RideTogether - Accueil"]._id,
+      auteur: U.marseille_mix._id,
+      contenu: "Marseille ici. Je roule moto/voiture selon les sorties.",
+      date: t(22),
+    },
+    {
+      idGroupe: groupByName["RideTogether - Accueil"]._id,
+      auteur: U.admin_ride._id,
+      contenu:
+        "Pensez à renseigner vos véhicules dans le profil, ça aide pour filtrer les balades.",
+      date: t(35),
     },
 
-    // Lyon Riders
+    // ===== Lyon Riders ===== (un peu plus tard le même soir)
     {
       idGroupe: groupByName["Lyon Riders"]._id,
       auteur: U.lyon_moto._id,
       contenu: "Qui est chaud pour une boucle Monts du Lyonnais samedi ?",
+      date: t(90),
     },
     {
       idGroupe: groupByName["Lyon Riders"]._id,
       auteur: U.admin_ride._id,
-      contenu: "Partant, je peux créer la balade et mettre 2-3 checkpoints.",
+      contenu: "Partant. Je peux créer la balade et mettre 2-3 checkpoints.",
+      date: t(98),
+    },
+    {
+      idGroupe: groupByName["Lyon Riders"]._id,
+      auteur: U.lyon_moto._id,
+      contenu: "Top. Je propose départ Bellecour, arrivée Yzeron.",
+      date: t(110),
     },
 
-    // Privé Sud
+    // ===== Privé - Sorties Sud ===== (le lendemain)
     {
       idGroupe: groupByName["Privé - Sorties Sud"]._id,
       auteur: U.marseille_mix._id,
       contenu: "Groupe privé : ici on prépare les sorties Calanques / cols.",
+      date: t(60 * 12), // +12h
     },
     {
       idGroupe: groupByName["Privé - Sorties Sud"]._id,
       auteur: U.nice_moto._id,
       contenu: "Turini bientôt si la météo tient.",
+      date: t(60 * 12 + 18),
+    },
+    {
+      idGroupe: groupByName["Privé - Sorties Sud"]._id,
+      auteur: U.marseille_mix._id,
+      contenu: "OK. On garde la sortie en privé, invitation seulement.",
+      date: t(60 * 12 + 27),
     },
 
-    // Ouest
+    // ===== Roadtrip Ouest ===== (même jour, un peu après)
     {
       idGroupe: groupByName["Roadtrip Ouest"]._id,
       auteur: U.bordeaux_moto._id,
       contenu: "Route des vins : départ 10h, checkpoint à Pessac.",
+      date: t(60 * 14), // +14h
     },
     {
       idGroupe: groupByName["Roadtrip Ouest"]._id,
       auteur: U.admin_ride._id,
-      contenu: "On peut aussi pousser jusqu’à l’océan une autre fois.",
+      contenu: "Nickel. On peut aussi pousser jusqu’à l’océan une autre fois.",
+      date: t(60 * 14 + 12),
+    },
+    {
+      idGroupe: groupByName["Roadtrip Ouest"]._id,
+      auteur: U.bordeaux_moto._id,
+      contenu: "Yes, on fera un Arcachon la prochaine.",
+      date: t(60 * 14 + 22),
     },
 
-    // Staff
+    // ===== Privé - Organisation (staff) ===== (le surlendemain)
     {
       idGroupe: groupByName["Privé - Organisation (staff)"]._id,
       auteur: U.admin_ride._id,
       contenu: "TODO: vérifier la recherche par rayon + invitations balades.",
+      date: t(60 * 36), // +36h
     },
     {
       idGroupe: groupByName["Privé - Organisation (staff)"]._id,
       auteur: U.paris_car._id,
       contenu: "OK, je teste ce soir avec Paris/Lyon/Marseille.",
+      date: t(60 * 36 + 9),
+    },
+    {
+      idGroupe: groupByName["Privé - Organisation (staff)"]._id,
+      auteur: U.admin_ride._id,
+      contenu: "Pensez aussi à tester les balades secrètes via lien.",
+      date: t(60 * 36 + 18),
+    },
+
+    // ===== Paris & IDF Riders =====
+    {
+      idGroupe: groupByName["Paris & IDF Riders"]._id,
+      auteur: U.paris_car._id,
+      contenu: "IDF: qui veut une sortie vers Fontainebleau ce week-end ?",
+      date: t(60 * 5), // +5h
+    },
+    {
+      idGroupe: groupByName["Paris & IDF Riders"]._id,
+      auteur: U.admin_ride._id,
+      contenu: "Partant. On met un checkpoint à Melun pour regrouper.",
+      date: t(60 * 5 + 11),
+    },
+
+    // ===== PACA Riders =====
+    {
+      idGroupe: groupByName["PACA Riders"]._id,
+      auteur: U.marseille_mix._id,
+      contenu: "PACA: on vise La Ciotat dimanche matin, rythme cool.",
+      date: t(60 * 20), // +20h
+    },
+    {
+      idGroupe: groupByName["PACA Riders"]._id,
+      auteur: U.nice_moto._id,
+      contenu: "Je peux rejoindre si départ pas trop tôt.",
+      date: t(60 * 20 + 16),
+    },
+
+    // ===== Moto Only =====
+    {
+      idGroupe: groupByName["Moto Only"]._id,
+      auteur: U.lyon_moto._id,
+      contenu: "Moto only: vos meilleurs spots routes autour de Lyon ?",
+      date: t(60 * 10), // +10h
+    },
+    {
+      idGroupe: groupByName["Moto Only"]._id,
+      auteur: U.nice_moto._id,
+      contenu: "PACA: arrière-pays niçois, gorges et cols tôt le matin.",
+      date: t(60 * 10 + 9),
+    },
+    {
+      idGroupe: groupByName["Moto Only"]._id,
+      auteur: U.bordeaux_moto._id,
+      contenu: "Bordeaux: Médoc tôt, routes très propres hors saison.",
+      date: t(60 * 10 + 18),
+    },
+
+    // ===== Privé - Spots & Secrets =====
+    {
+      idGroupe: groupByName["Privé - Spots & Secrets"]._id,
+      auteur: U.admin_ride._id,
+      contenu: "Ici: partage de spots uniquement via liens secrets.",
+      date: t(60 * 30), // +30h
+    },
+    {
+      idGroupe: groupByName["Privé - Spots & Secrets"]._id,
+      auteur: U.nice_moto._id,
+      contenu: "Je partage un spot Turini night dès que le lien est prêt.",
+      date: t(60 * 30 + 12),
     },
   ];
 
@@ -991,7 +1755,7 @@ async function resetAndSeed() {
     messagesPayload.map((m) => ({
       ...m,
       type: "text",
-      date: new Date(),
+      date: m.date, // obligatoire ici, on veut des dates différentes partout
     }))
   );
 
