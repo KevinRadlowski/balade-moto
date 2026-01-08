@@ -111,7 +111,6 @@ const rideSchema = new mongoose.Schema({
   // Lien secret pour les balades secrètes (généré automatiquement)
   secretLink: {
     type: String,
-    default: null,
   },
   participants: [{
     userId: {

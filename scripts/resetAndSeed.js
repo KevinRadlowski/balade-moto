@@ -830,13 +830,28 @@ async function resetAndSeed() {
   ];
 
   const createdRides = await Ride.insertMany(
-    ridesPayload.map((r) => ({
-      ...r,
-      status: r.status || "scheduled",
-      notes: [],
-      noteMoyenne: 0,
-    }))
+    ridesPayload.map((r) => {
+      const doc = {
+        ...r,
+        status: r.status || "scheduled",
+        notes: [],
+        noteMoyenne: 0,
+      };
+  
+      // IMPORTANT: ne jamais insérer secretLink: null
+      if (doc.secretLink == null) {
+        delete doc.secretLink;
+      }
+  
+      // Optionnel: si visibilite n'est pas 'secrete', on supprime aussi
+      if (doc.visibilite !== "secrete") {
+        delete doc.secretLink;
+      }
+  
+      return doc;
+    })
   );
+  
 
   console.log(`✅ ${createdRides.length} balades créées`);
 
