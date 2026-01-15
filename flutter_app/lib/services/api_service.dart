@@ -17,7 +17,7 @@ import '../exceptions/plan_limit_exception.dart';
 import 'route_cache_service.dart';
 
 class ApiService {
-  static const String baseUrl = ApiConfig.apiUrl;
+  static String get baseUrl => ApiConfig.apiUrl;
 
   String? _token;
   Function()? _onTokenRefresh;

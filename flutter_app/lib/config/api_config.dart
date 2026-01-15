@@ -1,5 +1,7 @@
 /// Configuration de l'URL de l'API backend
 /// 
+/// L'URL peut être définie via la variable d'environnement Dart API_BASE_URL
+/// 
 /// Pour le développement local :
 /// - Sur la même machine : utilisez 'http://localhost:5000'
 /// - Depuis un autre appareil sur le réseau : utilisez 'http://VOTRE_IP_LOCALE:5000'
@@ -8,14 +10,26 @@
 /// Pour trouver votre IP locale :
 /// - Windows : ipconfig (cherchez "Adresse IPv4")
 /// - Mac/Linux : ifconfig ou ip addr
+/// 
+/// Pour la production :
+/// - Lancez avec : flutter run --dart-define=API_BASE_URL=https://api.ridetogether.fr
+/// - Ou pour le build : flutter build web --dart-define=API_BASE_URL=https://api.ridetogether.fr
 class ApiConfig {
   // URL de base de l'API
-  // Changez cette valeur selon votre environnement
-   static const String apiBaseUrl = 'http://localhost:5000';
-  // static const String apiBaseUrl = 'https://api.ridetogether.fr';
+  // Priorité : variable d'environnement Dart > valeur par défaut
+  static String get apiBaseUrl {
+    // Essayer d'abord la variable d'environnement Dart
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+    
+    // Valeur par défaut pour le développement local
+    return 'http://localhost:5000';
+  }
   
   // URL complète pour les endpoints API
-  static const String apiUrl = '$apiBaseUrl/api';
+  static String get apiUrl => '$apiBaseUrl/api';
   
   // URL pour les fichiers statiques (avatars, images, etc.)
   static String getFileUrl(String? path) {
@@ -33,7 +47,7 @@ class ApiConfig {
   }
   
   // URL pour Socket.io
-  static const String socketUrl = apiBaseUrl;
+  static String get socketUrl => apiBaseUrl;
   
   // Clé API Google Maps
   // ⚠️ IMPORTANT : Cette clé doit être définie via la variable d'environnement GOOGLE_MAPS_API_KEY
