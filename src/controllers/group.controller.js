@@ -236,8 +236,14 @@ exports.getGroups = async (req, res, next) => {
     } = req.query;
 
     const userId = req.user._id;
+    
+    // Standardiser la pagination avec limites strictes
+    const pagination = require('../utils/pagination');
+    const maxLimit = parseInt(process.env.PAGINATION_MAX_LIMIT) || 50;
+    const defaultLimit = parseInt(process.env.PAGINATION_DEFAULT_LIMIT) || 20;
+    
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50
+    const limitNum = Math.min(maxLimit, Math.max(1, parseInt(limit) || defaultLimit));
 
     // Charger l'utilisateur pour avoir favoriteGroups
     const user = await User.findById(userId).select('favoriteGroups');
@@ -582,6 +588,15 @@ exports.getGroups = async (req, res, next) => {
           }
         });
       }
+    });
+
+    // Ajouter headers de pagination (pour future migration cursor-based)
+    const paginationHeaders = pagination.buildPaginationHeaders({
+      nextCursor: null,
+      hasNextPage: pageNum * limitNum < total
+    });
+    Object.keys(paginationHeaders).forEach(key => {
+      res.setHeader(key, paginationHeaders[key]);
     });
 
     res.status(200).json({

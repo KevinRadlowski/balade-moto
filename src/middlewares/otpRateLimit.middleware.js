@@ -1,8 +1,10 @@
 /**
- * Rate limiting pour les endpoints OTP avec express-rate-limit
+ * Rate limiting pour les endpoints OTP avec express-rate-limit et Redis
+ * Fail-open : utilise memory store si Redis indisponible
  */
 
 const rateLimit = require('express-rate-limit');
+const { createRedisStore } = require('./redis-rate-limit.store');
 
 /**
  * Rate limiter pour l'envoi d'OTP
@@ -11,6 +13,7 @@ const rateLimit = require('express-rate-limit');
 const sendOtpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 requêtes max
+  store: createRedisStore({ prefix: 'otp:send:', windowMs: 15 * 60 * 1000 }),
   message: {
     success: false,
     message: 'Trop de tentatives d\'envoi de code. Veuillez réessayer dans 15 minutes.'
@@ -28,6 +31,7 @@ const sendOtpLimiter = rateLimit({
 const verifyOtpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // 20 requêtes max
+  store: createRedisStore({ prefix: 'otp:verify:', windowMs: 15 * 60 * 1000 }),
   message: {
     success: false,
     message: 'Trop de tentatives de vérification. Veuillez réessayer dans 15 minutes.'
@@ -45,6 +49,7 @@ const verifyOtpLimiter = rateLimit({
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // 20 requêtes max
+  store: createRedisStore({ prefix: 'auth:register:', windowMs: 15 * 60 * 1000 }),
   message: {
     success: false,
     message: 'Trop de tentatives d\'inscription. Veuillez réessayer dans 15 minutes.'
@@ -62,6 +67,7 @@ const registerLimiter = rateLimit({
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 30, // 30 requêtes max
+  store: createRedisStore({ prefix: 'auth:login:', windowMs: 15 * 60 * 1000 }),
   message: {
     success: false,
     message: 'Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.'

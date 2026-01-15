@@ -13,6 +13,10 @@ const achievementService = require('../services/achievement.service');
 const vehicleStatsService = require('../services/vehicleStats.service');
 const subscriptionService = require('../services/subscription.service');
 
+// Services et repositories (refactoring progressif)
+const rideService = require('../services/ride.service');
+const rideRepository = require('../repositories/ride.repository');
+
 // Helper pour normaliser un organisateur supprimé ou introuvable
 function normalizeOrganizer(organisateur) {
   if (!organisateur || organisateur.isDeleted) {
@@ -32,157 +36,8 @@ function normalizeOrganizer(organisateur) {
 
 exports.createRide = async (req, res, next) => {
   try {
-    // Vérifier les limites du plan (FREE vs PREMIUM) pour les balades privées
-    const premiumConfig = require('../config/premium.config');
-    const userPlan = premiumConfig.getUserPlan(req.user);
-    const limits = premiumConfig.getPlanLimits(userPlan);
-    
-    const {
-      titre,
-      description,
-      typeVehicule,
-      date,
-      heure,
-      lieuDepart,
-      lieuArrivee,
-      rayon,
-      visibilite,
-      localisation,
-      waypoints, // Nouveau système de waypoints
-      vehicleId // ID du véhicule avec lequel l'organisateur effectue la balade
-    } = req.body;
-
-    const hasWaypoints = waypoints && Array.isArray(waypoints) && waypoints.length >= 2;
-    
-    if (!hasWaypoints && (!lieuDepart || !lieuArrivee)) {
-      throw new BadRequestError('Vous devez fournir soit des waypoints (départ, checkpoints, arrivée), soit un lieu de départ et d\'arrivée');
-    }
-
-    const rideDate = new Date(date);
-    if (rideDate < new Date()) {
-      throw new BadRequestError('La date de la balade doit être dans le futur');
-    }
-
-    let rideLocalisation = null;
-    if (hasWaypoints && waypoints.length > 0) {
-      const firstWaypoint = waypoints[0];
-      if (firstWaypoint.coordinates && firstWaypoint.coordinates.coordinates) {
-        rideLocalisation = {
-          type: 'Point',
-          coordinates: firstWaypoint.coordinates.coordinates
-        };
-      }
-    } else if (localisation) {
-      if (localisation.latitude !== undefined && localisation.longitude !== undefined) {
-        // Format simple { latitude, longitude }
-        rideLocalisation = {
-          type: 'Point',
-          coordinates: [parseFloat(localisation.longitude), parseFloat(localisation.latitude)]
-        };
-      } else if (localisation.type === 'Point' && Array.isArray(localisation.coordinates)) {
-        // Format GeoJSON déjà correct
-        rideLocalisation = {
-          type: 'Point',
-          coordinates: localisation.coordinates
-        };
-      }
-    }
-
-    let finalLieuDepart = lieuDepart;
-    let finalLieuArrivee = lieuArrivee;
-    
-    if (hasWaypoints) {
-      // Extraire le départ et l'arrivée des waypoints
-      const departWaypoint = waypoints.find(w => w.type === 'depart') || waypoints[0];
-      const arriveeWaypoint = waypoints.find(w => w.type === 'arrivee') || waypoints[waypoints.length - 1];
-      
-      finalLieuDepart = departWaypoint.address || JSON.stringify(departWaypoint.coordinates);
-      finalLieuArrivee = arriveeWaypoint.address || JSON.stringify(arriveeWaypoint.coordinates);
-    }
-
-    const finalVisibilite = visibilite || 'publique';
-    
-    // Vérifier la limite de balades privées par mois (FREE seulement)
-    if (finalVisibilite === 'privee' && !premiumConfig.isPremium(userPlan)) {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const privateRidesThisMonth = await Ride.countDocuments({
-        organisateur: req.user._id,
-        visibilite: 'privee',
-        date: { $gte: startOfMonth }
-      });
-      
-      if (privateRidesThisMonth >= limits.maxPrivateRidesCreatedPerMonth) {
-        throw createPlanLimitError(
-          'maxPrivateRidesCreatedPerMonth',
-          limits.maxPrivateRidesCreatedPerMonth,
-          privateRidesThisMonth,
-          userPlan,
-          'balade(s) privée(s) par mois'
-        );
-      }
-    }
-    
-    // Si un vehicleId est fourni, vérifier qu'il appartient à l'utilisateur et correspond au type de véhicule
-    let validatedVehicleId = null;
-    if (vehicleId) {
-      const Vehicle = require('../models/Vehicle');
-      const vehicle = await Vehicle.findOne({
-        _id: vehicleId,
-        ownerUserId: req.user._id,
-        active: true
-      });
-      
-      if (!vehicle) {
-        throw new BadRequestError('Véhicule non trouvé ou n\'appartient pas à l\'utilisateur');
-      }
-      
-      // Vérifier que le type du véhicule correspond au type de la balade
-      if (vehicle.type !== typeVehicule) {
-        throw new BadRequestError(`Le véhicule sélectionné est de type "${vehicle.type}" mais la balade est de type "${typeVehicule}"`);
-      }
-      
-      validatedVehicleId = vehicle._id;
-    }
-    
-    const rideData = {
-      titre,
-      description,
-      typeVehicule,
-      date: rideDate,
-      heure,
-      lieuDepart: finalLieuDepart,
-      lieuArrivee: finalLieuArrivee,
-      rayon: rayon || 0,
-      organisateur: req.user._id,
-      visibilite: finalVisibilite,
-      participants: [{ 
-        userId: req.user._id,
-        vehicleId: validatedVehicleId // Ajouter le véhicule de l'organisateur
-      }], // L'organisateur est automatiquement participant
-      localisation: rideLocalisation,
-      status: 'scheduled', // Statut par défaut
-      ridingStyle: req.body.ridingStyle || null, // Style de conduite (optionnel)
-      rideEvents: [] // Initialiser les événements
-    };
-
-    if (hasWaypoints) {
-      rideData.waypoints = waypoints.map((wp, index) => ({
-        type: wp.type || (index === 0 ? 'depart' : index === waypoints.length - 1 ? 'arrivee' : 'checkpoint'),
-        address: wp.address,
-        coordinates: {
-          type: 'Point',
-          coordinates: wp.coordinates?.coordinates || [wp.coordinates?.longitude || wp.longitude, wp.coordinates?.latitude || wp.latitude]
-        },
-        order: wp.order !== undefined ? wp.order : index
-      }));
-    }
-
-    const ride = new Ride(rideData);
-
-    await ride.save();
-    await ride.populate('organisateur', 'firstName lastName pseudo email');
-    await ride.populate('participants.userId', 'firstName lastName pseudo');
+    // Utiliser le service pour créer la balade
+    const ride = await rideService.createRide(req.body, req.user);
 
     res.status(201).json({
       success: true,
@@ -195,346 +50,30 @@ exports.createRide = async (req, res, next) => {
 };
 
 // Lister les balades avec filtres
-exports.getRides = async (req, res) => {
+exports.getRides = async (req, res, next) => {
   try {
-    const {
-      typeVehicule,
-      visibilite,
-      dateDebut,
-      dateFin,
-      organisateur,
-      participant,
-      search,
-      lat,
-      lng,
-      rayon,
-      page = 1,
-      limit = 10,
-      sortBy = 'date',
-      sortOrder = 'asc'
-    } = req.query;
+    // Utiliser le service pour lister les balades
+    const result = await rideService.listRides(req.query, req.user);
 
-    // Si lat, lng et rayon sont fournis, utiliser la recherche géospatiale
-    if (lat && lng && rayon) {
-      const latitude = parseFloat(lat);
-      const longitude = parseFloat(lng);
-      const radiusKm = Math.min(parseFloat(rayon) || 200, 200); // Max 200 km
-
-      // Validation des coordonnées
-      if (!isNaN(latitude) && !isNaN(longitude) && 
-          latitude >= -90 && latitude <= 90 && 
-          longitude >= -180 && longitude <= 180 &&
-          !isNaN(radiusKm) && radiusKm > 0 && radiusKm <= 200) {
-        
-        // Construire le filtre de base
-        const filter = {
-          localisation: {
-            $exists: true,
-            $ne: null
-          }
-        };
-
-        if (participant) {
-          // Si on filtre par participant, on veut les balades où l'utilisateur est participant OU organisateur
-          // Peu importe la visibilité (car s'il est participant, il a le droit de voir)
-          filter.$or = [
-            { 'participants.userId': participant },
-            { organisateur: participant }
-          ];
-        } else {
-          // Sinon, appliquer le filtre de visibilité normal
-          // Exclure les balades secrètes sauf si l'utilisateur est organisateur ou participant
-          if (visibilite && ['privee', 'publique'].includes(visibilite)) {
-            filter.visibilite = visibilite;
-          } else {
-            filter.$or = [
-              { visibilite: 'publique' },
-              { visibilite: 'privee', organisateur: req.user._id },
-              { visibilite: 'privee', 'participants.userId': req.user._id },
-              { visibilite: 'privee', 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } },
-              { visibilite: 'secrete', organisateur: req.user._id }, // L'organisateur peut voir ses balades secrètes
-              { visibilite: 'secrete', 'participants.userId': req.user._id } // Les participants peuvent voir les balades secrètes
-            ];
-          }
-        }
-
-        if (typeVehicule && ['moto', 'voiture'].includes(typeVehicule)) {
-          filter.typeVehicule = typeVehicule;
-        }
-
-        if (dateDebut || dateFin) {
-          filter.date = {};
-          if (dateDebut) {
-            filter.date.$gte = new Date(dateDebut);
-          }
-          if (dateFin) {
-            filter.date.$lte = new Date(dateFin);
-          }
-        } else {
-          // Par défaut, ne montrer que les balades futures
-          filter.date = { $gte: new Date() };
-        }
-
-        if (organisateur) {
-          filter.organisateur = organisateur;
-        }
-
-        if (search) {
-          filter.$or = [
-            ...(filter.$or || []),
-            { titre: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
-          ];
-        }
-
-        // Utiliser une aggregation avec $geoNear pour la recherche géospatiale
-        const pipeline = [
-          {
-            $geoNear: {
-              near: {
-                type: 'Point',
-                coordinates: [longitude, latitude] // MongoDB utilise [lng, lat]
-              },
-              distanceField: 'distance',
-              maxDistance: radiusKm * 1000, // Convertir km en mètres
-              spherical: true,
-              query: filter
-            }
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'organisateur',
-              foreignField: '_id',
-              as: 'organisateur'
-            }
-          },
-          {
-            $unwind: {
-              path: '$organisateur',
-              preserveNullAndEmptyArrays: true
-            }
-          },
-          {
-            // Ajouter un champ isOrganizerPremium pour le tri
-            $addFields: {
-              isOrganizerPremium: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $ne: ['$organisateur', null] },
-                      { $eq: ['$organisateur.subscription.isPremium', true] },
-                      {
-                        $or: [
-                          { $eq: ['$organisateur.subscription.premiumExpiresAt', null] },
-                          { $gte: ['$organisateur.subscription.premiumExpiresAt', new Date()] }
-                        ]
-                      }
-                    ]
-                  },
-                  then: 1,
-                  else: 0
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'participants',
-              foreignField: '_id',
-              as: 'participants'
-            }
-          },
-          {
-            $project: {
-              'organisateur.password': 0,
-              'organisateur.refreshToken': 0,
-              'participants.password': 0,
-              'participants.refreshToken': 0
-            }
-          },
-          {
-            $sort: {
-              isOrganizerPremium: -1, // Premium en premier
-              distance: 1, // Plus proche en premier
-              [sortBy]: sortOrder === 'desc' ? -1 : 1
-            }
-          },
-          {
-            $skip: (parseInt(page) - 1) * parseInt(limit)
-          },
-          {
-            $limit: parseInt(limit)
-          }
-        ];
-
-        const rides = await Ride.aggregate(pipeline);
-        const total = await Ride.countDocuments(filter);
-
-        // Vérifier si l'utilisateur a liké chaque balade et compter les likes
-        // Ajouter isOrganizerPremium pour chaque balade
-        const ridesWithLikes = await Promise.all(
-          rides.map(async (ride) => {
-            const totalLikes = await Like.countLikesByRide(ride._id);
-            const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
-            
-            // Calculer isOrganizerPremium
-            const isOrganizerPremium = ride.organisateur && 
-              subscriptionService.isPremiumActive(ride.organisateur);
-            
-            return {
-              ...ride,
-              totalLikes,
-              hasUserLiked,
-              isOrganizerPremium: isOrganizerPremium || false
-            };
-          })
-        );
-
-        return res.status(200).json({
-          success: true,
-          data: {
-            rides: ridesWithLikes,
-            pagination: {
-              page: parseInt(page),
-              limit: parseInt(limit),
-              total,
-              pages: Math.ceil(total / parseInt(limit))
-            }
-          }
-        });
-      }
-    }
-
-    // Sinon, utiliser la recherche classique
-    // Construire le filtre
-    const filter = {};
-
-    if (typeVehicule && ['moto', 'voiture'].includes(typeVehicule)) {
-      filter.typeVehicule = typeVehicule;
-    }
-
-    if (participant) {
-      // Si on filtre par participant, on veut les balades où l'utilisateur est participant OU organisateur
-      // Peu importe la visibilité (car s'il est participant, il a le droit de voir)
-      filter.$or = [
-        { 'participants.userId': participant },
-        { organisateur: participant }
-      ];
-    } else {
-      // Sinon, appliquer le filtre de visibilité normal
-      // Exclure les balades secrètes sauf si l'utilisateur est organisateur ou participant
-      if (visibilite && ['privee', 'publique'].includes(visibilite)) {
-        filter.visibilite = visibilite;
-      } else {
-        // Montrer les publiques et les privées où l'utilisateur est participant/organisateur/invité
-        // Inclure les balades secrètes uniquement si l'utilisateur est organisateur ou participant
-        filter.$or = [
-          { visibilite: 'publique' },
-          { visibilite: 'privee', organisateur: req.user._id },
-          { visibilite: 'privee', 'participants.userId': req.user._id },
-          { visibilite: 'privee', 'invitations.userId': req.user._id, 'invitations.status': { $in: ['pending', 'accepted'] } },
-          { visibilite: 'secrete', organisateur: req.user._id }, // L'organisateur peut voir ses balades secrètes
-          { visibilite: 'secrete', 'participants.userId': req.user._id } // Les participants peuvent voir les balades secrètes
-        ];
-      }
-    }
-
-    if (dateDebut || dateFin) {
-      filter.date = {};
-      if (dateDebut) {
-        filter.date.$gte = new Date(dateDebut);
-      }
-      if (dateFin) {
-        filter.date.$lte = new Date(dateFin);
-      }
-    } else {
-      // Par défaut, ne montrer que les balades futures
-      filter.date = { $gte: new Date() };
-    }
-
-    if (organisateur) {
-      filter.organisateur = organisateur;
-    }
-
-    if (search) {
-      filter.$or = [
-        ...(filter.$or || []),
-        { titre: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Récupérer les balades avec populate de l'organisateur incluant subscription
-    const rides = await Ride.find(filter)
-      .populate('organisateur', 'firstName lastName pseudo email subscription.isPremium subscription.premiumExpiresAt')
-      .populate('participants.userId', 'firstName lastName pseudo')
-      .lean(); // Utiliser lean() pour obtenir des objets JavaScript simples
-    
-    // Trier les balades : premium en premier, puis selon le tri demandé
-    rides.sort((a, b) => {
-      const aIsPremium = a.organisateur && subscriptionService.isPremiumActive(a.organisateur);
-      const bIsPremium = b.organisateur && subscriptionService.isPremiumActive(b.organisateur);
-      
-      // Premium en premier
-      if (aIsPremium && !bIsPremium) return -1;
-      if (!aIsPremium && bIsPremium) return 1;
-      
-      // Si même statut premium, trier selon sortBy
-      const aValue = a[sortBy];
-      const bValue = b[sortBy];
-      
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+    // Ajouter headers de pagination
+    const pagination = require('../utils/pagination');
+    const paginationHeaders = pagination.buildPaginationHeaders({
+      nextCursor: null,
+      hasNextPage: result.pagination.page * result.pagination.limit < result.pagination.total
     });
-    
-    // Appliquer pagination après tri
-    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
-
-    const total = rides.length;
-
-    const ridesWithLikes = await Promise.all(
-      paginatedRides.map(async (ride) => {
-        const totalLikes = await Like.countLikesByRide(ride._id);
-        const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
-        
-        // Calculer isOrganizerPremium
-        const isOrganizerPremium = ride.organisateur && 
-          subscriptionService.isPremiumActive(ride.organisateur);
-        
-        return {
-          ...ride,
-          totalLikes,
-          hasUserLiked,
-          isOrganizerPremium: isOrganizerPremium || false
-        };
-      })
-    );
+    Object.keys(paginationHeaders).forEach(key => {
+      res.setHeader(key, paginationHeaders[key]);
+    });
 
     res.status(200).json({
       success: true,
       data: {
-        rides: ridesWithLikes,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
+        rides: result.rides,
+        pagination: result.pagination
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des balades',
-      error: error.message
-    });
+    next(error);
   }
 };
 
@@ -550,6 +89,18 @@ exports.getPastRides = async (req, res) => {
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
+
+    // Standardiser la pagination avec limites strictes
+    const pagination = require('../utils/pagination');
+    const maxLimit = parseInt(process.env.PAGINATION_MAX_LIMIT) || 50;
+    const defaultLimit = parseInt(process.env.PAGINATION_DEFAULT_LIMIT) || 20;
+    
+    // Valider et borner limit
+    const validatedLimit = Math.min(
+      Math.max(parseInt(limit) || defaultLimit, 1),
+      maxLimit
+    );
+    const validatedPage = Math.max(parseInt(page) || 1, 1);
 
     const filter = {};
 
@@ -616,7 +167,6 @@ exports.getPastRides = async (req, res) => {
       });
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
@@ -661,35 +211,42 @@ exports.getPastRides = async (req, res) => {
     const total = rides.length;
     
     // Appliquer pagination après tri
-    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
+    const skip = (validatedPage - 1) * validatedLimit;
+    const paginatedRides = rides.slice(skip, skip + validatedLimit);
 
-    const ridesWithLikes = await Promise.all(
-      paginatedRides.map(async (ride) => {
-        const totalLikes = await Like.countLikesByRide(ride._id);
-        const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
-        
-        // Calculer isOrganizerPremium
-        const isOrganizerPremium = ride.organisateur && 
-          subscriptionService.isPremiumActive(ride.organisateur);
-        
-        return {
-          ...ride,
-          totalLikes,
-          hasUserLiked,
-          isOrganizerPremium: isOrganizerPremium || false
-        };
-      })
-    );
+    // Enrichir avec les likes en batch (évite N+1)
+    const rideStats = require('../utils/rideStats');
+    let ridesWithLikes = await rideStats.enrichRidesWithLikes(paginatedRides, req.user._id);
+    
+    // Ajouter isOrganizerPremium pour chaque ride
+    ridesWithLikes = ridesWithLikes.map(ride => {
+      const isOrganizerPremium = ride.organisateur && 
+        subscriptionService.isPremiumActive(ride.organisateur);
+      
+      return {
+        ...ride,
+        isOrganizerPremium: isOrganizerPremium || false
+      };
+    });
+
+    // Ajouter headers de pagination
+    const paginationHeaders = pagination.buildPaginationHeaders({
+      nextCursor: null,
+      hasNextPage: validatedPage * validatedLimit < total
+    });
+    Object.keys(paginationHeaders).forEach(key => {
+      res.setHeader(key, paginationHeaders[key]);
+    });
 
     res.status(200).json({
       success: true,
       data: {
         rides: ridesWithLikes,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: validatedPage,
+          limit: validatedLimit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / validatedLimit)
         }
       }
     });
@@ -714,6 +271,18 @@ exports.getMyPastRides = async (req, res) => {
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
+
+    // Standardiser la pagination avec limites strictes
+    const pagination = require('../utils/pagination');
+    const maxLimit = parseInt(process.env.PAGINATION_MAX_LIMIT) || 50;
+    const defaultLimit = parseInt(process.env.PAGINATION_DEFAULT_LIMIT) || 20;
+    
+    // Valider et borner limit
+    const validatedLimit = Math.min(
+      Math.max(parseInt(limit) || defaultLimit, 1),
+      maxLimit
+    );
+    const validatedPage = Math.max(parseInt(page) || 1, 1);
 
     // Utiliser Date.now() pour obtenir le timestamp UTC actuel, puis créer une date UTC
     const nowUTC = new Date(Date.now());
@@ -780,7 +349,6 @@ exports.getMyPastRides = async (req, res) => {
       });
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
@@ -825,35 +393,42 @@ exports.getMyPastRides = async (req, res) => {
     const total = rides.length;
     
     // Appliquer pagination après tri
-    const paginatedRides = rides.slice(skip, skip + parseInt(limit));
+    const skip = (validatedPage - 1) * validatedLimit;
+    const paginatedRides = rides.slice(skip, skip + validatedLimit);
 
-    const ridesWithLikes = await Promise.all(
-      paginatedRides.map(async (ride) => {
-        const totalLikes = await Like.countLikesByRide(ride._id);
-        const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
-        
-        // Calculer isOrganizerPremium
-        const isOrganizerPremium = ride.organisateur && 
-          subscriptionService.isPremiumActive(ride.organisateur);
-        
-        return {
-          ...ride,
-          totalLikes,
-          hasUserLiked,
-          isOrganizerPremium: isOrganizerPremium || false
-        };
-      })
-    );
+    // Enrichir avec les likes en batch (évite N+1)
+    const rideStats = require('../utils/rideStats');
+    let ridesWithLikes = await rideStats.enrichRidesWithLikes(paginatedRides, req.user._id);
+    
+    // Ajouter isOrganizerPremium pour chaque ride
+    ridesWithLikes = ridesWithLikes.map(ride => {
+      const isOrganizerPremium = ride.organisateur && 
+        subscriptionService.isPremiumActive(ride.organisateur);
+      
+      return {
+        ...ride,
+        isOrganizerPremium: isOrganizerPremium || false
+      };
+    });
+
+    // Ajouter headers de pagination
+    const paginationHeaders = pagination.buildPaginationHeaders({
+      nextCursor: null,
+      hasNextPage: validatedPage * validatedLimit < total
+    });
+    Object.keys(paginationHeaders).forEach(key => {
+      res.setHeader(key, paginationHeaders[key]);
+    });
 
     res.status(200).json({
       success: true,
       data: {
         rides: ridesWithLikes,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: validatedPage,
+          limit: validatedLimit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / validatedLimit)
         }
       }
     });
@@ -1079,31 +654,25 @@ exports.getRidesNearby = async (req, res) => {
 
     const rides = await Ride.aggregate(pipeline);
 
-    // Vérifier si l'utilisateur a liké chaque balade et compter les likes
-    // Ajouter isOrganizerPremium pour chaque balade
-    const ridesWithLikes = await Promise.all(
-      rides.map(async (ride) => {
-        const rideId = ride._id;
-        const totalLikes = await Like.countLikesByRide(rideId);
-        const hasUserLiked = await Like.hasUserLiked(rideId, req.user._id);
-        
-        // Calculer isOrganizerPremium
-        const isOrganizerPremium = ride.organisateur && 
-          subscriptionService.isPremiumActive(ride.organisateur);
-        
-        // Convertir _id en string pour la compatibilité
-        const rideObj = {
-          ...ride,
-          id: ride._id.toString(),
-          distance: ride.distance ? (ride.distance / 1000).toFixed(2) : null, // Convertir en km
-          totalLikes,
-          hasUserLiked,
-          isOrganizerPremium: isOrganizerPremium || false
-        };
-        delete rideObj._id;
-        return rideObj;
-      })
-    );
+    // Enrichir avec les likes en batch (évite N+1)
+    const rideStats = require('../utils/rideStats');
+    let ridesWithLikes = await rideStats.enrichRidesWithLikes(rides, req.user._id);
+    
+    // Ajouter isOrganizerPremium et formater pour chaque ride
+    ridesWithLikes = ridesWithLikes.map(ride => {
+      const isOrganizerPremium = ride.organisateur && 
+        subscriptionService.isPremiumActive(ride.organisateur);
+      
+      // Convertir _id en string pour la compatibilité
+      const rideObj = {
+        ...ride,
+        id: ride._id ? ride._id.toString() : ride.id,
+        distance: ride.distance ? (ride.distance / 1000).toFixed(2) : null, // Convertir en km
+        isOrganizerPremium: isOrganizerPremium || false
+      };
+      if (rideObj._id) delete rideObj._id;
+      return rideObj;
+    });
 
     res.status(200).json({
       success: true,
@@ -1182,13 +751,15 @@ exports.getRideById = async (req, res, next) => {
       }
     }
 
-    // Vérifier si l'utilisateur a liké cette balade et compter les likes
-    const totalLikes = await Like.countLikesByRide(ride._id);
-    const hasUserLiked = await Like.hasUserLiked(ride._id, req.user._id);
+    // Enrichir avec les likes (utilise batch même pour un seul ride)
+    const rideStats = require('../utils/rideStats');
+    const enrichedRides = await rideStats.enrichRidesWithLikes([ride], req.user._id);
+    const enrichedRide = enrichedRides[0] || ride;
 
-    const rideObj = ride.toObject();
-    rideObj.totalLikes = totalLikes;
-    rideObj.hasUserLiked = hasUserLiked;
+    // Convertir en objet si nécessaire
+    const rideObj = ride.toObject ? ride.toObject() : { ...ride };
+    rideObj.totalLikes = enrichedRide.totalLikes || 0;
+    rideObj.hasUserLiked = enrichedRide.hasUserLiked || false;
     // S'assurer que l'organisateur est normalisé dans l'objet
     rideObj.organisateur = normalizeOrganizer(rideObj.organisateur);
     // Calculer isOrganizerPremium
@@ -1218,95 +789,9 @@ exports.getRideById = async (req, res, next) => {
 exports.updateRide = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      titre,
-      description,
-      typeVehicule,
-      date,
-      heure,
-      lieuDepart,
-      lieuArrivee,
-      rayon,
-      visibilite,
-      localisation
-    } = req.body;
 
-    const ride = await Ride.findById(id);
-
-    if (!ride) {
-      return res.status(404).json({
-        success: false,
-        message: 'Balade non trouvée'
-      });
-    }
-
-    // Normaliser l'organisateur si supprimé
-    ride.organisateur = normalizeOrganizer(ride.organisateur);
-
-    // Vérifier que l'utilisateur est l'organisateur (ou que l'organisateur est supprimé)
-    const isOrganizer = ride.organisateur && ride.organisateur._id && 
-      ride.organisateur._id.toString() === req.user._id.toString();
-    
-    if (!isOrganizer && !ride.organisateur.isDeleted) {
-      return res.status(403).json({
-        success: false,
-        message: 'Vous n\'êtes pas autorisé à modifier cette balade'
-      });
-    }
-    
-    // Si l'organisateur est supprimé, permettre la modification mais suggérer de reprendre l'organisation
-    if (ride.organisateur.isDeleted) {
-      // L'utilisateur peut modifier mais on suggère de reprendre l'organisation
-      // On continue sans bloquer
-    }
-
-    // Mettre à jour les champs fournis
-    if (titre !== undefined) ride.titre = titre;
-    if (description !== undefined) ride.description = description;
-    if (typeVehicule !== undefined) ride.typeVehicule = typeVehicule;
-    if (date !== undefined) {
-      const rideDate = new Date(date);
-      if (rideDate < new Date()) {
-        return res.status(400).json({
-          success: false,
-          message: 'La date de la balade doit être dans le futur'
-        });
-      }
-      ride.date = rideDate;
-    }
-    if (heure !== undefined) ride.heure = heure;
-    if (lieuDepart !== undefined) ride.lieuDepart = lieuDepart;
-    if (lieuArrivee !== undefined) ride.lieuArrivee = lieuArrivee;
-    if (rayon !== undefined) ride.rayon = rayon;
-    if (visibilite !== undefined) ride.visibilite = visibilite;
-    if (localisation !== undefined) {
-      // Préparer la localisation GPS si fournie
-      let rideLocalisation = null;
-      if (localisation) {
-        if (localisation.latitude !== undefined && localisation.longitude !== undefined) {
-          const lat = parseFloat(localisation.latitude);
-          const lng = parseFloat(localisation.longitude);
-          if (!isNaN(lat) && !isNaN(lng) && 
-              lat >= -90 && lat <= 90 && 
-              lng >= -180 && lng <= 180) {
-            rideLocalisation = {
-              type: 'Point',
-              coordinates: [lng, lat]
-            };
-          }
-        } else if (localisation.type === 'Point' && Array.isArray(localisation.coordinates)) {
-          rideLocalisation = {
-            type: 'Point',
-            coordinates: localisation.coordinates
-          };
-        }
-      }
-      ride.localisation = rideLocalisation;
-    }
-
-    await ride.save();
-    await ride.populate('organisateur', 'firstName lastName pseudo email');
-    await ride.populate('participants.userId', 'firstName lastName pseudo');
+    // Utiliser le service pour mettre à jour la balade
+    const ride = await rideService.updateRide(id, req.body, req.user);
 
     res.status(200).json({
       success: true,
@@ -1314,24 +799,7 @@ exports.updateRide = async (req, res, next) => {
       data: { ride }
     });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Erreur de validation',
-        errors: Object.values(error.errors).map(err => err.message)
-      });
-    }
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de balade invalide'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la modification de la balade',
-      error: error.message
-    });
+    next(error);
   }
 };
 
@@ -1340,164 +808,29 @@ exports.deleteRide = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const ride = await Ride.findById(id);
-
-    if (!ride) {
-      return res.status(404).json({
-        success: false,
-        message: 'Balade non trouvée'
-      });
-    }
-
-    // Normaliser l'organisateur si supprimé
-    ride.organisateur = normalizeOrganizer(ride.organisateur);
-
-    // Vérifier que l'utilisateur est l'organisateur
-    const isOrganizer = ride.organisateur && ride.organisateur._id && 
-      ride.organisateur._id.toString() === req.user._id.toString();
-    
-    if (!isOrganizer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Vous n\'êtes pas autorisé à supprimer cette balade'
-      });
-    }
-
-    await Ride.findByIdAndDelete(id);
+    // Utiliser le service pour supprimer la balade
+    await rideService.deleteRide(id, req.user);
 
     res.status(200).json({
       success: true,
       message: 'Balade supprimée avec succès'
     });
   } catch (error) {
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de balade invalide'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la suppression de la balade',
-      error: error.message
-    });
+    next(error);
   }
 };
 
 // Rejoindre une balade
-exports.joinRide = async (req, res) => {
+exports.joinRide = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { vehicleId } = req.body; // Véhicule optionnel avec lequel participer
 
-    const ride = await Ride.findById(id);
+    // Utiliser le service pour rejoindre la balade
+    const result = await rideService.joinRide(id, req.user, vehicleId);
 
-    if (!ride) {
-      return res.status(404).json({
-        success: false,
-        message: 'Balade non trouvée'
-      });
-    }
-
-    // Vérifier que la balade n'est pas passée
-    const rideDate = new Date(ride.date);
-    if (rideDate < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Impossible de rejoindre une balade passée'
-      });
-    }
-
-    // Vérifier la visibilité
-    if (ride.visibilite === 'privee') {
-      const isOrganizer = ride.organisateur.toString() === req.user._id.toString();
-      const isParticipant = ride.participants.some(
-        p => p.userId && p.userId.toString() === req.user._id.toString()
-      );
-      const isInvited = ride.invitations && ride.invitations.some(
-        inv => inv.userId && inv.userId.toString() === req.user._id.toString() && 
-        (inv.status === 'pending' || inv.status === 'accepted')
-      );
-      
-      if (!isOrganizer && !isParticipant && !isInvited) {
-        return res.status(403).json({
-          success: false,
-          message: 'Cette balade est privée'
-        });
-      }
-    }
-
-    // Vérifier si l'utilisateur est déjà participant (comparaison de string pour éviter les problèmes d'ObjectId)
-    const isAlreadyParticipant = ride.participants.some(
-      p => p.userId && p.userId.toString() === req.user._id.toString()
-    );
-    
-    if (isAlreadyParticipant) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vous êtes déjà participant à cette balade'
-      });
-    }
-
-    // Si un vehicleId est fourni, vérifier qu'il appartient à l'utilisateur et correspond au type de véhicule
-    if (vehicleId) {
-      const Vehicle = require('../models/Vehicle');
-      const vehicle = await Vehicle.findById(vehicleId);
-      
-      if (!vehicle) {
-        return res.status(404).json({
-          success: false,
-          message: 'Véhicule non trouvé'
-        });
-      }
-
-      if (vehicle.ownerUserId.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'Ce véhicule ne vous appartient pas'
-        });
-      }
-
-      if (vehicle.type !== ride.typeVehicule) {
-        return res.status(400).json({
-          success: false,
-          message: `Le type de véhicule ne correspond pas (balade: ${ride.typeVehicule}, véhicule: ${vehicle.type})`
-        });
-      }
-    }
-
-    // Vérifier si l'utilisateur est déjà en liste d'attente
-    const isInWaitlist = ride.waitlist?.some(
-      w => w.userId.toString() === req.user._id.toString()
-    );
-    if (isInWaitlist) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vous êtes déjà en liste d\'attente pour cette balade'
-      });
-    }
-
-    // Vérifier si une demande est déjà en attente
-    const hasPendingRequest = ride.pendingRequests?.some(
-      r => r.userId.toString() === req.user._id.toString()
-    );
-    if (hasPendingRequest) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vous avez déjà une demande en attente pour cette balade'
-      });
-    }
-
-    // Si validation manuelle requise, rediriger vers requestToJoin
-    if (ride.requiresApproval) {
-      ride.pendingRequests = ride.pendingRequests || [];
-      ride.pendingRequests.push({
-        userId: req.user._id,
-        vehicleId: vehicleId || null,
-        requestedAt: new Date()
-      });
-      await ride.save();
-
+    // Construire la réponse selon le statut
+    if (result.status === 'pending_approval') {
       return res.status(200).json({
         success: true,
         message: 'Demande envoyée. L\'organisateur doit approuver votre participation.',
@@ -1505,85 +838,30 @@ exports.joinRide = async (req, res) => {
       });
     }
 
-    // Vérifier la limite de participants
-    if (ride.maxParticipants && ride.participants.length >= ride.maxParticipants) {
-      // Si liste d'attente activée, ajouter à la waitlist
-      if (ride.enableWaitlist) {
-        ride.waitlist = ride.waitlist || [];
-        const position = ride.waitlist.length + 1;
-        ride.waitlist.push({
-          userId: req.user._id,
-          vehicleId: vehicleId || null,
-          addedAt: new Date(),
-          position
-        });
-        await ride.save();
-
-        return res.status(200).json({
-          success: true,
-          message: `Balade complète. Vous êtes en position ${position} sur la liste d'attente.`,
-          data: { status: 'waitlisted', position }
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: 'La balade est complète'
-        });
-      }
+    if (result.status === 'waitlisted') {
+      return res.status(200).json({
+        success: true,
+        message: `Balade complète. Vous êtes en position ${result.position} sur la liste d'attente.`,
+        data: { 
+          ride: result.ride,
+          status: 'waitlisted', 
+          position: result.position 
+        }
+      });
     }
 
-    // Calculer la compatibilité avec l'organisateur (optionnel, pour warning)
-    let compatibility = null;
-    try {
-      compatibility = await compatibilityService.checkCompatibility(
-        req.user._id.toString(),
-        ride.organisateur.toString(),
-        ride._id.toString()
-      );
-    } catch (error) {
-      // Ne pas bloquer si le check de compatibilité échoue
-      console.warn('Erreur lors du calcul de compatibilité:', error);
-    }
-
-    // Ajouter l'utilisateur aux participants avec la nouvelle structure
-    ride.participants.push({
-      userId: req.user._id,
-      vehicleId: vehicleId || null
-    });
-    
-    // Ajouter un événement participant_joined
-    ride.rideEvents.push({
-      type: 'participant_joined',
-      timestamp: new Date(),
-      userId: req.user._id,
-      details: {}
-    });
-    
-    await ride.save();
-    await ride.populate('participants.userId', 'firstName lastName pseudo');
-    await ride.populate('participants.vehicleId', 'nickname make model year');
-
+    // Statut 'joined'
     res.status(200).json({
       success: true,
       message: 'Vous avez rejoint la balade avec succès',
       data: { 
-        ride,
+        ride: result.ride,
         status: 'joined',
-        compatibility: compatibility || undefined // Inclure seulement si calculé
+        compatibility: result.compatibility || undefined
       }
     });
   } catch (error) {
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de balade invalide'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la participation à la balade',
-      error: error.message
-    });
+    next(error);
   }
 };
 
@@ -1592,51 +870,8 @@ exports.leaveRide = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const ride = await Ride.findById(id);
-
-    if (!ride) {
-      return res.status(404).json({
-        success: false,
-        message: 'Balade non trouvée'
-      });
-    }
-
-    // Vérifier si l'utilisateur est participant
-    // Les participants sont des objets avec un champ userId
-    const isParticipant = ride.participants.some(
-      p => p.userId && p.userId.toString() === req.user._id.toString()
-    );
-    
-    if (!isParticipant) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vous n\'êtes pas participant à cette balade'
-      });
-    }
-
-    // Ne pas permettre à l'organisateur de quitter sa propre balade
-    if (ride.organisateur.toString() === req.user._id.toString()) {
-      return res.status(400).json({
-        success: false,
-        message: 'L\'organisateur ne peut pas quitter sa propre balade'
-      });
-    }
-
-    // Retirer l'utilisateur des participants
-    ride.participants = ride.participants.filter(
-      p => !p.userId || p.userId.toString() !== req.user._id.toString()
-    );
-    
-    // Ajouter un événement participant_left
-    ride.rideEvents.push({
-      type: 'participant_left',
-      timestamp: new Date(),
-      userId: req.user._id,
-      details: {}
-    });
-    
-    await ride.save();
-    await ride.populate('participants.userId', 'firstName lastName pseudo');
+    // Utiliser le service pour quitter la balade
+    const ride = await rideService.leaveRide(id, req.user);
 
     res.status(200).json({
       success: true,
@@ -1644,17 +879,7 @@ exports.leaveRide = async (req, res, next) => {
       data: { ride }
     });
   } catch (error) {
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de balade invalide'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la sortie de la balade',
-      error: error.message
-    });
+    next(error);
   }
 };
 
@@ -1663,51 +888,19 @@ exports.likeRide = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const ride = await Ride.findById(id);
+    // Utiliser le service pour liker la balade
+    await rideService.likeRide(id, req.user);
 
-    if (!ride) {
-      return res.status(404).json({
-        success: false,
-        message: 'Balade non trouvée'
-      });
-    }
+    // Récupérer la balade mise à jour pour la réponse
+    const ride = await rideService.getRideById(id, req.user);
 
-    const userId = req.user._id;
-    const isLiked = ride.likes.includes(userId);
-
-    if (isLiked) {
-      // Retirer le like
-      ride.likes = ride.likes.filter(like => like.toString() !== userId.toString());
-      await ride.save();
-      
-      res.status(200).json({
-        success: true,
-        message: 'Like retiré',
-        data: { ride, liked: false }
-      });
-    } else {
-      // Ajouter le like
-      ride.likes.push(userId);
-      await ride.save();
-      
-      res.status(200).json({
-        success: true,
-        message: 'Balade likée avec succès',
-        data: { ride, liked: true }
-      });
-    }
-  } catch (error) {
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de balade invalide'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du like de la balade',
-      error: error.message
+    res.status(200).json({
+      success: true,
+      message: 'Balade likée avec succès',
+      data: { ride, liked: true }
     });
+  } catch (error) {
+    next(error);
   }
 };
 

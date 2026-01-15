@@ -30,6 +30,7 @@ const swaggerSpec = require('./config/swagger');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const { initRedis } = require('./config/redis');
 const { buildCorsOptions, getCorsInfo } = require('./config/cors');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -65,7 +66,14 @@ const app = express();
 const server = http.createServer(app);
 
 // Connexion à MongoDB
+// Connexion à MongoDB
 connectDB();
+
+// Initialisation Redis (optionnel, fail-open vers memory store)
+initRedis().catch(err => {
+  console.error('❌ Erreur lors de l\'initialisation Redis:', err.message);
+  console.log('ℹ️  L\'application continue avec rate limiting en mémoire.');
+});
 
 // Middlewares de sécurité
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;

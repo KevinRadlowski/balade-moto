@@ -7,7 +7,17 @@ const User = require('../models/User');
 exports.getMessages = async (req, res) => {
   try {
     const { conversationId, type } = req.params; // type: 'group' ou 'ride'
-    const { cursor, limit = 50 } = req.query;
+    const { cursor } = req.query;
+    
+    // Standardiser la pagination avec limites strictes
+    const pagination = require('../utils/pagination');
+    const maxLimit = parseInt(process.env.PAGINATION_MAX_LIMIT) || 50;
+    const defaultLimit = parseInt(process.env.PAGINATION_DEFAULT_LIMIT) || 20;
+    
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit) || defaultLimit, 1),
+      maxLimit
+    );
 
     let filter = {};
     if (type === 'group') {
@@ -87,12 +97,15 @@ exports.getMessages = async (req, res) => {
       }
     });
 
-    const hasMore = messages.length > parseInt(limit);
-    const resultMessages = hasMore ? messages.slice(0, parseInt(limit)) : messages;
+    const hasMore = messages.length > limit;
+    const resultMessages = hasMore ? messages.slice(0, limit) : messages;
     const nextCursor = resultMessages.length > 0 ? resultMessages[resultMessages.length - 1].date : null;
 
     // Inverser pour avoir les plus anciens en premier
     resultMessages.reverse();
+
+    // Encoder le cursor si nécessaire
+    const encodedCursor = nextCursor ? pagination.encodeCursor({ createdAt: nextCursor }) : null;
 
     res.status(200).json({
       success: true,
@@ -100,8 +113,8 @@ exports.getMessages = async (req, res) => {
         messages: resultMessages,
         pagination: {
           hasMore,
-          nextCursor,
-          limit: parseInt(limit)
+          nextCursor: encodedCursor || nextCursor, // Supporte les deux formats pour compatibilité
+          limit
         }
       }
     });

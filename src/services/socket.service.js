@@ -12,33 +12,58 @@ const initializeSocket = (server) => {
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        // Autoriser les requêtes sans origin
+        const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+        
+        // Autoriser les requêtes sans origin (mobile apps natifs, Postman, curl, etc.)
         if (!origin) {
+          if (isDevelopment) {
+            console.log('✅ Socket.io CORS: Requête sans origin autorisée (app native/Postman)');
+          }
           return callback(null, true);
         }
         
         // En développement, autoriser tous les ports localhost (pour Flutter Web qui change de port)
-        if (process.env.NODE_ENV === 'development') {
+        if (isDevelopment) {
           // Autoriser localhost avec n'importe quel port
-          if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          if (origin.startsWith('http://localhost:') || 
+              origin.startsWith('http://127.0.0.1:') ||
+              origin.startsWith('http://192.168.')) {
             return callback(null, true);
           }
         }
         
-        // Si allowedOrigins est null, autoriser toutes les origines (FRONTEND_URL="*")
+        // Si allowedOrigins est null, autoriser toutes les origines (CORS_ORIGINS="*")
         if (allowedOrigins === null) {
+          if (isDevelopment) {
+            console.log(`✅ Socket.io CORS: Origin autorisée (mode "*"): ${origin}`);
+          }
           return callback(null, true);
         }
         
+        // Production sans config : refuser toutes les origines
+        if (allowedOrigins && allowedOrigins.length === 0) {
+          const errorMsg = `Socket.io CORS: Origin ${origin} is not allowed. Aucune origine configurée en production.`;
+          if (process.env.DEBUG_CORS === 'true') {
+            console.error(`🚫 ${errorMsg}`);
+            console.error(`   Configurez CORS_ORIGINS ou FRONTEND_URL dans votre .env`);
+          }
+          return callback(new Error(errorMsg));
+        }
+        
         // Vérifier si l'origine est dans la liste autorisée
-        if (allowedOrigins.includes(origin)) {
+        if (allowedOrigins && allowedOrigins.includes(origin)) {
+          if (isDevelopment) {
+            console.log(`✅ Socket.io CORS: Origin dans whitelist: ${origin}`);
+          }
           callback(null, true);
         } else {
-          // En développement, logger l'erreur
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`⚠️  Origine Socket.io CORS rejetée: ${origin}. Origines autorisées:`, allowedOrigins);
+          // Origine non autorisée
+          const errorMsg = `Socket.io CORS: Origin ${origin} is not allowed`;
+          if (isDevelopment || process.env.DEBUG_CORS === 'true') {
+            console.warn(`⚠️  ${errorMsg}`);
+            console.warn(`   Origines autorisées:`, allowedOrigins || 'Toutes (*)');
           }
-          callback(new Error('Not allowed by CORS'));
+          callback(new Error(errorMsg));
         }
       },
       methods: ["GET", "POST"],

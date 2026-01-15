@@ -61,7 +61,8 @@ exports.sendOtp = async (req, res) => {
         });
       }
 
-      throw new Error('Service SMS non configuré');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('Service SMS non configuré', { service: 'twilio', config: 'TWILIO_*' });
     }
 
     // Vérifier si l'utilisateur existe
@@ -97,7 +98,8 @@ exports.sendOtp = async (req, res) => {
     const verifyServiceSid = getVerifyServiceSid();
 
     if (!twilioClient || !verifyServiceSid) {
-      throw new Error('Service SMS non configuré');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('Service SMS non configuré', { service: 'twilio', config: 'TWILIO_*' });
     }
 
     try {
@@ -123,7 +125,8 @@ exports.sendOtp = async (req, res) => {
         throw new BadRequestError('Trop de tentatives. Veuillez réessayer plus tard');
       }
       
-      throw new Error('Erreur lors de l\'envoi du code OTP');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('Erreur lors de l\'envoi du code OTP', { service: 'twilio', action: 'send_otp' });
     }
   } catch (error) {
     if (error instanceof BadRequestError || error instanceof NotFoundError) {
@@ -210,7 +213,8 @@ exports.verifyOtp = async (req, res) => {
         }
       }
 
-      throw new Error('Service SMS non configuré');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('Service SMS non configuré', { service: 'twilio', config: 'TWILIO_*' });
     }
 
     // Vérifier le code via Twilio Verify
@@ -218,7 +222,8 @@ exports.verifyOtp = async (req, res) => {
     const verifyServiceSid = getVerifyServiceSid();
 
     if (!twilioClient || !verifyServiceSid) {
-      throw new Error('Service SMS non configuré');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('Service SMS non configuré', { service: 'twilio', config: 'TWILIO_*' });
     }
 
     try {

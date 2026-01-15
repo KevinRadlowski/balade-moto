@@ -42,6 +42,62 @@ likeSchema.statics.hasUserLiked = async function(rideId, userId) {
   return like !== null;
 };
 
+// Méthode batch pour compter les likes de plusieurs balades en une seule requête
+likeSchema.statics.countLikesByRides = async function(rideIds) {
+  if (!rideIds || rideIds.length === 0) return {};
+  
+  const counts = await this.aggregate([
+    {
+      $match: {
+        balade: { $in: rideIds }
+      }
+    },
+    {
+      $group: {
+        _id: '$balade',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+  
+  // Convertir en Map pour accès rapide
+  const countsMap = {};
+  counts.forEach(item => {
+    countsMap[item._id.toString()] = item.count;
+  });
+  
+  // Ajouter 0 pour les rides sans likes
+  rideIds.forEach(rideId => {
+    const idStr = rideId.toString();
+    if (!countsMap[idStr]) {
+      countsMap[idStr] = 0;
+    }
+  });
+  
+  return countsMap;
+};
+
+// Méthode batch pour vérifier si un utilisateur a liké plusieurs balades
+likeSchema.statics.hasUserLikedRides = async function(rideIds, userId) {
+  if (!rideIds || rideIds.length === 0) return {};
+  
+  const likes = await this.find({
+    balade: { $in: rideIds },
+    utilisateur: userId
+  }).select('balade').lean();
+  
+  // Convertir en Set pour accès rapide
+  const likedRideIds = new Set(likes.map(like => like.balade.toString()));
+  
+  // Créer un objet avec true/false pour chaque ride
+  const result = {};
+  rideIds.forEach(rideId => {
+    result[rideId.toString()] = likedRideIds.has(rideId.toString());
+  });
+  
+  return result;
+};
+
 // Méthode pour formater la réponse
 likeSchema.methods.toJSON = function() {
   const obj = this.toObject();

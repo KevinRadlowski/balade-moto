@@ -8,6 +8,7 @@
     "dev": "nodemon src/app.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:ci": "jest --coverage --ci --maxWorkers=2",
     "generate-mock": "node scripts/generateMockData.js",
     "fix-pseudo-index": "node scripts/fixPseudoIndex.js",
     "fix-index": "node fix-index.js",
@@ -22,7 +23,8 @@
     "generate:fr:motos": "node scripts/generate-fr-moto-reference.mjs",
     "test:smtp": "node scripts/test-smtp.js",
     "subscription:cleanup": "node src/scripts/subscription-expiration.job.js",
-    "reset-seed": "node scripts/resetAndSeed.js"
+    "reset-seed": "node scripts/resetAndSeed.js",
+    "db:indexes": "node tools/ensure-indexes.js"
   },
   "keywords": [
     "express",
@@ -45,6 +47,7 @@
     "google-auth-library": "^9.4.1",
     "helmet": "^8.1.0",
     "ics": "^3.4.0",
+    "ioredis": "^5.9.1",
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.33",
     "mongoose": "^8.0.3",

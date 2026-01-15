@@ -369,6 +369,11 @@ rideSchema.index({ participants: 1 });
 rideSchema.index({ 'participants.vehicleId': 1 }); // Pour rechercher les balades par véhicule
 rideSchema.index({ status: 1, date: 1 }); // Pour les requêtes par statut
 rideSchema.index({ ridingStyle: 1 }); // Pour les filtres par style
+// Index compound pour requêtes fréquentes (listing avec filtres)
+rideSchema.index({ typeVehicule: 1, date: 1, visibilite: 1 });
+rideSchema.index({ organisateur: 1, date: -1 }); // Mes balades triées par date
+rideSchema.index({ 'participants.userId': 1, date: -1 }); // Balades où je participe
+rideSchema.index({ createdAt: -1 }); // Tri par date de création
 rideSchema.index({ 'invitations.userId': 1 }); // Pour rechercher les invitations par utilisateur
 rideSchema.index({ 'invitations.status': 1 }); // Pour filtrer par statut d'invitation
 // Index géospatial 2dsphere pour les requêtes de proximité

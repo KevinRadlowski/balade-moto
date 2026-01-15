@@ -31,8 +31,13 @@ const { BadRequestError, NotFoundError } = require('../utils/errors');
  */
 exports.getUsers = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 50;
+    // Standardiser la pagination avec limites strictes
+    const pagination = require('../utils/pagination');
+    const maxLimit = parseInt(process.env.PAGINATION_MAX_LIMIT) || 50;
+    const defaultLimit = parseInt(process.env.PAGINATION_DEFAULT_LIMIT) || 20;
+    
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(maxLimit, Math.max(1, parseInt(req.query.limit, 10) || defaultLimit));
     const skip = (page - 1) * limit;
     const { query } = req.query;
 
@@ -49,6 +54,15 @@ exports.getUsers = async (req, res, next) => {
       .limit(limit);
 
     const total = await User.countDocuments(filter);
+
+    // Ajouter headers de pagination
+    const paginationHeaders = pagination.buildPaginationHeaders({
+      nextCursor: null,
+      hasNextPage: page * limit < total
+    });
+    Object.keys(paginationHeaders).forEach(key => {
+      res.setHeader(key, paginationHeaders[key]);
+    });
 
     res.json({
       success: true,

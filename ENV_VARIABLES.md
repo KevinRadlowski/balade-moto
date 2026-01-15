@@ -15,13 +15,27 @@ PORT=5000
 NODE_ENV=development
 BASE_URL=http://localhost:5000
 
-# Frontend URLs (séparées par des virgules pour plusieurs origines)
-# En développement (NODE_ENV=development), tous les ports localhost sont automatiquement autorisés
-# En production, vous DEVEZ spécifier toutes les URLs autorisées
-# Exemple dev (optionnel, car localhost autorisé automatiquement):
-FRONTEND_URL=http://localhost:3000,http://localhost:59219
+# CORS Configuration (Production Ready)
+# CORS_ORIGINS est la variable RECOMMANDÉE pour configurer les origines autorisées
+# FRONTEND_URL est conservée pour compatibilité mais CORS_ORIGINS a la priorité
+# 
+# En développement (NODE_ENV=development):
+#   - Tous les localhost/127.0.0.1/192.168.* sont automatiquement autorisés
+#   - CORS_ORIGINS/FRONTEND_URL sont optionnels en dev
+#
+# En production (NODE_ENV=production):
+#   - CORS_ORIGINS ou FRONTEND_URL sont OBLIGATOIRES
+#   - Sans configuration, TOUTES les origines seront REFUSÉES (sécurité stricte)
+#   - Utilisez CORS_ORIGINS="*" uniquement si nécessaire (⚠️ DÉCONSEILLÉ)
+#
+# Exemple développement (optionnel):
+# CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+# FRONTEND_URL=http://localhost:3000,http://localhost:59219
+#
 # Exemple production (OBLIGATOIRE):
-# FRONTEND_URL=https://votre-domaine.com,https://www.votre-domaine.com
+CORS_ORIGINS=https://app.ridetogether.fr,https://www.app.ridetogether.fr,https://panel.ridetogether.fr
+# Ou utiliser FRONTEND_URL pour compatibilité:
+# FRONTEND_URL=https://app.ridetogether.fr,https://www.app.ridetogether.fr
 
 # Google Maps API (OBLIGATOIRE - pas de valeur par défaut)
 GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
@@ -47,10 +61,66 @@ TWILIO_VERIFY_SERVICE_SID=your-twilio-verify-service-sid
 # Pour désactiver la simulation même en développement, ne définissez PAS SKIP_SMS_VERIFICATION
 # SKIP_SMS_VERIFICATION=true  # Ne définissez PAS cette variable si vous voulez recevoir de vrais SMS
 
-# Redis (optionnel, pour cache et rate limiting distribué)
-# REDIS_HOST=localhost
-# REDIS_PORT=6379
-# REDIS_PASSWORD=
+# ============================================
+# Redis Configuration (Production Ready)
+# ============================================
+# Redis est utilisé pour le rate limiting distribué
+# Si non configuré, l'application utilise un memory store (fallback)
+# 
+# Format de l'URL Redis:
+# - Local: redis://localhost:6379
+# - Avec auth: redis://:password@localhost:6379
+# - Remote: redis://user:password@host:port
+# - Redis Cloud: redis://default:password@host:port
+#
+# Exemple local:
+REDIS_URL=redis://localhost:6379
+REDIS_ENABLED=true
+
+# Pour désactiver Redis (utilise memory store):
+# REDIS_ENABLED=false
+
+# ============================================
+# Upload Configuration (Production Ready)
+# ============================================
+# Type de stockage: 'local' (par défaut) ou 's3'
+STORAGE_TYPE=local
+
+# Répertoire de base pour les uploads (si STORAGE_TYPE=local)
+# UPLOAD_BASE_DIR=./uploads
+
+# Configuration S3 (si STORAGE_TYPE=s3)
+# S3_BUCKET=your-bucket-name
+# S3_REGION=us-east-1
+# S3_ACCESS_KEY_ID=your-access-key
+# S3_SECRET_ACCESS_KEY=your-secret-key
+
+# Limites de taille par type de fichier (en MB)
+UPLOAD_MAX_SIZE_IMAGE=5
+UPLOAD_MAX_SIZE_DOCUMENT=20
+UPLOAD_MAX_SIZE_VIDEO=50
+UPLOAD_MAX_SIZE_AUDIO=10
+
+# Quotas par utilisateur (mensuels)
+# Images
+UPLOAD_QUOTA_IMAGES_PER_USER=100
+UPLOAD_QUOTA_IMAGES_MB_PER_MONTH=500
+
+# Documents
+UPLOAD_QUOTA_DOCUMENTS_PER_USER=50
+UPLOAD_QUOTA_DOCUMENTS_MB_PER_MONTH=200
+
+# Vidéos
+UPLOAD_QUOTA_VIDEOS_PER_USER=20
+UPLOAD_QUOTA_VIDEOS_MB_PER_MONTH=1000
+
+# Audio
+UPLOAD_QUOTA_AUDIO_PER_USER=30
+UPLOAD_QUOTA_AUDIO_MB_PER_MONTH=300
+
+# Autres
+UPLOAD_QUOTA_OTHER_PER_USER=50
+UPLOAD_QUOTA_OTHER_MB_PER_MONTH=200
 ```
 
 ## Notes importantes

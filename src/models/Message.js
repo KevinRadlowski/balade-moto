@@ -164,6 +164,9 @@ const messageSchema = new mongoose.Schema({
 messageSchema.index({ idBalade: 1, date: -1 });
 messageSchema.index({ idGroupe: 1, date: -1 });
 messageSchema.index({ auteur: 1 });
+// Index pour requêtes fréquentes
+messageSchema.index({ auteur: 1, date: -1 }); // Messages d'un utilisateur
+messageSchema.index({ createdAt: -1 }); // Tri par création
 
 // Validation : soit idBalade soit idGroupe doit être défini
 // Et soit contenu soit metadata (fichier) doit être présent

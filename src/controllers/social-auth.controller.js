@@ -46,7 +46,8 @@ const verifyGoogleToken = async (idToken) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     
     if (!clientId) {
-      throw new Error('GOOGLE_CLIENT_ID non configuré dans les variables d\'environnement');
+      const { InternalServerError } = require('../utils/errors');
+      throw new InternalServerError('GOOGLE_CLIENT_ID non configuré dans les variables d\'environnement', { config: 'GOOGLE_CLIENT_ID' });
     }
     
     const client = new OAuth2Client(clientId);
@@ -62,12 +63,13 @@ const verifyGoogleToken = async (idToken) => {
     const payload = ticket.getPayload();
     
     // Vérifier que le token contient les informations requises
+    const { BadRequestError } = require('../utils/errors');
     if (!payload.email) {
-      throw new Error('Token Google invalide : email manquant dans le payload');
+      throw new BadRequestError('Token Google invalide : email manquant dans le payload', { provider: 'google', missing: 'email' });
     }
     
     if (!payload.sub) {
-      throw new Error('Token Google invalide : sub (Google User ID) manquant dans le payload');
+      throw new BadRequestError('Token Google invalide : sub (Google User ID) manquant dans le payload', { provider: 'google', missing: 'sub' });
     }
     
     return payload;
@@ -76,18 +78,19 @@ const verifyGoogleToken = async (idToken) => {
     console.error('Erreur vérification token Google:', error.message);
     
     // Retourner une erreur plus descriptive
+    const { UnauthorizedError, BadRequestError } = require('../utils/errors');
     if (error.message.includes('Token used too early') || 
         error.message.includes('Token used too late')) {
-      throw new Error('Token Google expiré ou utilisé trop tôt');
+      throw new UnauthorizedError('Token Google expiré ou utilisé trop tôt', { provider: 'google', reason: 'expired' });
     }
     if (error.message.includes('audience')) {
-      throw new Error('Token Google invalide : audience ne correspond pas au Client ID configuré');
+      throw new BadRequestError('Token Google invalide : audience ne correspond pas au Client ID configuré', { provider: 'google', reason: 'audience_mismatch' });
     }
     if (error.message.includes('signature')) {
-      throw new Error('Token Google invalide : signature invalide');
+      throw new BadRequestError('Token Google invalide : signature invalide', { provider: 'google', reason: 'invalid_signature' });
     }
     
-    throw new Error(`Token Google invalide : ${error.message}`);
+    throw new BadRequestError(`Token Google invalide : ${error.message}`, { provider: 'google', originalError: error.message });
   }
 };
 
@@ -101,13 +104,15 @@ const verifyAppleToken = async (idToken) => {
     const jwt = require('jsonwebtoken');
     const decoded = jwt.decode(idToken, { complete: true });
     
+    const { BadRequestError } = require('../utils/errors');
     if (!decoded || decoded.payload.iss !== 'https://appleid.apple.com') {
-      throw new Error('Token Apple invalide');
+      throw new BadRequestError('Token Apple invalide', { provider: 'apple', reason: 'invalid_issuer' });
     }
     
     return decoded.payload;
   } catch (error) {
-    throw new Error('Token Apple invalide');
+    const { BadRequestError } = require('../utils/errors');
+    throw new BadRequestError('Token Apple invalide', { provider: 'apple', originalError: error.message });
   }
 };
 
@@ -142,7 +147,8 @@ const getUserInfoFromAccessToken = async (accessToken) => {
     } else {
       console.error('   - Pas de response dans l\'erreur (erreur réseau probable)');
     }
-    throw new Error('Impossible de récupérer les informations utilisateur depuis Google');
+    const { InternalServerError } = require('../utils/errors');
+    throw new InternalServerError('Impossible de récupérer les informations utilisateur depuis Google', { provider: 'google', api: 'userinfo' });
   }
 };
 
@@ -153,13 +159,15 @@ const verifyFacebookToken = async (accessToken) => {
       `https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture&access_token=${accessToken}`
     );
     
+    const { BadRequestError } = require('../utils/errors');
     if (response.data.error) {
-      throw new Error('Token Facebook invalide');
+      throw new BadRequestError('Token Facebook invalide', { provider: 'facebook', reason: 'api_error' });
     }
     
     return response.data;
   } catch (error) {
-    throw new Error('Token Facebook invalide');
+    const { BadRequestError } = require('../utils/errors');
+    throw new BadRequestError('Token Facebook invalide', { provider: 'facebook', originalError: error.message });
   }
 };
 

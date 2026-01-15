@@ -1,41 +1,52 @@
 /**
- * Configuration CORS centralisée
+ * Configuration CORS centralisée - Production Ready
  * 
- * Gère les origines autorisées selon FRONTEND_URL :
- * - FRONTEND_URL="*" -> autorise toutes les origines
- * - FRONTEND_URL="url1,url2" -> autorise uniquement ces URLs
- * - FRONTEND_URL vide -> utilise les fallbacks par défaut
+ * Gère les origines autorisées selon CORS_ORIGINS (priorité) ou FRONTEND_URL (compatibilité) :
+ * - CORS_ORIGINS="url1,url2" -> autorise uniquement ces URLs (STRICT en production)
+ * - CORS_ORIGINS="*" -> autorise toutes les origines (⚠️ DÉCONSEILLÉ en production)
+ * - CORS_ORIGINS vide + FRONTEND_URL="url1,url2" -> utilise FRONTEND_URL (compatibilité)
+ * - En production sans config : REFUSE toutes les origines (sécurité stricte)
+ * - En développement : autorise localhost/127.0.0.1/192.168.* (flexible)
  */
 
 const cors = require('cors');
 
 /**
- * Parse FRONTEND_URL et retourne la liste des origines autorisées
+ * Parse CORS_ORIGINS ou FRONTEND_URL et retourne la liste des origines autorisées
  * @returns {string[]|null} Liste d'origines ou null si "*" (toutes autorisées)
  */
 function getAllowedOrigins() {
-  const frontendUrl = process.env.FRONTEND_URL;
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const corsOrigins = process.env.CORS_ORIGINS;
+  const frontendUrl = process.env.FRONTEND_URL; // Compatibilité
+  const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
   
-  // Mode développement : origines locales
+  // Mode développement : origines locales flexibles
   if (isDevelopment) {
+    // En dev, autoriser tous les localhost/127.0.0.1/192.168.*
+    // Pour faciliter le développement avec Flutter Web qui change de port
     return [
       'http://192.168.1.70:8080',
       'http://localhost:8080',
-      'http://127.0.0.1:8080'
+      'http://127.0.0.1:8080',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:59219'
     ];
   }
   
-  // Production : parser FRONTEND_URL
-  if (frontendUrl) {
-    const trimmed = frontendUrl.trim();
+  // PRODUCTION : Utiliser CORS_ORIGINS en priorité
+  const originsEnv = corsOrigins || frontendUrl;
+  
+  if (originsEnv) {
+    const trimmed = originsEnv.trim();
     
-    // Si "*", autoriser toutes les origines
+    // Si "*", autoriser toutes les origines (⚠️ DÉCONSEILLÉ mais possible)
     if (trimmed === '*') {
+      console.warn('⚠️  CORS: Mode "*" activé - TOUTES les origines sont autorisées (non recommandé en production)');
       return null; // null = toutes les origines autorisées
     }
     
-    // Sinon, parser la liste d'URLs
+    // Parser la liste d'URLs
     const origins = trimmed
       .split(',')
       .map(url => url.trim())
@@ -46,13 +57,11 @@ function getAllowedOrigins() {
     }
   }
   
-  // Fallback : origines par défaut en production
-  return [
-    'http://localhost:3000',
-    'http://localhost:59219',
-    'https://app.ridetogether.fr',
-    'https://www.app.ridetogether.fr'
-  ];
+  // PRODUCTION SANS CONFIG : Refuser toutes les origines (sécurité stricte)
+  // Ne pas utiliser de fallback par défaut en production
+  console.error('❌ CORS: Aucune origine configurée en production. CORS_ORIGINS ou FRONTEND_URL requis.');
+  console.error('   Exemple: CORS_ORIGINS=https://app.ridetogether.fr,https://www.app.ridetogether.fr');
+  return []; // Liste vide = aucune origine autorisée (sécurité stricte)
 }
 
 /**
@@ -92,20 +101,30 @@ function buildCorsOptions() {
       }
       
       // Vérifier si l'origine est dans la whitelist
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
         if (isDevelopment) {
           console.log(`✅ CORS: Origin dans whitelist: ${origin}`);
         }
         callback(null, true);
+      } else if (allowedOrigins && allowedOrigins.length === 0) {
+        // Production sans config : refuser
+        const errorMsg = `CORS: Origin ${origin} is not allowed. Aucune origine configurée en production.`;
+        if (process.env.DEBUG_CORS === 'true') {
+          console.error(`🚫 ${errorMsg}`);
+          console.error(`   Configurez CORS_ORIGINS ou FRONTEND_URL dans votre .env`);
+        }
+        callback(new Error(errorMsg));
       } else {
+        // Origine non dans la whitelist
+        const errorMsg = `CORS: Origin ${origin} is not allowed`;
         // Log uniquement en développement ou si DEBUG_CORS est défini
         if (isDevelopment || process.env.DEBUG_CORS === 'true') {
-          console.warn(`🚫 CORS blocked for origin: ${origin}`);
+          console.warn(`🚫 ${errorMsg}`);
           console.warn(`   NODE_ENV: ${process.env.NODE_ENV || 'non défini'}`);
           console.warn(`   isDevelopment: ${isDevelopment}`);
-          console.warn(`   Allowed origins:`, allowedOrigins);
+          console.warn(`   Allowed origins:`, allowedOrigins || 'Toutes (*)');
         }
-        callback(new Error(`CORS: Origin ${origin} is not allowed`));
+        callback(new Error(errorMsg));
       }
     },
     credentials: true,

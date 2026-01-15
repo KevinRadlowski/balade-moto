@@ -108,6 +108,9 @@ groupSchema.index({ 'membres.userId': 1 });
 groupSchema.index({ 'bannedUsers.userId': 1 });
 // Index géospatial pour les recherches "près de moi" (seulement si location.geo existe)
 groupSchema.index({ 'location.geo': '2dsphere' }, { sparse: true });
+// Index pour tri et pagination
+groupSchema.index({ createdAt: -1 });
+groupSchema.index({ visibilite: 1, createdAt: -1 }); // Compound pour listing filtré
 
 // Méthode pour vérifier si un utilisateur est membre
 groupSchema.methods.isMember = function(userId) {
