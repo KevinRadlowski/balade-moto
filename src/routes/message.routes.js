@@ -17,6 +17,10 @@ router.post('/:id/pin', authMiddleware, subscriptionMiddleware, messageControlle
 router.post('/:id/poll/vote', authMiddleware, subscriptionMiddleware, messageController.votePoll);
 router.post('/:type/:conversationId/read', authMiddleware, subscriptionMiddleware, messageController.markAsRead);
 
+// ========== THREADS ROUTES ==========
+// Obtenir un thread complet (message racine + réponses)
+router.get('/:messageId/thread', authMiddleware, subscriptionMiddleware, messageController.getThread);
+
 // Routes legacy (pour compatibilité)
 router.get('/rides/:id', authMiddleware, subscriptionMiddleware, groupController.getRideMessages);
 

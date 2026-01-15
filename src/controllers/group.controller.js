@@ -1,6 +1,8 @@
 const Group = require('../models/Group');
 const User = require('../models/User');
-const { createPlanLimitError } = require('../utils/errors');
+const Ride = require('../models/Ride');
+const { createPlanLimitError, NotFoundError, ForbiddenError, BadRequestError } = require('../utils/errors');
+const icsService = require('../services/ics.service');
 
 // Helper pour normaliser un créateur supprimé ou introuvable
 function normalizeCreator(createur) {
@@ -562,6 +564,127 @@ exports.getGroups = async (req, res, next) => {
             $project: {
               createurInfo: 0,
               membresInfo: 0
+            }
+          },
+          // Ajouter lastMessageAt et unreadCount
+          {
+            $lookup: {
+              from: 'messages',
+              let: { groupId: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$idGroupe', '$$groupId'] },
+                        { $eq: ['$deletedForAll', false] },
+                        { $eq: ['$parentMessageId', null] } // Seulement les messages principaux (pas les réponses de threads)
+                      ]
+                    }
+                  }
+                },
+                { $sort: { date: -1 } },
+                { $limit: 1 },
+                {
+                  $project: {
+                    date: 1
+                  }
+                }
+              ],
+              as: 'lastMessage'
+            }
+          },
+          {
+            $addFields: {
+              lastMessageAt: {
+                $cond: {
+                  if: { $gt: [{ $size: '$lastMessage' }, 0] },
+                  then: { $arrayElemAt: ['$lastMessage.date', 0] },
+                  else: null
+                }
+              }
+            }
+          },
+          // Calculer unreadCount pour les membres
+          {
+            $lookup: {
+              from: 'groupreads',
+              let: { groupId: '$_id', userId: userId },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$groupId', '$$groupId'] },
+                        { $eq: ['$userId', '$$userId'] }
+                      ]
+                    }
+                  }
+                },
+                { $limit: 1 },
+                { $project: { lastReadAt: 1 } }
+              ],
+              as: 'readInfo'
+            }
+          },
+          // Calculer unreadCount : compter les messages après lastReadAt
+          {
+            $addFields: {
+              lastReadAt: {
+                $cond: {
+                  if: { $gt: [{ $size: '$readInfo' }, 0] },
+                  then: { $arrayElemAt: ['$readInfo.lastReadAt', 0] },
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'messages',
+              let: { 
+                groupId: '$_id',
+                lastReadAt: '$lastReadAt'
+              },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$idGroupe', '$$groupId'] },
+                        { $eq: ['$deletedForAll', false] },
+                        { $eq: ['$parentMessageId', null] },
+                        {
+                          $or: [
+                            { $eq: ['$$lastReadAt', null] }, // Si pas de lastReadAt, compter tous les messages
+                            { $gt: ['$date', '$$lastReadAt'] } // Sinon, seulement ceux après lastReadAt
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                { $count: 'count' }
+              ],
+              as: 'unreadMessages'
+            }
+          },
+          {
+            $addFields: {
+              unreadCount: {
+                $cond: {
+                  if: { $gt: [{ $size: '$unreadMessages' }, 0] },
+                  then: { $arrayElemAt: ['$unreadMessages.count', 0] },
+                  else: 0
+                }
+              }
+            }
+          },
+          {
+            $project: {
+              lastMessage: 0,
+              readInfo: 0,
+              unreadMessages: 0
             }
           }
         ],
@@ -1571,6 +1694,293 @@ exports.claimAdmin = async (req, res) => {
 };
 
 // Obtenir les messages d'une balade
+/**
+ * Obtenir les balades d'un groupe pour le calendrier
+ */
+exports.getGroupRides = async (req, res, next) => {
+  try {
+    const { id: groupId } = req.params;
+    const { from, to, view } = req.query;
+
+    // Validation des paramètres
+    if (!from || !to) {
+      return next(new BadRequestError('Les paramètres "from" et "to" (dates ISO) sont requis'));
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return next(new BadRequestError('Les dates "from" et "to" doivent être au format ISO valide'));
+    }
+
+    if (fromDate > toDate) {
+      return next(new BadRequestError('La date "from" doit être antérieure à "to"'));
+    }
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier les permissions
+    const isCreator = group.createur.toString() === req.user._id.toString();
+    const isMember = group.isMember(req.user._id);
+
+    if (group.visibilite === 'privee' && !isMember && !isCreator) {
+      return next(new ForbiddenError('Vous n\'avez pas accès à ce groupe privé'));
+    }
+
+    // Construire la date/heure de début et fin pour la requête
+    // On cherche les balades dont la date est dans la plage [from, to]
+    // et on construit startAt en combinant date + heure
+    const query = {
+      groupId: groupId,
+      date: {
+        $gte: fromDate,
+        $lte: toDate
+      },
+      status: { $in: ['scheduled', 'postponed'] } // Uniquement les balades à venir ou reportées
+    };
+
+    // Récupérer les balades avec projection optimisée
+    const rides = await Ride.find(query)
+      .select('_id titre date heure lieuDepart lieuArrivee status visibilite organisateur')
+      .populate('organisateur', 'pseudo')
+      .lean()
+      .sort({ date: 1, heure: 1 });
+
+    // Transformer les rides en format calendar
+    const items = rides.map(ride => {
+      // Construire startAt (date + heure)
+      const startAt = new Date(ride.date);
+      const [hours, minutes] = ride.heure.split(':').map(Number);
+      startAt.setHours(hours, minutes, 0, 0);
+
+      // Estimer endAt (départ + durée estimée si disponible, sinon +2h par défaut)
+      const endAt = new Date(startAt);
+      if (ride.estimatedDuration) {
+        const durationMinutes = typeof ride.estimatedDuration === 'number' 
+          ? ride.estimatedDuration 
+          : parseInt(ride.estimatedDuration) || 120;
+        endAt.setMinutes(endAt.getMinutes() + durationMinutes);
+      } else {
+        endAt.setHours(endAt.getHours() + 2); // 2h par défaut
+      }
+
+      // Extraire les noms de départ et arrivée
+      let departureName = 'Départ';
+      let arrivalName = 'Arrivée';
+      
+      if (typeof ride.lieuDepart === 'string') {
+        departureName = ride.lieuDepart;
+      } else if (ride.lieuDepart && ride.lieuDepart.address) {
+        departureName = ride.lieuDepart.address;
+      }
+
+      if (typeof ride.lieuArrivee === 'string') {
+        arrivalName = ride.lieuArrivee;
+      } else if (ride.lieuArrivee && ride.lieuArrivee.address) {
+        arrivalName = ride.lieuArrivee.address;
+      }
+
+      return {
+        rideId: ride._id.toString(),
+        title: ride.titre,
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+        status: ride.status,
+        departureName,
+        arrivalName,
+        organizer: {
+          id: ride.organisateur._id.toString(),
+          pseudo: ride.organisateur.pseudo || 'Organisateur'
+        },
+        visibility: ride.visibilite
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        items,
+        meta: {
+          total: items.length,
+          from: fromDate.toISOString(),
+          to: toDate.toISOString(),
+          view: view || 'month'
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Exporter le calendrier d'un groupe en format ICS
+ * Supporte l'authentification via header Bearer OU query param token
+ */
+exports.exportGroupCalendar = async (req, res, next) => {
+  try {
+    const { id: groupId } = req.params;
+    const { from, to, token } = req.query;
+    
+    // Si pas de token dans le header mais présent en query param, authentifier manuellement
+    if (!req.headers.authorization && token) {
+      const jwt = require('jsonwebtoken');
+      const User = require('../models/User');
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = await User.findById(decoded.userId).select('-password -refreshToken');
+        if (!req.user) {
+          return next(new ForbiddenError('Token invalide'));
+        }
+        // Vérifier si l'utilisateur est supprimé ou banni
+        if (req.user.isDeleted) {
+          return next(new ForbiddenError('Ce compte a été supprimé'));
+        }
+        if (req.user.banned) {
+          return next(new ForbiddenError('Ce compte a été banni'));
+        }
+      } catch (err) {
+        return next(new ForbiddenError('Token invalide ou expiré'));
+      }
+    }
+
+    // Validation des paramètres
+    if (!from || !to) {
+      return next(new BadRequestError('Les paramètres "from" et "to" (dates ISO) sont requis'));
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return next(new BadRequestError('Les dates "from" et "to" doivent être au format ISO valide'));
+    }
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier les permissions
+    const isCreator = group.createur.toString() === req.user._id.toString();
+    const isMember = group.isMember(req.user._id);
+
+    if (group.visibilite === 'privee' && !isMember && !isCreator) {
+      return next(new ForbiddenError('Vous n\'avez pas accès à ce groupe privé'));
+    }
+
+    // Récupérer les balades du groupe dans la période
+    const query = {
+      groupId: groupId,
+      date: {
+        $gte: fromDate,
+        $lte: toDate
+      },
+      status: { $in: ['scheduled', 'postponed'] }
+    };
+
+    const rides = await Ride.find(query)
+      .populate('organisateur', 'firstName lastName email')
+      .sort({ date: 1, heure: 1 });
+
+    if (rides.length === 0) {
+      return res.status(200).send('BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//RideTogether//Group Calendar//FR\nEND:VCALENDAR');
+    }
+
+    // Générer les événements ICS
+    const events = rides.map(ride => {
+      const rideDate = new Date(ride.date);
+      const [hours, minutes] = ride.heure.split(':').map(Number);
+      rideDate.setHours(hours, minutes, 0, 0);
+
+      // Date de fin (durée estimée si disponible, sinon +2h par défaut)
+      const endDate = new Date(rideDate);
+      if (ride.estimatedDuration) {
+        const durationMinutes = typeof ride.estimatedDuration === 'number' 
+          ? ride.estimatedDuration 
+          : parseInt(ride.estimatedDuration) || 120;
+        endDate.setMinutes(endDate.getMinutes() + durationMinutes);
+      } else {
+        endDate.setHours(endDate.getHours() + 2);
+      }
+
+      // Extraire les noms de départ et arrivée
+      let departureName = 'Départ';
+      let arrivalName = 'Arrivée';
+      
+      if (typeof ride.lieuDepart === 'string') {
+        departureName = ride.lieuDepart;
+      } else if (ride.lieuDepart && ride.lieuDepart.address) {
+        departureName = ride.lieuDepart.address;
+      }
+
+      if (typeof ride.lieuArrivee === 'string') {
+        arrivalName = ride.lieuArrivee;
+      } else if (ride.lieuArrivee && ride.lieuArrivee.address) {
+        arrivalName = ride.lieuArrivee.address;
+      }
+
+      const location = `Départ: ${departureName} / Arrivée: ${arrivalName}`;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const description = `${ride.description || ''}\n\nLien: ${frontendUrl}/rides/${ride._id}`.trim();
+
+      return {
+        start: [
+          rideDate.getFullYear(),
+          rideDate.getMonth() + 1,
+          rideDate.getDate(),
+          rideDate.getHours(),
+          rideDate.getMinutes()
+        ],
+        end: [
+          endDate.getFullYear(),
+          endDate.getMonth() + 1,
+          endDate.getDate(),
+          endDate.getHours(),
+          endDate.getMinutes()
+        ],
+        title: `RideTogether: ${ride.titre}`,
+        description,
+        location,
+        url: `${frontendUrl}/rides/${ride._id}`,
+        status: 'CONFIRMED',
+        busyStatus: 'BUSY',
+        organizer: {
+          name: ride.organisateur.firstName && ride.organisateur.lastName
+            ? `${ride.organisateur.firstName} ${ride.organisateur.lastName}`
+            : ride.organisateur.email,
+          email: ride.organisateur.email
+        },
+        uid: `ridetogether-${ride._id}@ridetogether`,
+        categories: [ride.typeVehicule === 'moto' ? 'Moto' : 'Voiture']
+      };
+    });
+
+    // Générer le fichier ICS
+    const ics = require('ics');
+    const { error, value } = ics.createEvents(events);
+
+    if (error) {
+      console.error('Erreur génération ICS:', error);
+      return next(new Error(`Erreur lors de la génération du fichier ICS: ${error.message}`));
+    }
+
+    // Définir les headers
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="ridetogether-${groupId}.ics"`);
+
+    res.send(value);
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.getRideMessages = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1637,6 +2047,285 @@ exports.getRideMessages = async (req, res) => {
       message: 'Erreur lors de la récupération des messages',
       error: error.message
     });
+  }
+};
+
+/**
+ * Obtenir des suggestions d'utilisateurs pour les mentions @pseudo
+ * GET /api/groups/:groupId/members/suggest?q=ma
+ */
+exports.suggestMembers = async (req, res, next) => {
+  try {
+    const { id: groupId } = req.params;
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(200).json({
+        success: true,
+        data: { suggestions: [] }
+      });
+    }
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier que l'utilisateur est membre
+    if (!group.isMember(req.user._id) && group.createur.toString() !== req.user._id.toString()) {
+      return next(new ForbiddenError('Vous n\'êtes pas membre de ce groupe'));
+    }
+
+    // Récupérer les IDs des membres du groupe
+    const memberIds = [
+      group.createur,
+      ...group.membres.map(m => m.userId)
+    ];
+
+    // Rechercher les utilisateurs membres du groupe dont le pseudo ou email correspond
+    const searchQuery = q.trim().toLowerCase();
+    const users = await User.find({
+      _id: { $in: memberIds },
+      isDeleted: { $ne: true },
+      $or: [
+        { pseudo: { $regex: searchQuery, $options: 'i' } },
+        { email: { $regex: searchQuery, $options: 'i' } }
+      ]
+    })
+      .select('_id pseudo email avatarUrl firstName lastName')
+      .limit(10)
+      .lean();
+
+    // Formater les suggestions
+    const suggestions = users.map(user => ({
+      userId: user._id.toString(),
+      username: user.pseudo || user.email,
+      displayName: user.pseudo || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      avatarUrl: user.avatarUrl || null
+    }));
+
+    // Construire les URLs complètes des avatars
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+    suggestions.forEach(suggestion => {
+      if (suggestion.avatarUrl && !suggestion.avatarUrl.startsWith('http')) {
+        suggestion.avatarUrl = `${baseUrl}${suggestion.avatarUrl}`;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { suggestions }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Muter un utilisateur dans un groupe
+ * POST /api/groups/:groupId/members/:userId/mute
+ */
+exports.muteUser = async (req, res, next) => {
+  try {
+    const { groupId, userId } = req.params;
+    const { durationMinutes, reason } = req.body;
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier les permissions (owner/admin/mod uniquement)
+    if (!group.isModerator(req.user._id)) {
+      return next(new ForbiddenError('Seuls le créateur, les administrateurs et les modérateurs peuvent muter des utilisateurs'));
+    }
+
+    // Vérifier que l'utilisateur cible est membre du groupe
+    if (!group.isMember(userId) && group.createur.toString() !== userId) {
+      return next(new NotFoundError('Utilisateur non trouvé dans ce groupe'));
+    }
+
+    // Ne pas permettre de muter le créateur
+    if (group.createur.toString() === userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Impossible de muter le créateur du groupe'
+      });
+    }
+
+    // Vérifier que l'utilisateur ne mute pas lui-même
+    if (req.user._id.toString() === userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vous ne pouvez pas vous muter vous-même'
+      });
+    }
+
+    // Valider durationMinutes
+    const duration = parseInt(durationMinutes);
+    if (!duration || duration <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'La durée doit être un nombre positif (en minutes)'
+      });
+    }
+
+    // Calculer mutedUntil
+    const mutedUntil = new Date(Date.now() + duration * 60 * 1000);
+
+    // Vérifier s'il y a déjà un mute actif
+    const GroupMute = require('../models/GroupMute');
+    const existingMute = await GroupMute.findOne({
+      groupId: groupId,
+      userId: userId,
+      mutedUntil: { $gt: new Date() }
+    });
+
+    if (existingMute) {
+      // Mettre à jour le mute existant
+      existingMute.mutedUntil = mutedUntil;
+      existingMute.reason = reason?.trim() || null;
+      existingMute.createdBy = req.user._id;
+      await existingMute.save();
+    } else {
+      // Créer un nouveau mute
+      await GroupMute.create({
+        groupId: groupId,
+        userId: userId,
+        mutedUntil: mutedUntil,
+        reason: reason?.trim() || null,
+        createdBy: req.user._id
+      });
+    }
+
+    // Logger l'action
+    const GroupModerationLog = require('../models/GroupModerationLog');
+    await GroupModerationLog.create({
+      groupId: groupId,
+      action: 'mute',
+      targetUserId: userId,
+      performedBy: req.user._id,
+      meta: {
+        durationMinutes: duration,
+        mutedUntil: mutedUntil,
+        reason: reason
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Utilisateur muté jusqu'au ${mutedUntil.toISOString()}`,
+      data: {
+        mutedUntil: mutedUntil,
+        durationMinutes: duration
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Démuter un utilisateur dans un groupe
+ * POST /api/groups/:groupId/members/:userId/unmute
+ */
+exports.unmuteUser = async (req, res, next) => {
+  try {
+    const { groupId, userId } = req.params;
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier les permissions (owner/admin/mod uniquement)
+    if (!group.isModerator(req.user._id)) {
+      return next(new ForbiddenError('Seuls le créateur, les administrateurs et les modérateurs peuvent démuter des utilisateurs'));
+    }
+
+    // Retirer tous les mutes actifs pour cet utilisateur dans ce groupe
+    const GroupMute = require('../models/GroupMute');
+    const result = await GroupMute.updateMany(
+      {
+        groupId: groupId,
+        userId: userId,
+        mutedUntil: { $gt: new Date() }
+      },
+      {
+        $set: { mutedUntil: new Date() } // Mettre à jour pour qu'il expire immédiatement
+      }
+    );
+
+    // Logger l'action
+    const GroupModerationLog = require('../models/GroupModerationLog');
+    await GroupModerationLog.create({
+      groupId: groupId,
+      action: 'unmute',
+      targetUserId: userId,
+      performedBy: req.user._id
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Utilisateur démuté avec succès',
+      data: {
+        updatedCount: result.modifiedCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Obtenir la liste des utilisateurs mutés dans un groupe
+ * GET /api/groups/:groupId/mutes
+ */
+exports.getMutedUsers = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return next(new NotFoundError('Groupe'));
+    }
+
+    // Vérifier les permissions (owner/admin/mod uniquement)
+    if (!group.isModerator(req.user._id)) {
+      return next(new ForbiddenError('Seuls le créateur, les administrateurs et les modérateurs peuvent voir la liste des utilisateurs mutés'));
+    }
+
+    // Récupérer les mutes actifs
+    const GroupMute = require('../models/GroupMute');
+    const mutes = await GroupMute.find({
+      groupId: groupId,
+      mutedUntil: { $gt: new Date() }
+    })
+      .populate('userId', 'pseudo email avatarUrl')
+      .populate('createdBy', 'pseudo email')
+      .sort({ mutedUntil: 1 })
+      .lean();
+
+    // Construire les URLs complètes des avatars
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+    mutes.forEach(mute => {
+      if (mute.userId && mute.userId.avatarUrl && !mute.userId.avatarUrl.startsWith('http')) {
+        mute.userId.avatarUrl = `${baseUrl}${mute.userId.avatarUrl}`;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        mutes: mutes
+      }
+    });
+  } catch (error) {
+    next(error);
   }
 };
 

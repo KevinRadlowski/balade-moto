@@ -27,6 +27,10 @@ class MessageExtended {
   final String? pinnedByPseudo;
   final PollData? pollData;
   final String? proposedRideId;
+  // Threads
+  final String? parentMessageId;
+  final String? threadRootId;
+  final int threadReplyCount;
 
   MessageExtended({
     required this.id,
@@ -55,6 +59,9 @@ class MessageExtended {
     this.pinnedByPseudo,
     this.pollData,
     this.proposedRideId,
+    this.parentMessageId,
+    this.threadRootId,
+    this.threadReplyCount = 0,
   });
 
   factory MessageExtended.fromJson(Map<String, dynamic> json) {
@@ -212,6 +219,10 @@ class MessageExtended {
           : null,
       pollData: pollData,
       proposedRideId: proposedRideId,
+      // Threads
+      parentMessageId: json['parentMessageId']?.toString(),
+      threadRootId: json['threadRootId']?.toString(),
+      threadReplyCount: json['threadReplyCount'] ?? 0,
     );
   }
 

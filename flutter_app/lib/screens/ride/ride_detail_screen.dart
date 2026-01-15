@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../models/ride.dart';
 import '../../models/waypoint.dart';
+import '../../models/weather.dart';
 import '../../widgets/rating_form.dart';
 import '../../widgets/average_rating_display.dart';
 import '../../widgets/navigation/navigation_app_selector.dart';
@@ -54,6 +55,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
   // Distance et durée de la balade
   double? _totalDistance; // en km
   String? _estimatedDuration; // formaté (ex: "2 h 30 min")
+  
+  // Météo
+  RideWeather? _weather;
+  bool _isLoadingWeather = false;
+  DateTime? _lastWeatherRefresh;
 
   @override
   void initState() {
@@ -141,6 +147,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
       // Charger le trajet sur la carte si des waypoints existent
       if (ride.waypoints != null && ride.waypoints!.isNotEmpty) {
         _loadRouteOnMap(ride.waypoints!);
+      }
+      
+      // Charger la météo (uniquement pour les balades futures)
+      if (!_isRidePast) {
+        _loadWeather();
       }
     } catch (e) {
       if (mounted) {
@@ -1045,6 +1056,525 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
     }
   }
 
+  // ========== ANNULATION / REPORT / REPROGRAMMATION ==========
+
+  Future<void> _cancelRide() async {
+    if (_ride == null) return;
+
+    String? selectedReasonCode;
+    final reasonTextController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.cancel, color: AppTheme.errorColor),
+                  SizedBox(width: 8),
+                  Text('Annuler la balade'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Motif d\'annulation *',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    ...['WEATHER', 'MECHANICAL', 'ROAD_CLOSED', 'LOW_PARTICIPATION', 'OTHER'].map((code) {
+                      String label;
+                      switch (code) {
+                        case 'WEATHER':
+                          label = 'Météo défavorable';
+                          break;
+                        case 'MECHANICAL':
+                          label = 'Problème mécanique';
+                          break;
+                        case 'ROAD_CLOSED':
+                          label = 'Route fermée';
+                          break;
+                        case 'LOW_PARTICIPATION':
+                          label = 'Peu de participants';
+                          break;
+                        case 'OTHER':
+                          label = 'Autre raison';
+                          break;
+                        default:
+                          label = code;
+                      }
+                      return RadioListTile<String>(
+                        title: Text(label),
+                        value: code,
+                        groupValue: selectedReasonCode,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedReasonCode = value;
+                          });
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Détails (optionnel)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonTextController,
+                      decoration: InputDecoration(
+                        hintText: 'Précisez la raison...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      maxLines: 3,
+                      maxLength: 500,
+                      enabled: !isSubmitting,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isSubmitting)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Annuler'),
+                  ),
+                  ElevatedButton(
+                    onPressed: selectedReasonCode == null
+                        ? null
+                        : () async {
+                            setState(() {
+                              isSubmitting = true;
+                            });
+
+                            try {
+                              await _apiService.cancelRide(
+                                _ride!.id,
+                                reasonCode: selectedReasonCode!,
+                                reasonText: reasonTextController.text.trim().isEmpty
+                                    ? null
+                                    : reasonTextController.text.trim(),
+                              );
+
+                              if (context.mounted) {
+                                Navigator.of(context).pop(true);
+                                await _loadRide();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Balade annulée avec succès'),
+                                    backgroundColor: AppTheme.successColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    backgroundColor: AppTheme.errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.errorColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Confirmer l\'annulation'),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _postponeRide() async {
+    if (_ride == null) return;
+
+    String? selectedReasonCode;
+    final reasonTextController = TextEditingController();
+    DateTime? selectedNewDateTime;
+    bool isSubmitting = false;
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Reporter la balade'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Motif de report *',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    ...['WEATHER', 'MECHANICAL', 'ROAD_CLOSED', 'LOW_PARTICIPATION', 'OTHER'].map((code) {
+                      String label;
+                      switch (code) {
+                        case 'WEATHER':
+                          label = 'Météo défavorable';
+                          break;
+                        case 'MECHANICAL':
+                          label = 'Problème mécanique';
+                          break;
+                        case 'ROAD_CLOSED':
+                          label = 'Route fermée';
+                          break;
+                        case 'LOW_PARTICIPATION':
+                          label = 'Peu de participants';
+                          break;
+                        case 'OTHER':
+                          label = 'Autre raison';
+                          break;
+                        default:
+                          label = code;
+                      }
+                      return RadioListTile<String>(
+                        title: Text(label),
+                        value: code,
+                        groupValue: selectedReasonCode,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedReasonCode = value;
+                          });
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nouvelle date/heure (optionnel)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      title: Text(
+                        selectedNewDateTime == null
+                            ? 'Sélectionner une date'
+                            : DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(selectedNewDateTime!),
+                      ),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: _ride!.date.isAfter(DateTime.now()) ? _ride!.date : DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(_ride!.date),
+                          );
+                          if (time != null) {
+                            setState(() {
+                              selectedNewDateTime = DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                                time.hour,
+                                time.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Détails (optionnel)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonTextController,
+                      decoration: InputDecoration(
+                        hintText: 'Précisez la raison...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      maxLines: 3,
+                      maxLength: 500,
+                      enabled: !isSubmitting,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isSubmitting)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Annuler'),
+                  ),
+                  ElevatedButton(
+                    onPressed: selectedReasonCode == null
+                        ? null
+                        : () async {
+                            setState(() {
+                              isSubmitting = true;
+                            });
+
+                            try {
+                              await _apiService.postponeRide(
+                                _ride!.id,
+                                reasonCode: selectedReasonCode!,
+                                reasonText: reasonTextController.text.trim().isEmpty
+                                    ? null
+                                    : reasonTextController.text.trim(),
+                                newDateTime: selectedNewDateTime,
+                              );
+
+                              if (context.mounted) {
+                                Navigator.of(context).pop(true);
+                                await _loadRide();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Balade reportée avec succès'),
+                                    backgroundColor: AppTheme.successColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    backgroundColor: AppTheme.errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Confirmer le report'),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _rescheduleRide() async {
+    if (_ride == null) return;
+
+    DateTime? selectedNewDateTime;
+    bool keepVisibility = true;
+    bool keepParticipants = false;
+    bool isSubmitting = false;
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.event_repeat, color: AppTheme.primaryColor),
+                  SizedBox(width: 8),
+                  Text('Reprogrammer la balade'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Nouvelle date et heure *',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      title: Text(
+                        selectedNewDateTime == null
+                            ? 'Sélectionner une date'
+                            : DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(selectedNewDateTime!),
+                      ),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(_ride!.date),
+                          );
+                          if (time != null) {
+                            setState(() {
+                              selectedNewDateTime = DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                                time.hour,
+                                time.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      title: const Text('Conserver la visibilité'),
+                      subtitle: const Text('La nouvelle balade aura la même visibilité que l\'originale'),
+                      value: keepVisibility,
+                      onChanged: (value) {
+                        setState(() {
+                          keepVisibility = value ?? true;
+                        });
+                      },
+                    ),
+                    CheckboxListTile(
+                      title: const Text('Conserver les participants'),
+                      subtitle: const Text('Les participants seront automatiquement ajoutés à la nouvelle balade'),
+                      value: keepParticipants,
+                      onChanged: (value) {
+                        setState(() {
+                          keepParticipants = value ?? false;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isSubmitting)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Annuler'),
+                  ),
+                  ElevatedButton(
+                    onPressed: selectedNewDateTime == null
+                        ? null
+                        : () async {
+                            setState(() {
+                              isSubmitting = true;
+                            });
+
+                            try {
+                              final newRide = await _apiService.rescheduleRide(
+                                _ride!.id,
+                                newDateTime: selectedNewDateTime!,
+                                keepVisibility: keepVisibility,
+                                keepParticipants: keepParticipants,
+                              );
+
+                              if (context.mounted) {
+                                Navigator.of(context).pop(true);
+                                // Naviguer vers la nouvelle balade
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                    builder: (context) => RideDetailScreen(rideId: newRide.id),
+                                  ),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Balade reprogrammée avec succès'),
+                                    backgroundColor: AppTheme.successColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    backgroundColor: AppTheme.errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Reprogrammer'),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _getHeroBackgroundImage() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final user = authService.user;
@@ -1173,9 +1703,25 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // BANNIÈRES D'ANNULATION/REPORT EN PREMIER (très visibles)
+                if (_ride!.status == 'cancelled' && _ride!.cancellation != null) ...[
+                  _buildCancellationBanner(),
+                  const SizedBox(height: 20),
+                ],
+                if (_ride!.status == 'postponed' && _ride!.postponement != null) ...[
+                  _buildPostponementBanner(),
+                  const SizedBox(height: 20),
+                ],
+                
                 // Description (titre supprimé car déjà dans le hero)
                 if (_ride!.description != null && _ride!.description!.isNotEmpty) ...[
                   _buildDescriptionCard(),
+                  const SizedBox(height: 20),
+                ],
+                
+                // Météo (uniquement pour les balades futures)
+                if (!_isRidePast) ...[
+                  _buildWeatherSection(),
                   const SizedBox(height: 20),
                 ],
                 
@@ -1187,6 +1733,8 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                 if (_ride!.waypoints != null && _ride!.waypoints!.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   _buildMapSection(),
+                  const SizedBox(height: 16),
+                  _buildWaypointsList(),
                 ],
                 
                 // Notes
@@ -1205,6 +1753,64 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                   _buildRatedCard(),
                 ],
                 
+                // Bandeau si reprogrammée
+                if (_ride!.reprogrammedToRideId != null) ...[
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.event_repeat,
+                          color: AppTheme.primaryColor,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cette balade a été reprogrammée',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Une nouvelle balade a été créée avec les mêmes informations',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => RideDetailScreen(rideId: _ride!.reprogrammedToRideId!),
+                              ),
+                            );
+                          },
+                          child: const Text('Voir la nouvelle balade'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+
                 // Outils organisateur (uniquement pour l'organisateur)
                 if (_ride!.organisateur.id == Provider.of<AuthService>(context, listen: false).user?.id) ...[
                   const SizedBox(height: 24),
@@ -1307,8 +1913,10 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Badges (visibilité + premium)
-                Row(
+                // Badges (visibilité + premium + statut)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     // Badge visibilité
                     Container(
@@ -1340,8 +1948,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                       ),
                     ),
                     // Badge "Organisateur Premium"
-                    if (_ride!.isOrganizerPremium == true) ...[
-                      const SizedBox(width: 8),
+                    if (_ride!.isOrganizerPremium == true)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -1369,7 +1976,64 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                           ],
                         ),
                       ),
-                    ],
+                    // Badge "Annulée"
+                    if (_ride!.status == 'cancelled')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppTheme.cardShadow,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cancel,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Annulée',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Badge "Reportée"
+                    if (_ride!.status == 'postponed')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppTheme.cardShadow,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Reportée',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -1432,6 +2096,442 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
     );
   }
 
+
+  /// Bannière d'annulation (très visible en haut)
+  Widget _buildCancellationBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.errorColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.errorColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.cancel,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Balade annulée',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Raison: ${_ride!.cancellation!.reasonLabel}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 15,
+                  ),
+                ),
+                if (_ride!.cancellation!.cancelReasonText != null && _ride!.cancellation!.cancelReasonText!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _ride!.cancellation!.cancelReasonText!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Bannière de report (très visible en haut)
+  Widget _buildPostponementBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade700,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.schedule,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Balade reportée',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Raison: ${_ride!.postponement!.reasonLabel}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 15,
+                  ),
+                ),
+                if (_ride!.postponement!.postponeReasonText != null && _ride!.postponement!.postponeReasonText!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _ride!.postponement!.postponeReasonText!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+                if (_ride!.postponement!.newDateTime != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Nouvelle date: ${DateFormat('dd/MM/yyyy à HH:mm', 'fr_FR').format(_ride!.postponement!.newDateTime!)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Charger la météo pour la balade
+  Future<void> _loadWeather({bool forceRefresh = false}) async {
+    if (_ride == null) return;
+    
+    // Cooldown : ne pas recharger si déjà chargé il y a moins de 5 minutes (sauf forceRefresh)
+    if (!forceRefresh && 
+        _lastWeatherRefresh != null && 
+        DateTime.now().difference(_lastWeatherRefresh!) < const Duration(minutes: 5)) {
+      return;
+    }
+    
+    setState(() {
+      _isLoadingWeather = true;
+    });
+    
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+      
+      final weather = await _apiService.getRideWeather(_ride!.id);
+      
+      if (mounted) {
+        setState(() {
+          _weather = weather; // Peut être null si service indisponible
+          _isLoadingWeather = false;
+          if (weather != null) {
+            _lastWeatherRefresh = DateTime.now();
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement météo: $e');
+      // Si c'est une erreur 503 (service indisponible), ne pas afficher d'erreur
+      // Le message sera affiché dans l'UI
+      if (mounted) {
+        setState(() {
+          _isLoadingWeather = false;
+          // Garder _weather à null pour afficher le message "non disponible"
+        });
+      }
+    }
+  }
+
+  /// Section météo
+  Widget _buildWeatherSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.wb_sunny, color: Colors.orange, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                'Météo',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              if (_weather != null)
+                IconButton(
+                  icon: _isLoadingWeather
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh, size: 20),
+                  onPressed: _isLoadingWeather
+                      ? null
+                      : () => _loadWeather(forceRefresh: true),
+                  tooltip: 'Rafraîchir la météo',
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (_isLoadingWeather && _weather == null)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_weather == null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Météo non disponible',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Le service météo n\'est pas configuré',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => _loadWeather(forceRefresh: true),
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            // Alertes météo
+            if (_weather!.alerts.isNotEmpty) ...[
+              ..._weather!.alerts.map((alert) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: alert.severity == 'danger'
+                      ? Colors.red.shade50
+                      : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: alert.severity == 'danger'
+                        ? Colors.red.shade300
+                        : Colors.orange.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      alert.severity == 'danger' ? Icons.warning : Icons.info,
+                      color: alert.severity == 'danger' ? Colors.red : Colors.orange,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        alert.message,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: alert.severity == 'danger' ? Colors.red.shade900 : Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 16),
+            ],
+            
+            // Météo départ et arrivée
+            Row(
+              children: [
+                // Départ
+                Expanded(
+                  child: _buildWeatherCard(
+                    title: 'Départ',
+                    forecast: _weather!.departure,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Arrivée
+                Expanded(
+                  child: _buildWeatherCard(
+                    title: 'Arrivée',
+                    forecast: _weather!.arrival,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Carte météo individuelle (départ ou arrivée)
+  Widget _buildWeatherCard({
+    required String title,
+    required WeatherForecast forecast,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                forecast.getWeatherEmoji(),
+                style: const TextStyle(fontSize: 32),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (forecast.temperature != null)
+                      Text(
+                        '${forecast.temperature!.round()}°C',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    Text(
+                      forecast.description,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildWeatherInfo(
+                icon: Icons.air,
+                value: '${forecast.windSpeed.round()} km/h',
+              ),
+              const SizedBox(width: 12),
+              _buildWeatherInfo(
+                icon: Icons.water_drop,
+                value: '${forecast.precipitationProb.round()}%',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Info météo individuelle (vent, pluie)
+  Widget _buildWeatherInfo({required IconData icon, required String value}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildDescriptionCard() {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1724,6 +2824,216 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
     );
   }
 
+  /// Construire la liste des waypoints sous la carte
+  Widget _buildWaypointsList() {
+    if (_ride == null || _ride!.waypoints == null || _ride!.waypoints!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Trier les waypoints par ordre
+    final sortedWaypoints = List<Waypoint>.from(_ride!.waypoints!);
+    sortedWaypoints.sort((a, b) => a.order.compareTo(b.order));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.elevatedShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.route, color: AppTheme.primaryColor, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Checkpoints',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    color: Colors.grey.shade900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            itemCount: sortedWaypoints.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final waypoint = sortedWaypoints[index];
+              return _buildWaypointItem(waypoint, index);
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Construire un item de waypoint dans la liste
+  Widget _buildWaypointItem(Waypoint waypoint, int index) {
+    // Déterminer le type d'affichage
+    String title;
+    IconData icon;
+    Color iconColor;
+    
+    if (waypoint.type == 'depart') {
+      title = 'Départ';
+      icon = Icons.play_circle_filled;
+      iconColor = Colors.green;
+    } else if (waypoint.type == 'arrivee') {
+      title = 'Arrivée';
+      icon = Icons.flag;
+      iconColor = Colors.red;
+    } else {
+      // Checkpoint avec type spécifique
+      switch (waypoint.waypointType) {
+        case 'fuel':
+          title = 'Pause carburant';
+          icon = Icons.local_gas_station;
+          iconColor = Colors.orange;
+          break;
+        case 'coffee':
+          title = 'Pause café';
+          icon = Icons.local_cafe;
+          iconColor = Colors.brown;
+          break;
+        case 'danger':
+          title = 'Danger';
+          icon = Icons.warning;
+          iconColor = Colors.red;
+          break;
+        case 'viewpoint':
+          title = 'Point de vue';
+          icon = Icons.landscape;
+          iconColor = Colors.purple;
+          break;
+        default:
+          title = 'Checkpoint ${index + 1}';
+          icon = Icons.location_on;
+          iconColor = AppTheme.primaryColor;
+      }
+    }
+
+    return InkWell(
+      onTap: () {
+        // Centrer la carte sur ce waypoint
+        _centerMapOnWaypoint(waypoint);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        child: Row(
+          children: [
+            // Numéro/icône
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Contenu
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      if (waypoint.isMandatoryStop) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Obligatoire',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    waypoint.address,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (waypoint.note != null && waypoint.note!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      waypoint.note!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Icône de navigation
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Centrer la carte sur un waypoint spécifique
+  void _centerMapOnWaypoint(Waypoint waypoint) {
+    if (_mapController == null) return;
+
+    _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(waypoint.latitude, waypoint.longitude),
+          zoom: 15.0,
+        ),
+      ),
+    );
+  }
+
   Widget _buildRatingSection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1796,8 +3106,8 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
       children: [
         // Si l'utilisateur est l'organisateur
         if (isOrganizer) ...[
-          // Si la balade est programmée ET pas encore passée, afficher "Démarrer la balade"
-          if (_ride!.status == 'scheduled' && !_isRidePast) ...[
+          // Si la balade est programmée ou reportée ET pas encore passée, afficher "Démarrer la balade"
+          if ((_ride!.status == 'scheduled' || _ride!.status == 'postponed') && !_isRidePast) ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -2154,10 +3464,144 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
   Widget _buildSecondaryActions() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final isOrganizer = _ride!.organisateur.id == authService.user?.id;
+    // Permettre les actions si la balade n'est pas annulée ou terminée
+    // (même si elle est reportée, on peut toujours l'annuler, la reporter à nouveau ou la reprogrammer)
+    final canCancelOrPostpone = isOrganizer && 
+        _ride!.status != 'cancelled' && 
+        _ride!.status != 'completed';
     
     return Column(
       children: [
         if (isOrganizer) ...[
+          // Actions d'annulation/report/reprogrammation (si balade pas encore annulée/complétée)
+          if (canCancelOrPostpone) ...[
+            // Annuler
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.errorColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _cancelRide,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.cancel_outlined,
+                          size: 22,
+                          color: AppTheme.errorColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Annuler la balade',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.errorColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Reporter
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _postponeRide,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.schedule_outlined,
+                          size: 22,
+                          color: Colors.orange.shade900,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Reporter la balade',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Reprogrammer
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _rescheduleRide,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_repeat_outlined,
+                          size: 22,
+                          color: AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Reprogrammer la balade',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           // Supprimer - version améliorée avec fond
           Container(
             width: double.infinity,
@@ -2568,25 +4012,59 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
       final waypoint = sortedWaypoints[i];
       final markerId = MarkerId('waypoint_$i');
 
+      // Construire le titre avec le type de waypoint
+      String title;
+      if (waypoint.type == 'depart') {
+        title = 'Départ';
+      } else if (waypoint.type == 'arrivee') {
+        title = 'Arrivée';
+      } else {
+        title = waypoint.getTypeName();
+      }
+
+      // Ajouter badge "Obligatoire" si nécessaire
+      String snippet = waypoint.address;
+      if (waypoint.isMandatoryStop) {
+        snippet = '⚠️ Arrêt obligatoire\n$snippet';
+      }
+      if (waypoint.note != null && waypoint.note!.isNotEmpty) {
+        snippet = '$snippet\n${waypoint.note}';
+      }
+
+      // Choisir la couleur selon waypointType
+      double markerHue;
+      if (waypoint.type == 'depart') {
+        markerHue = BitmapDescriptor.hueGreen.toDouble();
+      } else if (waypoint.type == 'arrivee') {
+        markerHue = BitmapDescriptor.hueRed.toDouble();
+      } else {
+        switch (waypoint.waypointType) {
+          case 'fuel':
+            markerHue = BitmapDescriptor.hueOrange.toDouble();
+            break;
+          case 'coffee':
+            markerHue = BitmapDescriptor.hueYellow.toDouble();
+            break;
+          case 'danger':
+            markerHue = BitmapDescriptor.hueRed.toDouble();
+            break;
+          case 'viewpoint':
+            markerHue = BitmapDescriptor.hueViolet.toDouble();
+            break;
+          default:
+            markerHue = BitmapDescriptor.hueBlue.toDouble();
+        }
+      }
+
       _markers.add(
         Marker(
           markerId: markerId,
           position: LatLng(waypoint.latitude, waypoint.longitude),
           infoWindow: InfoWindow(
-            title: waypoint.type == 'depart'
-                ? 'Départ'
-                : waypoint.type == 'arrivee'
-                    ? 'Arrivée'
-                    : 'Checkpoint ${i}',
-            snippet: waypoint.address,
+            title: title,
+            snippet: snippet,
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            waypoint.type == 'depart'
-                ? BitmapDescriptor.hueGreen
-                : waypoint.type == 'arrivee'
-                    ? BitmapDescriptor.hueRed
-                    : BitmapDescriptor.hueBlue,
-          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(markerHue),
         ),
       );
     }

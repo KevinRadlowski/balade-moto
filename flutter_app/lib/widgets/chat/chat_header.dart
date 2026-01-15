@@ -5,6 +5,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
   final String? subtitle;
   final VoidCallback? onBack;
   final VoidCallback? onSearch;
+  final VoidCallback? onPins; // Pour ouvrir la liste des messages épinglés
   final VoidCallback? onMenu;
   final Widget? leading;
 
@@ -14,6 +15,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     this.subtitle,
     this.onBack,
     this.onSearch,
+    this.onPins,
     this.onMenu,
     this.leading,
   });
@@ -53,10 +55,17 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        if (onPins != null)
+          IconButton(
+            icon: const Icon(Icons.push_pin),
+            onPressed: onPins,
+            tooltip: 'Messages épinglés',
+          ),
         if (onSearch != null)
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: onSearch,
+            tooltip: 'Rechercher',
           ),
         Padding(
           padding: const EdgeInsets.only(right: 8),

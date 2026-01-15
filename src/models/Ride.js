@@ -38,6 +38,10 @@ const rideSchema = new mongoose.Schema({
   },
   // Nouveau système de waypoints (comme Liberty Rider)
   waypoints: [{
+    _id: {
+      type: mongoose.Schema.Types.ObjectId,
+      auto: true
+    },
     type: {
       type: String,
       enum: ['depart', 'checkpoint', 'arrivee'],
@@ -70,6 +74,30 @@ const rideSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 0
+    },
+    // NOUVEAUX CHAMPS - Types de waypoints avancés
+    waypointType: {
+      type: String,
+      enum: ['normal', 'fuel', 'coffee', 'danger', 'viewpoint'],
+      default: 'normal'
+    },
+    isMandatoryStop: {
+      type: Boolean,
+      default: false
+    },
+    note: {
+      type: String,
+      maxlength: [500, 'La note ne peut pas dépasser 500 caractères'],
+      default: null
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
     }
   }],
   localisation: {
@@ -101,6 +129,13 @@ const rideSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'L\'organisateur est requis']
+  },
+  // Association avec un groupe (optionnel, rétrocompatible)
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group',
+    default: null,
+    index: true
   },
   visibilite: {
     type: String,
@@ -201,6 +236,66 @@ const rideSchema = new mongoose.Schema({
     type: String,
     enum: ['calme', 'modere', 'sportif', 'mixte'],
     default: null
+  },
+  // ========== ANNULATION / REPORT ==========
+  // Annulation
+  cancellation: {
+    cancelledAt: {
+      type: Date,
+      default: null
+    },
+    cancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    cancelReasonCode: {
+      type: String,
+      enum: ['WEATHER', 'MECHANICAL', 'ROAD_CLOSED', 'LOW_PARTICIPATION', 'OTHER'],
+      default: null
+    },
+    cancelReasonText: {
+      type: String,
+      maxlength: [500, 'Le texte de raison ne peut pas dépasser 500 caractères'],
+      default: null
+    }
+  },
+  // Report (reporté sans nouvelle date)
+  postponement: {
+    postponedAt: {
+      type: Date,
+      default: null
+    },
+    postponedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    postponeReasonCode: {
+      type: String,
+      enum: ['WEATHER', 'MECHANICAL', 'ROAD_CLOSED', 'LOW_PARTICIPATION', 'OTHER'],
+      default: null
+    },
+    postponeReasonText: {
+      type: String,
+      maxlength: [500, 'Le texte de raison ne peut pas dépasser 500 caractères'],
+      default: null
+    },
+    newDateTime: {
+      type: Date,
+      default: null // Date/heure proposée pour le report (optionnel)
+    }
+  },
+  // Reprogrammation (duplication)
+  originalRideId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ride',
+    default: null // Si cette balade est une reprogrammation, référence à la balade originale
+  },
+  reprogrammedToRideId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ride',
+    default: null // Si cette balade a été reprogrammée, référence à la nouvelle balade
   },
 
   // ========== OUTILS ORGANISATEUR ==========
@@ -369,6 +464,9 @@ rideSchema.index({ participants: 1 });
 rideSchema.index({ 'participants.vehicleId': 1 }); // Pour rechercher les balades par véhicule
 rideSchema.index({ status: 1, date: 1 }); // Pour les requêtes par statut
 rideSchema.index({ ridingStyle: 1 }); // Pour les filtres par style
+// Index pour calendar groupe
+rideSchema.index({ groupId: 1, date: 1 }); // Calendar queries
+rideSchema.index({ groupId: 1, status: 1, date: 1 }); // Filtered calendar
 // Index compound pour requêtes fréquentes (listing avec filtres)
 rideSchema.index({ typeVehicule: 1, date: 1, visibilite: 1 });
 rideSchema.index({ organisateur: 1, date: -1 }); // Mes balades triées par date

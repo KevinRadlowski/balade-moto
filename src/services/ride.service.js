@@ -443,6 +443,9 @@ async function getRideById(rideId, user) {
   rideObj.organisateur = normalizeOrganizer(rideObj.organisateur);
   rideObj.isOrganizerPremium = ride.organisateur && 
     subscriptionService.isPremiumActive(ride.organisateur) || false;
+  
+  // Ajouter le résumé des waypoints
+  rideObj.waypointSummary = calculateWaypointSummary(rideObj);
 
   return rideObj;
 }
@@ -467,7 +470,8 @@ async function createRide(rideData, user) {
     localisation,
     waypoints,
     vehicleId,
-    ridingStyle
+    ridingStyle,
+    groupId // Nouveau : association avec un groupe
   } = rideData;
 
   // Vérifier les limites du plan pour les balades privées
@@ -565,6 +569,19 @@ async function createRide(rideData, user) {
     validatedVehicleId = vehicle._id;
   }
   
+  // Vérifier que le groupe existe si groupId est fourni
+  if (groupId) {
+    const Group = require('../models/Group');
+    const group = await Group.findById(groupId);
+    if (!group) {
+      throw new NotFoundError('Groupe');
+    }
+    // Vérifier que l'utilisateur est membre du groupe
+    if (!group.isMember(user._id) && group.createur.toString() !== user._id.toString()) {
+      throw new ForbiddenError('Vous devez être membre du groupe pour créer une balade associée');
+    }
+  }
+
   // Préparer les données finales de la balade
   const finalRideData = {
     titre,
@@ -576,6 +593,7 @@ async function createRide(rideData, user) {
     lieuArrivee: finalLieuArrivee,
     rayon: rayon || 0,
     organisateur: user._id,
+    groupId: groupId || null, // Associer au groupe si fourni
     visibilite: finalVisibilite,
     participants: [{ 
       userId: user._id,
@@ -587,17 +605,9 @@ async function createRide(rideData, user) {
     rideEvents: []
   };
 
-  // Ajouter les waypoints si présents
+  // Ajouter les waypoints si présents (normalisés avec nouveaux champs)
   if (hasWaypoints) {
-    finalRideData.waypoints = waypoints.map((wp, index) => ({
-      type: wp.type || (index === 0 ? 'depart' : index === waypoints.length - 1 ? 'arrivee' : 'checkpoint'),
-      address: wp.address,
-      coordinates: {
-        type: 'Point',
-        coordinates: wp.coordinates?.coordinates || [wp.coordinates?.longitude || wp.longitude, wp.coordinates?.latitude || wp.latitude]
-      },
-      order: wp.order !== undefined ? wp.order : index
-    }));
+    finalRideData.waypoints = normalizeWaypoints(waypoints, user._id);
   }
 
   // Créer la balade
@@ -904,6 +914,52 @@ async function unlikeRide(rideId, user) {
  * @param {object} user - Utilisateur
  * @returns {Promise<object>} Balade mise à jour
  */
+/**
+ * Associer une balade à un groupe
+ * @param {string} rideId - ID de la balade
+ * @param {string} groupId - ID du groupe
+ * @param {object} user - Utilisateur (doit être organisateur de la balade ET membre du groupe)
+ * @returns {Promise<object>} Balade mise à jour
+ */
+async function associateRideToGroup(rideId, groupId, user) {
+  const ride = await rideRepository.findById(rideId);
+  if (!ride) {
+    throw new NotFoundError('Balade');
+  }
+
+  // Vérifier que le groupe existe
+  const Group = require('../models/Group');
+  const group = await Group.findById(groupId);
+  if (!group) {
+    throw new NotFoundError('Groupe');
+  }
+
+  // Vérifier que l'utilisateur est membre du groupe
+  if (!group.isMember(user._id) && group.createur.toString() !== user._id.toString()) {
+    throw new ForbiddenError('Vous devez être membre du groupe pour associer une balade');
+  }
+
+  // Vérifier les permissions pour associer la balade :
+  // - L'utilisateur est l'organisateur OU
+  // - La balade est publique OU
+  // - L'utilisateur est participant à la balade
+  const isOrganizer = ride.organisateur.toString() === user._id.toString();
+  const isParticipant = ride.participants && ride.participants.some(
+    p => p.userId && p.userId.toString() === user._id.toString()
+  );
+  const isPublic = ride.visibilite === 'publique';
+
+  if (!isOrganizer && !isPublic && !isParticipant) {
+    throw new ForbiddenError('Vous ne pouvez associer que vos propres balades, les balades publiques ou celles auxquelles vous participez');
+  }
+
+  // Associer le groupe à la balade (même si déjà associée à un autre groupe, on la réassocie)
+  ride.groupId = groupId;
+  await ride.save();
+
+  return ride;
+}
+
 async function updateRide(rideId, updateData, user) {
   const ride = await rideRepository.findById(rideId);
 
@@ -1021,7 +1077,218 @@ async function deleteRide(rideId, user) {
   await rideRepository.deleteById(rideId);
 }
 
+/**
+ * Normalise les waypoints lors de la création/mise à jour
+ * Gère la rétrocompatibilité avec l'ancien format
+ * @param {Array} waypoints - Waypoints à normaliser
+ * @param {string} userId - ID de l'utilisateur créateur
+ * @returns {Array} Waypoints normalisés
+ */
+function normalizeWaypoints(waypoints, userId) {
+  if (!waypoints || !Array.isArray(waypoints)) {
+    return [];
+  }
+
+  return waypoints.map((wp, index) => {
+    // Si waypoint a lat/lng sans location/type => créer location Point + type="normal"
+    let coordinates = null;
+    if (wp.coordinates) {
+      if (wp.coordinates.coordinates && Array.isArray(wp.coordinates.coordinates)) {
+        coordinates = wp.coordinates;
+      } else if (Array.isArray(wp.coordinates)) {
+        coordinates = {
+          type: 'Point',
+          coordinates: wp.coordinates
+        };
+      }
+    } else if (wp.latitude !== undefined && wp.longitude !== undefined) {
+      // Ancien format lat/lng
+      coordinates = {
+        type: 'Point',
+        coordinates: [parseFloat(wp.longitude), parseFloat(wp.latitude)]
+      };
+    }
+
+    if (!coordinates || !coordinates.coordinates || coordinates.coordinates.length !== 2) {
+      throw new BadRequestError(`Waypoint ${index}: coordonnées invalides`);
+    }
+
+    return {
+      type: wp.type || (index === 0 ? 'depart' : index === waypoints.length - 1 ? 'arrivee' : 'checkpoint'),
+      address: wp.address || '',
+      coordinates: coordinates,
+      order: wp.order !== undefined ? wp.order : index,
+      waypointType: wp.waypointType || 'normal',
+      isMandatoryStop: wp.isMandatoryStop || false,
+      note: wp.note || null,
+      createdBy: wp.createdBy || userId || null,
+      createdAt: wp.createdAt || new Date()
+    };
+  });
+}
+
+/**
+ * Calcule le résumé des waypoints d'une balade
+ * @param {object} ride - La balade
+ * @returns {object} Résumé des waypoints
+ */
+function calculateWaypointSummary(ride) {
+  if (!ride.waypoints || !Array.isArray(ride.waypoints)) {
+    return {
+      mandatoryStopsCount: 0,
+      dangerCount: 0,
+      fuelStopsCount: 0,
+      coffeeStopsCount: 0,
+      viewpointCount: 0
+    };
+  }
+
+  const summary = {
+    mandatoryStopsCount: 0,
+    dangerCount: 0,
+    fuelStopsCount: 0,
+    coffeeStopsCount: 0,
+    viewpointCount: 0
+  };
+
+  ride.waypoints.forEach(wp => {
+    if (wp.isMandatoryStop) {
+      summary.mandatoryStopsCount++;
+    }
+    switch (wp.waypointType) {
+      case 'danger':
+        summary.dangerCount++;
+        break;
+      case 'fuel':
+        summary.fuelStopsCount++;
+        break;
+      case 'coffee':
+        summary.coffeeStopsCount++;
+        break;
+      case 'viewpoint':
+        summary.viewpointCount++;
+        break;
+    }
+  });
+
+  return summary;
+}
+
+/**
+ * Ajoute ou modifie un waypoint dans une balade
+ * @param {string} rideId - ID de la balade
+ * @param {object} waypointData - Données du waypoint
+ * @param {object} user - Utilisateur effectuant l'action
+ * @returns {Promise<object>} La balade mise à jour
+ */
+async function addOrUpdateWaypoint(rideId, waypointData, user) {
+  const ride = await rideRepository.findById(rideId);
+
+  if (!ride) {
+    throw new NotFoundError('Balade');
+  }
+
+  // Vérifier que l'utilisateur est l'organisateur
+  if (ride.organisateur.toString() !== user._id.toString()) {
+    throw new ForbiddenError('Vous n\'êtes pas autorisé à modifier les waypoints de cette balade');
+  }
+
+  // Normaliser le waypoint
+  const normalizedWaypoint = normalizeWaypoints([waypointData], user._id)[0];
+
+  // Si waypointId fourni, mettre à jour le waypoint existant
+  if (waypointData._id || waypointData.id) {
+    const waypointId = waypointData._id || waypointData.id;
+    const waypointIndex = ride.waypoints.findIndex(
+      wp => wp._id && wp._id.toString() === waypointId.toString()
+    );
+
+    if (waypointIndex === -1) {
+      throw new NotFoundError('Waypoint');
+    }
+
+    // Mettre à jour le waypoint
+    ride.waypoints[waypointIndex] = {
+      ...ride.waypoints[waypointIndex].toObject(),
+      ...normalizedWaypoint,
+      _id: ride.waypoints[waypointIndex]._id // Conserver l'ID existant
+    };
+  } else {
+    // Ajouter un nouveau waypoint
+    ride.waypoints.push(normalizedWaypoint);
+  }
+
+  await ride.save();
+
+  const populatedRide = await rideRepository.findById(rideId, {
+    populate: [
+      { path: 'organisateur', select: 'firstName lastName pseudo email' },
+      { path: 'participants.userId', select: 'firstName lastName pseudo' }
+    ]
+  });
+
+  return populatedRide;
+}
+
+/**
+ * Supprime un waypoint d'une balade
+ * @param {string} rideId - ID de la balade
+ * @param {string} waypointId - ID du waypoint
+ * @param {object} user - Utilisateur effectuant l'action
+ * @returns {Promise<object>} La balade mise à jour
+ */
+async function deleteWaypoint(rideId, waypointId, user) {
+  const ride = await rideRepository.findById(rideId);
+
+  if (!ride) {
+    throw new NotFoundError('Balade');
+  }
+
+  // Vérifier que l'utilisateur est l'organisateur
+  if (ride.organisateur.toString() !== user._id.toString()) {
+    throw new ForbiddenError('Vous n\'êtes pas autorisé à supprimer les waypoints de cette balade');
+  }
+
+  // Vérifier qu'il reste au moins 2 waypoints (départ et arrivée)
+  if (ride.waypoints.length <= 2) {
+    throw new BadRequestError('Une balade doit avoir au moins un départ et une arrivée');
+  }
+
+  const waypointIndex = ride.waypoints.findIndex(
+    wp => wp._id && wp._id.toString() === waypointId.toString()
+  );
+
+  if (waypointIndex === -1) {
+    throw new NotFoundError('Waypoint');
+  }
+
+  // Ne pas permettre la suppression du départ ou de l'arrivée
+  const waypoint = ride.waypoints[waypointIndex];
+  if (waypoint.type === 'depart' || waypoint.type === 'arrivee') {
+    throw new BadRequestError('Le départ et l\'arrivée ne peuvent pas être supprimés');
+  }
+
+  ride.waypoints.splice(waypointIndex, 1);
+
+  // Réordonner les waypoints
+  ride.waypoints.forEach((wp, index) => {
+    wp.order = index;
+  });
+
+  await ride.save();
+
+  const populatedRide = await rideRepository.findById(rideId, {
+    populate: [
+      { path: 'organisateur', select: 'firstName lastName pseudo email' },
+      { path: 'participants.userId', select: 'firstName lastName pseudo' }
+    ]
+  });
+
+  return populatedRide;
+}
+
 module.exports = {
+  associateRideToGroup,
   listRides,
   getRideById,
   createRide,
@@ -1033,6 +1300,10 @@ module.exports = {
   unlikeRide,
   normalizeOrganizer,
   buildRideFilters,
-  buildGeospatialFilters
+  buildGeospatialFilters,
+  normalizeWaypoints,
+  calculateWaypointSummary,
+  addOrUpdateWaypoint,
+  deleteWaypoint
 };
 

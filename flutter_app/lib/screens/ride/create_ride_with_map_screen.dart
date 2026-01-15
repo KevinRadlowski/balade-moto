@@ -19,8 +19,9 @@ import '../garage/add_vehicle_screen.dart';
 
 class CreateRideWithMapScreen extends StatefulWidget {
   final Ride? duplicateRide;
+  final String? groupId; // ID du groupe si la balade est créée depuis un groupe
   
-  const CreateRideWithMapScreen({super.key, this.duplicateRide});
+  const CreateRideWithMapScreen({super.key, this.duplicateRide, this.groupId});
 
   @override
   State<CreateRideWithMapScreen> createState() => _CreateRideWithMapScreenState();
@@ -58,6 +59,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
   final Set<Polyline> _polylines = {};
   LatLng? _currentLocation;
   int _nextOrder = 0;
+  
   
 
   @override
@@ -193,11 +195,17 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
     if (ride.waypoints != null && ride.waypoints!.isNotEmpty) {
       setState(() {
         _waypoints = ride.waypoints!.map((wp) => Waypoint(
+          id: wp.id,
           type: wp.type,
+          waypointType: wp.waypointType, // Préserver le type personnalisé
           address: wp.address,
           latitude: wp.latitude,
           longitude: wp.longitude,
           order: wp.order,
+          isMandatoryStop: wp.isMandatoryStop, // Préserver l'arrêt obligatoire
+          note: wp.note, // Préserver la note
+          createdBy: wp.createdBy,
+          createdAt: wp.createdAt,
         )).toList();
         _nextOrder = _waypoints.length;
       });
@@ -344,19 +352,23 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         }
       }
 
-      final waypoint = Waypoint(
-        type: type,
+      // Ouvrir le bottom sheet pour choisir le type de waypoint
+      final waypointData = await _showWaypointTypeSelector(
         address: address,
-        latitude: position.latitude,
-        longitude: position.longitude,
+        position: position,
+        type: type,
         order: _nextOrder++,
       );
 
-      setState(() {
-        _waypoints.add(waypoint);
-        _reorganizeWaypointTypes();
-        _updateMarkersAndPolylines();
-      });
+      if (waypointData != null) {
+        setState(() {
+          _waypoints.add(waypointData);
+          _reorganizeWaypointTypes();
+          // Debug: vérifier que waypointType est préservé
+          debugPrint('✅ Waypoint ajouté: type=${waypointData.type}, waypointType=${waypointData.waypointType}, isMandatoryStop=${waypointData.isMandatoryStop}');
+          _updateMarkersAndPolylines();
+        });
+      }
     } catch (e) {
       debugPrint('Erreur lors de l\'ajout du point: $e');
       if (mounted) {
@@ -368,6 +380,361 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         );
       }
     }
+  }
+
+  // Afficher le sélecteur de type de waypoint
+  Future<Waypoint?> _showWaypointTypeSelector({
+    required String address,
+    required LatLng position,
+    required String type,
+    required int order,
+  }) async {
+    String selectedWaypointType = 'normal';
+    bool isMandatoryStop = false;
+    String? note;
+
+    return showModalBottomSheet<Waypoint>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              left: 24,
+              right: 24,
+              top: 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Titre avec style premium
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.location_on_rounded,
+                        color: Theme.of(context).primaryColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Type de point',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Sélection du type avec design premium
+                _buildPremiumWaypointTypeGrid(
+                  selectedWaypointType,
+                  (value) => setModalState(() => selectedWaypointType = value),
+                ),
+                const SizedBox(height: 24),
+                // Toggle arrêt obligatoire avec style premium
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.grey.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: CheckboxListTile(
+                    title: const Text(
+                      'Arrêt obligatoire',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Ce point doit être visité',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    value: isMandatoryStop,
+                    onChanged: (value) => setModalState(() => isMandatoryStop = value ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Champ note avec style premium
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Note (optionnel)',
+                    hintText: 'Ex: Plein d\'essence obligatoire',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 15),
+                  onChanged: (value) => note = value.isEmpty ? null : value,
+                ),
+                const SizedBox(height: 24),
+                // Boutons avec style premium
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: const Text(
+                          'Annuler',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final waypoint = Waypoint(
+                            type: type,
+                            address: address,
+                            latitude: position.latitude,
+                            longitude: position.longitude,
+                            order: order,
+                            waypointType: selectedWaypointType,
+                            isMandatoryStop: isMandatoryStop,
+                            note: note,
+                          );
+                          Navigator.pop(context, waypoint);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          'Ajouter',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumWaypointTypeGrid(
+    String selected,
+    Function(String) onSelected,
+  ) {
+    final types = [
+      {
+        'value': 'normal',
+        'icon': Icons.location_on_rounded,
+        'label': 'Normal',
+        'color': Colors.blue,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'value': 'fuel',
+        'icon': Icons.local_gas_station_rounded,
+        'label': 'Carburant',
+        'color': Colors.orange,
+        'gradient': [Colors.orange.shade400, Colors.orange.shade600],
+      },
+      {
+        'value': 'coffee',
+        'icon': Icons.local_cafe_rounded,
+        'label': 'Café',
+        'color': Colors.brown,
+        'gradient': [Colors.brown.shade400, Colors.brown.shade600],
+      },
+      {
+        'value': 'danger',
+        'icon': Icons.warning_rounded,
+        'label': 'Danger',
+        'color': Colors.red,
+        'gradient': [Colors.red.shade400, Colors.red.shade600],
+      },
+      {
+        'value': 'viewpoint',
+        'icon': Icons.landscape_rounded,
+        'label': 'Point de vue',
+        'color': Colors.purple,
+        'gradient': [Colors.purple.shade400, Colors.purple.shade600],
+      },
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.1,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: types.length,
+      itemBuilder: (context, index) {
+        final type = types[index];
+        final isSelected = selected == type['value'];
+        final color = type['color'] as Color;
+        final gradient = type['gradient'] as List<Color>;
+        
+        return GestureDetector(
+          onTap: () => onSelected(type['value'] as String),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected
+                    ? color
+                    : Colors.grey.shade300,
+                width: isSelected ? 2.5 : 1.5,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.25)
+                        : color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    type['icon'] as IconData,
+                    color: isSelected ? Colors.white : color,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  type['label'] as String,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (isSelected) ...[
+                  const SizedBox(height: 4),
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Réorganiser les types de waypoints pour que l'arrivée soit toujours le dernier
@@ -385,13 +752,20 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         type = 'checkpoint';
       }
       
+      // Préserver toutes les propriétés du waypoint original
       updatedWaypoints.add(
         Waypoint(
+          id: _waypoints[i].id,
           type: type,
+          waypointType: _waypoints[i].waypointType, // Préserver le type personnalisé
           address: _waypoints[i].address,
           latitude: _waypoints[i].latitude,
           longitude: _waypoints[i].longitude,
           order: i,
+          isMandatoryStop: _waypoints[i].isMandatoryStop, // Préserver l'arrêt obligatoire
+          note: _waypoints[i].note, // Préserver la note
+          createdBy: _waypoints[i].createdBy,
+          createdAt: _waypoints[i].createdAt,
         ),
       );
     }
@@ -751,31 +1125,80 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
     for (int i = 0; i < _waypoints.length; i++) {
       final waypoint = _waypoints[i];
       final markerId = MarkerId('waypoint_$i');
+      
+      // Debug: vérifier les propriétés du waypoint
+      debugPrint('📍 Création marqueur $i: type=${waypoint.type}, waypointType=${waypoint.waypointType}, isMandatoryStop=${waypoint.isMandatoryStop}');
 
-      _markers.add(
-        Marker(
-          markerId: markerId,
-          position: LatLng(waypoint.latitude, waypoint.longitude),
-          infoWindow: InfoWindow(
-            title: waypoint.type == 'depart' 
-                ? 'Départ' 
-                : waypoint.type == 'arrivee' 
-                    ? 'Arrivée' 
-                    : 'Checkpoint $i',
-            snippet: waypoint.address,
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            waypoint.type == 'depart' 
-                ? BitmapDescriptor.hueGreen
-                : waypoint.type == 'arrivee'
-                    ? BitmapDescriptor.hueRed
-                    : BitmapDescriptor.hueBlue,
-          ),
+      // Construire le titre avec le type de waypoint
+      String title;
+      if (waypoint.type == 'depart') {
+        title = 'Départ';
+      } else if (waypoint.type == 'arrivee') {
+        title = 'Arrivée';
+      } else {
+        title = waypoint.getTypeName();
+      }
+
+      // Ajouter badge "Obligatoire" si nécessaire
+      String snippet = waypoint.address;
+      if (waypoint.isMandatoryStop) {
+        snippet = '⚠️ Arrêt obligatoire\n$snippet';
+      }
+      if (waypoint.note != null && waypoint.note!.isNotEmpty) {
+        snippet = '$snippet\n${waypoint.note}';
+      }
+
+      // Choisir l'icône selon waypointType
+      BitmapDescriptor markerIcon;
+      if (waypoint.type == 'depart') {
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+        debugPrint('🟢 Marqueur $i (Départ): vert');
+      } else if (waypoint.type == 'arrivee') {
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+        debugPrint('🔴 Marqueur $i (Arrivée): rouge');
+      } else {
+        // Pour les checkpoints, utiliser waypointType pour déterminer la couleur
+        debugPrint('🔵 Marqueur $i (Checkpoint): waypointType="${waypoint.waypointType}"');
+        switch (waypoint.waypointType) {
+          case 'fuel':
+            markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+            debugPrint('  → 🟠 Couleur: Orange');
+            break;
+          case 'coffee':
+            markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+            debugPrint('  → 🟡 Couleur: Jaune');
+            break;
+          case 'danger':
+            markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+            debugPrint('  → 🔴 Couleur: Rouge');
+            break;
+          case 'viewpoint':
+            markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+            debugPrint('  → 🟣 Couleur: Violet');
+            break;
+          default:
+            markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+            debugPrint('  → 🔵 Couleur: Bleu (normal)');
+        }
+      }
+
+      final marker = Marker(
+        markerId: markerId,
+        position: LatLng(waypoint.latitude, waypoint.longitude),
+        infoWindow: InfoWindow(
+          title: title,
+          snippet: snippet,
         ),
+        icon: markerIcon,
       );
+      _markers.add(marker);
+      debugPrint('  ✅ Marqueur ajouté avec couleur: ${marker.icon}');
     }
     
-    setState(() {});
+    debugPrint('📊 Total marqueurs créés: ${_markers.length}');
+    setState(() {
+      // Forcer la mise à jour de la carte
+    });
     
     // Debouncer le calcul de route (seulement si on a au moins 2 waypoints)
     // Augmenté à 1500ms pour réduire le nombre de requêtes
@@ -932,7 +1355,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
       final depart = _waypoints.first;
       final arrivee = _waypoints.last;
 
-      await _apiService.createRide(
+      final createdRide = await _apiService.createRide(
         titre: _titreController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
             ? null
@@ -951,6 +1374,7 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         },
         waypoints: waypointsJson,
         vehicleId: _selectedVehicleId, // Envoyer l'ID du véhicule sélectionné
+        groupId: widget.groupId, // Associer au groupe si créée depuis un groupe
       );
 
       if (mounted) {
@@ -962,7 +1386,9 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
         );
         // Rafraîchir l'écran d'accueil avant de revenir
         HomeScreen.refresh(context);
-        Navigator.of(context).pop(true); // Retour avec succès pour déclencher le refresh
+        // Retourner le Ride créé si groupId est présent (création depuis un groupe),
+        // sinon retourner true pour compatibilité avec l'écran d'accueil
+        Navigator.of(context).pop(widget.groupId != null ? createdRide : true);
       }
     } catch (e) {
       if (mounted) {
@@ -1247,37 +1673,107 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                       const SizedBox(height: 8),
                       ...List.generate(_waypoints.length, (index) {
                         final waypoint = _waypoints[index];
+                        // Déterminer le titre et l'icône selon le type de waypoint
+                        String title;
+                        IconData iconData;
+                        Color iconColor;
+                        
+                        if (waypoint.type == 'depart') {
+                          title = 'Départ';
+                          iconData = Icons.play_arrow;
+                          iconColor = Colors.green;
+                        } else if (waypoint.type == 'arrivee') {
+                          title = 'Arrivée';
+                          iconData = Icons.flag;
+                          iconColor = Colors.red;
+                        } else {
+                          // Pour les checkpoints, utiliser le type personnalisé
+                          title = waypoint.getTypeName();
+                          // Icône selon waypointType
+                          switch (waypoint.waypointType) {
+                            case 'fuel':
+                              iconData = Icons.local_gas_station;
+                              iconColor = Colors.orange;
+                              break;
+                            case 'coffee':
+                              iconData = Icons.coffee;
+                              iconColor = Colors.brown;
+                              break;
+                            case 'danger':
+                              iconData = Icons.warning;
+                              iconColor = Colors.red;
+                              break;
+                            case 'viewpoint':
+                              iconData = Icons.photo_camera;
+                              iconColor = Colors.purple;
+                              break;
+                            default:
+                              iconData = Icons.location_on;
+                              iconColor = Colors.blue;
+                          }
+                        }
+                        
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: waypoint.type == 'depart'
-                                  ? Colors.green
-                                  : waypoint.type == 'arrivee'
-                                      ? Colors.red
-                                      : Colors.blue,
+                              backgroundColor: iconColor,
                               child: Icon(
-                                waypoint.type == 'depart'
-                                    ? Icons.play_arrow
-                                    : waypoint.type == 'arrivee'
-                                        ? Icons.flag
-                                        : Icons.location_on,
+                                iconData,
                                 color: Colors.white,
                                 size: 20,
                               ),
                             ),
-                            title: Text(
-                              waypoint.type == 'depart'
-                                  ? 'Départ'
-                                  : waypoint.type == 'arrivee'
-                                      ? 'Arrivée'
-                                      : 'Checkpoint $index',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                if (waypoint.isMandatoryStop) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      '⚠️ Obligatoire',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            subtitle: Text(
-                              waypoint.address,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  waypoint.address,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (waypoint.note != null && waypoint.note!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    waypoint.note!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),

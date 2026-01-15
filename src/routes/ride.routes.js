@@ -76,6 +76,43 @@ router.get('/secret/:secretLink', authMiddleware, subscriptionMiddleware, rideCo
 
 // Routes avec paramètre :id (doivent être en dernier)
 router.get('/:id', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getRideById);
+
+// ========== WAYPOINTS ROUTES ==========
+// Ajouter/modifier un waypoint
+router.put('/:id/waypoints', authMiddleware, subscriptionMiddleware, validateRideId, rideController.addOrUpdateWaypoint);
+// Supprimer un waypoint
+router.delete('/:id/waypoints/:waypointId', authMiddleware, subscriptionMiddleware, validateRideId, rideController.deleteWaypoint);
+// Obtenir le résumé des waypoints
+router.get('/:id/waypoint-summary', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getWaypointSummary);
+
+// ========== DANGER REPORTS ROUTES ==========
+// Signaler un danger (crowdsourcing)
+router.post('/:id/waypoints/danger-report', authMiddleware, subscriptionMiddleware, validateRideId, rideController.reportDanger);
+// Lister les signalements
+router.get('/:id/danger-reports', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getDangerReports);
+// Approuver un signalement (organisateur)
+router.post('/danger-reports/:reportId/approve', authMiddleware, subscriptionMiddleware, rideController.approveDangerReport);
+// Rejeter un signalement (organisateur)
+router.post('/danger-reports/:reportId/reject', authMiddleware, subscriptionMiddleware, rideController.rejectDangerReport);
+// Promouvoir un signalement en waypoint (organisateur)
+router.post('/danger-reports/:reportId/promote', authMiddleware, subscriptionMiddleware, rideController.promoteDangerReportToWaypoint);
+
+// ========== MÉTÉO ==========
+// Récupérer la météo pour une balade
+router.get('/:id/weather', authMiddleware, subscriptionMiddleware, validateRideId, rideController.getRideWeather);
+
+// ========== GROUP ASSOCIATION ==========
+// Associer une balade à un groupe
+router.post('/:id/associate-group', authMiddleware, subscriptionMiddleware, validateRideId, rideController.associateRideToGroup);
+
+// ========== ANNULATION / REPORT / REPROGRAMMATION ==========
+// Annuler une balade
+router.post('/:id/cancel', authMiddleware, subscriptionMiddleware, validateRideId, rideController.cancelRide);
+// Reporter une balade
+router.post('/:id/postpone', authMiddleware, subscriptionMiddleware, validateRideId, rideController.postponeRide);
+// Reprogrammer une balade (créer une nouvelle balade)
+router.post('/:id/reschedule', authMiddleware, subscriptionMiddleware, validateRideId, rideController.rescheduleRide);
+
 router.get('/:id/ics', authMiddleware, subscriptionMiddleware, validateRideId, rideController.exportRideICS);
 router.put('/:id', authMiddleware, subscriptionMiddleware, validateRideId, validateUpdateRide, rideController.updateRide);
 router.delete('/:id', authMiddleware, subscriptionMiddleware, validateRideId, rideController.deleteRide);
@@ -119,6 +156,14 @@ router.get('/:id/export/gpx', authMiddleware, subscriptionMiddleware, validateRi
 router.get('/:id/export/pdf', authMiddleware, subscriptionMiddleware, validateRideId, rideController.exportRidePDF);
 // Mise à jour visibilité (mode secret)
 router.put('/:id/visibility', authMiddleware, subscriptionMiddleware, validateRideId, rideController.updateRideVisibility);
+
+// ========== DANGER REPORTS ACTIONS (organisateur) ==========
+// Approuver un signalement (organisateur)
+router.post('/danger-reports/:reportId/approve', authMiddleware, subscriptionMiddleware, rideController.approveDangerReport);
+// Rejeter un signalement (organisateur)
+router.post('/danger-reports/:reportId/reject', authMiddleware, subscriptionMiddleware, rideController.rejectDangerReport);
+// Promouvoir un signalement en waypoint (organisateur)
+router.post('/danger-reports/:reportId/promote', authMiddleware, subscriptionMiddleware, rideController.promoteDangerReportToWaypoint);
 
 // Routes live ride (doivent être avant /:id pour éviter les conflits)
 router.post('/:id/start', authMiddleware, subscriptionMiddleware, validateLiveRideId, liveRideController.startLiveRide);

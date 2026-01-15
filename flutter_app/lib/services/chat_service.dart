@@ -61,6 +61,7 @@ class ChatService {
     required String type,
     required String content,
     String? replyToMessageId,
+    String? parentMessageId, // Pour les threads
     String messageType = 'text',
     Map<String, dynamic>? pollData,
     String? proposedRideId,
@@ -73,6 +74,7 @@ class ChatService {
         'type': type,
         'content': content,
         if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+        if (parentMessageId != null) 'parentMessageId': parentMessageId, // Pour les threads
         'messageType': messageType,
         if (pollData != null) 'pollData': pollData,
         if (proposedRideId != null) 'proposedRideId': proposedRideId,
@@ -121,6 +123,21 @@ class ChatService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors du vote');
+    }
+  }
+
+  // Obtenir un thread complet (message racine + réponses)
+  Future<Map<String, dynamic>> getThread(String messageId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/messages/$messageId/thread'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération du thread');
     }
   }
 
@@ -345,6 +362,144 @@ class ChatService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors de l\'épinglage du message');
+    }
+  }
+
+  // Obtenir la liste des messages épinglés d'un groupe
+  Future<Map<String, dynamic>> getPinnedMessages(String groupId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/groups/$groupId/messages/pins'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des messages épinglés');
+    }
+  }
+
+  // Recherche avancée de messages dans un groupe
+  Future<Map<String, dynamic>> searchMessages({
+    required String groupId,
+    String? query,
+    bool? media,
+    bool? poll,
+    DateTime? from,
+    DateTime? to,
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final queryParams = <String, String>{
+      'limit': limit.toString(),
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      if (media != null) 'media': media.toString(),
+      if (poll != null) 'poll': poll.toString(),
+      if (from != null) 'from': from.toIso8601String(),
+      if (to != null) 'to': to.toIso8601String(),
+      if (cursor != null) 'cursor': cursor,
+    };
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/groups/$groupId/messages/search').replace(queryParameters: queryParams),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la recherche');
+    }
+  }
+
+  // Signaler un message
+  Future<Map<String, dynamic>> reportMessage({
+    required String groupId,
+    required String messageId,
+    required String reasonCode,
+    String? reasonText,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/groups/$groupId/messages/$messageId/report'),
+      headers: {
+        ..._headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'reasonCode': reasonCode,
+        if (reasonText != null && reasonText.trim().isNotEmpty) 'reasonText': reasonText.trim(),
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du signalement');
+    }
+  }
+
+  // Muter un utilisateur dans un groupe
+  Future<Map<String, dynamic>> muteUser({
+    required String groupId,
+    required String userId,
+    required int durationMinutes,
+    String? reason,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/groups/$groupId/members/$userId/mute'),
+      headers: {
+        ..._headers,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'durationMinutes': durationMinutes,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du mute');
+    }
+  }
+
+  // Démuter un utilisateur dans un groupe
+  Future<Map<String, dynamic>> unmuteUser({
+    required String groupId,
+    required String userId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/groups/$groupId/members/$userId/unmute'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du démute');
+    }
+  }
+
+  // Obtenir la liste des utilisateurs mutés dans un groupe
+  Future<Map<String, dynamic>> getMutedUsers({
+    required String groupId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/groups/$groupId/mutes'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des utilisateurs mutés');
     }
   }
 

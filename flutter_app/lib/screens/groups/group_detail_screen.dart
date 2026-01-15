@@ -6,6 +6,7 @@ import '../../models/group.dart';
 import '../../utils/background_helper.dart';
 import '../../config/api_config.dart';
 import '../chat/group_chat_screen_v2.dart';
+import 'group_calendar_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
@@ -255,11 +256,39 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 ? Center(child: Text(_errorMessage!))
                 : _group == null
                     ? const Center(child: Text('Groupe non trouvé'))
-                    : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
+                    : DefaultTabController(
+                      length: 2,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // TabBar
+                          Container(
+                            color: Colors.white.withOpacity(0.9),
+                            child: TabBar(
+                              labelColor: Colors.blue,
+                              unselectedLabelColor: Colors.grey,
+                              indicatorColor: Colors.blue,
+                              tabs: const [
+                                Tab(
+                                  icon: Icon(Icons.chat),
+                                  text: 'Discussion',
+                                ),
+                                Tab(
+                                  icon: Icon(Icons.calendar_today),
+                                  text: 'Calendrier',
+                                ),
+                              ],
+                            ),
+                          ),
+                          // TabBarView
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                // Onglet Discussion (contenu existant)
+                                SingleChildScrollView(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                           // Titre avec background
                           Container(
                             padding: const EdgeInsets.all(16),
@@ -375,8 +404,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        Navigator.of(context).push(
+                                      onPressed: () async {
+                                        await Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (_) => GroupChatScreenV2(
                                               groupId: _group!.id,
@@ -385,6 +414,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                             ),
                                           ),
                                         );
+                                        // Recharger le groupe pour mettre à jour le badge
+                                        _loadGroup();
                                       },
                                       icon: const Icon(Icons.chat),
                                       label: const Text('Ouvrir le chat'),
@@ -504,6 +535,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               ),
                             ),
                           ],
+                                    ],
+                                  ),
+                                ),
+                                // Onglet Calendrier
+                                GroupCalendarScreen(groupId: widget.groupId),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),

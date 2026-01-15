@@ -16,6 +16,9 @@ const subscriptionService = require('../services/subscription.service');
 // Services et repositories (refactoring progressif)
 const rideService = require('../services/ride.service');
 const rideRepository = require('../repositories/ride.repository');
+const dangerReportService = require('../services/danger-report.service');
+const rideCancellationService = require('../services/ride-cancellation.service');
+const weatherService = require('../services/weather.service');
 
 // Helper pour normaliser un organisateur supprimé ou introuvable
 function normalizeOrganizer(organisateur) {
@@ -33,6 +36,202 @@ function normalizeOrganizer(organisateur) {
   }
   return organisateur;
 }
+
+// ========== WAYPOINTS ENDPOINTS ==========
+
+/**
+ * Ajouter ou modifier un waypoint
+ */
+exports.addOrUpdateWaypoint = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { waypoint } = req.body;
+    const ride = await rideService.addOrUpdateWaypoint(id, waypoint, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Waypoint ajouté/modifié avec succès',
+      data: { ride, waypoint: waypoint._id ? ride.waypoints.find(w => w._id.toString() === waypoint._id.toString()) : ride.waypoints[ride.waypoints.length - 1] }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Supprimer un waypoint
+ */
+exports.deleteWaypoint = async (req, res, next) => {
+  try {
+    const { id, waypointId } = req.params;
+    const ride = await rideService.deleteWaypoint(id, waypointId, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Waypoint supprimé avec succès',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Obtenir le résumé des waypoints
+ */
+exports.getWaypointSummary = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const ride = await rideService.getRideById(id, req.user);
+    const summary = rideService.calculateWaypointSummary(ride);
+    res.status(200).json({
+      success: true,
+      data: { waypointSummary: summary }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ========== DANGER REPORTS ENDPOINTS ==========
+
+/**
+ * Signaler un danger (crowdsourcing)
+ */
+exports.reportDanger = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await dangerReportService.reportDanger(id, req.body, req.user);
+    res.status(201).json({
+      success: true,
+      message: 'Signalement en attente de validation par l\'organisateur',
+      data: { report }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approuver un signalement (organisateur)
+ */
+exports.approveDangerReport = async (req, res, next) => {
+  try {
+    const { reportId } = req.params;
+    const report = await dangerReportService.approveDangerReport(reportId, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Signalement approuvé',
+      data: { report }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Rejeter un signalement (organisateur)
+ */
+exports.rejectDangerReport = async (req, res, next) => {
+  try {
+    const { reportId } = req.params;
+    const report = await dangerReportService.rejectDangerReport(reportId, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Signalement rejeté',
+      data: { report }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Promouvoir un signalement en waypoint (organisateur)
+ */
+exports.promoteDangerReportToWaypoint = async (req, res, next) => {
+  try {
+    const { reportId } = req.params;
+    const ride = await dangerReportService.promoteDangerReportToWaypoint(reportId, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Signalement promu en waypoint DANGER',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Lister les signalements d'une balade
+ */
+exports.getDangerReports = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const reports = await dangerReportService.getDangerReports(id, req.user);
+    res.status(200).json({
+      success: true,
+      data: { reports }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ========== ANNULATION / REPORT / REPROGRAMMATION ==========
+
+/**
+ * Annuler une balade
+ */
+exports.cancelRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reasonCode, reasonText } = req.body;
+    const ride = await rideCancellationService.cancelRide(id, { reasonCode, reasonText }, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Balade annulée avec succès',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reporter une balade
+ */
+exports.postponeRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reasonCode, reasonText, newDateTime } = req.body;
+    const ride = await rideCancellationService.postponeRide(id, { reasonCode, reasonText, newDateTime }, req.user);
+    res.status(200).json({
+      success: true,
+      message: 'Balade reportée avec succès',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reprogrammer une balade (créer une nouvelle balade)
+ */
+exports.rescheduleRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newDateTime, keepVisibility, keepParticipants } = req.body;
+    const newRide = await rideCancellationService.rescheduleRide(id, { newDateTime, keepVisibility, keepParticipants }, req.user);
+    res.status(201).json({
+      success: true,
+      message: 'Balade reprogrammée avec succès',
+      data: { ride: newRide }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.createRide = async (req, res, next) => {
   try {
@@ -820,6 +1019,30 @@ exports.deleteRide = async (req, res, next) => {
   }
 };
 
+/**
+ * Associer une balade à un groupe
+ */
+exports.associateRideToGroup = async (req, res, next) => {
+  try {
+    const { id: rideId } = req.params;
+    const { groupId } = req.body;
+
+    if (!groupId) {
+      return next(new BadRequestError('Le groupId est requis'));
+    }
+
+    const ride = await rideService.associateRideToGroup(rideId, groupId, req.user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Balade associée au groupe avec succès',
+      data: { ride }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Rejoindre une balade
 exports.joinRide = async (req, res, next) => {
   try {
@@ -1420,6 +1643,47 @@ exports.placesAutocomplete = async (req, res, next) => {
 };
 
 // Place Details
+/**
+ * Récupère la météo pour une balade (départ et arrivée)
+ */
+exports.getRideWeather = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const ride = await rideService.getRideById(id, req.user);
+    
+    if (!ride) {
+      return next(new NotFoundError('Balade'));
+    }
+
+    // Récupérer la météo
+    const weather = await weatherService.getRideWeather(ride);
+
+    // Si la météo est null (clé API non configurée), retourner un message explicite
+    if (!weather) {
+      return res.status(503).json({
+        success: false,
+        message: 'Service météo temporairement indisponible. La clé API OpenWeatherMap n\'est pas configurée.',
+        code: 'WEATHER_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: weather
+    });
+  } catch (error) {
+    // Si erreur liée à la clé API, retourner un message plus clair
+    if (error.message && error.message.includes('WEATHER_API_KEY')) {
+      return res.status(503).json({
+        success: false,
+        message: 'Service météo temporairement indisponible. La clé API OpenWeatherMap n\'est pas configurée.',
+        code: 'WEATHER_SERVICE_UNAVAILABLE'
+      });
+    }
+    next(error);
+  }
+};
+
 exports.placeDetails = async (req, res, next) => {
   try {
     const { placeId } = req.query;

@@ -308,7 +308,7 @@ const initializeSocket = (server) => {
     socket.on('send-group-message', async (data) => {
       try {
         console.log('📨 Données reçues pour send-group-message:', JSON.stringify(data, null, 2));
-        const { groupId, contenu, replyToMessageId, type = 'text' } = data;
+        const { groupId, contenu, replyToMessageId, parentMessageId, type = 'text' } = data;
 
         if (!groupId) {
           console.error('❌ groupId manquant');
@@ -328,6 +328,21 @@ const initializeSocket = (server) => {
         // Vérifier que l'utilisateur est membre
         if (!group.isMember(socket.userId)) {
           return socket.emit('error', { message: 'Vous n\'êtes pas membre de ce groupe' });
+        }
+
+        // Vérifier si l'utilisateur est muté dans ce groupe
+        const GroupMute = require('../models/GroupMute');
+        const activeMute = await GroupMute.findOne({
+          groupId: groupId,
+          userId: socket.userId,
+          mutedUntil: { $gt: new Date() }
+        });
+
+        if (activeMute) {
+          return socket.emit('error', { 
+            message: `Vous êtes muet dans ce groupe jusqu'au ${new Date(activeMute.mutedUntil).toLocaleString('fr-FR')}`,
+            code: 'MUTED'
+          });
         }
 
         // Préparer replyPreview si replyToMessageId existe
@@ -353,12 +368,67 @@ const initializeSocket = (server) => {
           }
         }
 
+        // Parser et résoudre les mentions
+        let mentions = [];
+        if (contenu && typeof contenu === 'string' && contenu.trim().length > 0) {
+          try {
+            const mentionService = require('../services/mention.service');
+            const Notification = require('../models/Notification');
+            const User = require('../models/User');
+            
+            const resolvedMentions = await mentionService.parseAndResolveMentions(contenu, groupId);
+            mentions = resolvedMentions.map(m => m.userId);
+
+            // Créer des notifications pour les utilisateurs mentionnés (en arrière-plan)
+            if (resolvedMentions.length > 0) {
+              const user = await User.findById(socket.userId).select('pseudo email').lean();
+              const group = await Group.findById(groupId).select('nom').lean();
+              
+              for (const mention of resolvedMentions) {
+                // Ne pas notifier si l'utilisateur s'est mentionné lui-même
+                if (mention.userId.toString() === socket.userId.toString()) {
+                  continue;
+                }
+
+                await Notification.create({
+                  user: mention.userId,
+                  type: 'mention',
+                  title: `${user?.pseudo || 'Quelqu\'un'} vous a mentionné${group?.nom ? ` dans ${group.nom}` : ''}`,
+                  message: contenu.length > 100 ? contenu.substring(0, 100) + '...' : contenu,
+                  metadata: {
+                    groupId: groupId,
+                    mentionedBy: socket.userId,
+                    mentionedByPseudo: user?.pseudo || user?.email
+                  }
+                });
+              }
+            }
+          } catch (mentionError) {
+            console.error('Erreur lors du parsing des mentions:', mentionError);
+            // Continuer sans mentions si le parsing échoue
+          }
+        }
+
+        // Gérer les threads : si parentMessageId est fourni, c'est une réponse dans un thread
+        let threadRootId = null;
+        if (parentMessageId) {
+          // Trouver le message parent pour déterminer le threadRootId
+          const parentMessage = await Message.findById(parentMessageId);
+          if (parentMessage) {
+            // Si le parent a déjà un threadRootId, l'utiliser, sinon le parent est la racine
+            threadRootId = parentMessage.threadRootId || parentMessage._id;
+          }
+        }
+
         // Créer le message
         const messageData = {
           auteur: socket.userId,
           contenu: contenu.trim(),
           type: type,
           idGroupe: groupId,
+          parentMessageId: parentMessageId || null, // Pour les threads
+          threadRootId: threadRootId, // ID du message racine du fil
+          mentions: mentions // Ajouter les mentions résolues
         };
 
         // Ajouter replyToMessageId seulement s'il existe
@@ -396,6 +466,19 @@ const initializeSocket = (server) => {
         console.log('💾 Sauvegarde du message...');
         await message.save();
         console.log('✅ Message sauvegardé avec succès, ID:', message._id);
+
+        // Si c'est une réponse dans un thread, incrémenter le compteur du message racine
+        if (parentMessageId && threadRootId) {
+          try {
+            await Message.updateOne(
+              { _id: threadRootId },
+              { $inc: { threadReplyCount: 1 } }
+            );
+          } catch (countError) {
+            console.error('Erreur lors de la mise à jour du compteur de thread:', countError);
+            // Ne pas bloquer si le compteur échoue
+          }
+        }
         await message.populate('auteur', 'pseudo email avatarUrl');
         if (message.replyToMessageId) {
           await message.populate('replyToMessageId', 'contenu auteur');
@@ -509,6 +592,23 @@ const initializeSocket = (server) => {
           }
           message.deletedForAll = true;
           message.contenu = 'Ce message a été supprimé';
+          
+          // Si c'est un message de type 'ride' avec un proposedRideId et un idGroupe,
+          // retirer le groupId de la balade pour qu'elle disparaisse du calendrier
+          if (message.type === 'ride' && message.proposedRideId && message.idGroupe) {
+            try {
+              const Ride = require('../models/Ride');
+              const ride = await Ride.findById(message.proposedRideId);
+              if (ride && ride.groupId && ride.groupId.toString() === message.idGroupe.toString()) {
+                ride.groupId = null;
+                await ride.save();
+                console.log(`✅ Balade ${ride._id} retirée du groupe ${message.idGroupe} après suppression du message`);
+              }
+            } catch (rideError) {
+              console.error('Erreur lors de la suppression du groupId de la balade:', rideError);
+              // Ne pas bloquer la suppression du message si la mise à jour de la balade échoue
+            }
+          }
         } else {
           if (!message.deletedForUserIds.includes(socket.userId)) {
             message.deletedForUserIds.push(socket.userId);

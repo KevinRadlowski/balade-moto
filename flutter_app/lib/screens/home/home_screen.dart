@@ -258,31 +258,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final groupsData = result['groups'] as List;
       final groups = groupsData.map((g) {
         final group = Group.fromJson(g);
-        // Si le backend ne fournit pas unreadCount/lastMessageAt, simuler temporairement
-        // TODO: Retirer cette simulation quand le backend sera prêt
-        if (group.unreadCount == null && group.lastMessageAt == null) {
-          // Simuler des données mockées pour la démo
-          // En production, ces données viendront du backend
-          return Group(
-            id: group.id,
-            nom: group.nom,
-            description: group.description,
-            visibilite: group.visibilite,
-            createur: group.createur,
-            membres: group.membres,
-            bannedUsers: group.bannedUsers,
-            // Mock: simuler un groupe avec 2 messages non lus
-            unreadCount: group.membres.length > 1 ? 2 : 0,
-            // Mock: simuler un dernier message il y a 30 minutes
-            lastMessageAt: group.membres.length > 1 
-                ? DateTime.now().subtract(const Duration(minutes: 30))
-                : null,
-            isFavorite: group.isFavorite,
-            isMember: group.isMember,
-            location: group.location,
-          );
-        }
-        return group;
+        // Le backend fournit maintenant unreadCount et lastMessageAt
+        return Group(
+          id: group.id,
+          nom: group.nom,
+          description: group.description,
+          visibilite: group.visibilite,
+          createur: group.createur,
+          membres: group.membres,
+          bannedUsers: group.bannedUsers,
+          unreadCount: group.unreadCount,
+          lastMessageAt: group.lastMessageAt,
+          isFavorite: group.isFavorite,
+          isMember: group.isMember,
+          location: group.location,
+        );
       }).toList();
       
       // Limiter à 3 groupes maximum
@@ -341,6 +331,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Filtrer pour ne garder que les balades où l'utilisateur n'a pas participé
       final filteredRides = allRides.where((ride) {
+        // Exclure les balades annulées
+        if (ride.status == 'cancelled') return false;
         // Exclure les balades où l'utilisateur participe déjà
         if (userId != null) {
           final isParticipant = ride.participants.any((p) => p.id == userId);

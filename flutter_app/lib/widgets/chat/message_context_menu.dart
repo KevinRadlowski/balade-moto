@@ -9,6 +9,8 @@ class MessageContextMenu extends StatelessWidget {
   final VoidCallback? onCopy;
   final VoidCallback? onForward;
   final VoidCallback? onPin;
+  final bool isPinned; // Pour afficher "Épingler" ou "Désépingler"
+  final VoidCallback? onReport; // Pour signaler un message
 
   const MessageContextMenu({
     super.key,
@@ -20,6 +22,8 @@ class MessageContextMenu extends StatelessWidget {
     this.onCopy,
     this.onForward,
     this.onPin,
+    this.isPinned = false,
+    this.onReport,
   });
 
   @override
@@ -65,10 +69,19 @@ class MessageContextMenu extends StatelessWidget {
             ),
           if (onPin != null)
             _MenuItem(
-              icon: Icons.push_pin,
-              label: 'Épingler',
+              icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+              label: isPinned ? 'Désépingler' : 'Épingler',
               onTap: onPin!,
             ),
+          if (!isOwnMessage && onReport != null) ...[
+            const Divider(height: 1),
+            _MenuItem(
+              icon: Icons.flag,
+              label: 'Signaler',
+              onTap: onReport!,
+              textColor: Colors.orange,
+            ),
+          ],
           if (isOwnMessage) ...[
             const Divider(height: 1),
             if (onEdit != null)

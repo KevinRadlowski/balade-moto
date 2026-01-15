@@ -72,14 +72,17 @@ class ActiveGroupsSection extends StatelessWidget {
               itemBuilder: (context, index) {
                 return _GroupCard(
                   group: groups[index],
-                  onTap: () {
-                    Navigator.of(context).push(
+                  onTap: () async {
+                    // Ouvrir le groupe
+                    await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => GroupDetailScreen(
                           groupId: groups[index].id,
                         ),
                       ),
-                    ).then((_) => onDataReload?.call());
+                    );
+                    // Recharger les données pour mettre à jour le badge
+                    onDataReload?.call();
                   },
                 );
               },

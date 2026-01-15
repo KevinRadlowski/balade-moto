@@ -20,5 +20,34 @@ router.get('/:id/messages', authMiddleware, subscriptionMiddleware, groupControl
 router.post('/:id/claim-admin', authMiddleware, subscriptionMiddleware, groupController.claimAdmin);
 router.post('/:id/favorite', authMiddleware, subscriptionMiddleware, groupController.toggleFavorite);
 
+// ========== GROUP CALENDAR ROUTES ==========
+// Liste des balades d'un groupe (calendrier)
+router.get('/:id/rides', authMiddleware, subscriptionMiddleware, groupController.getGroupRides);
+// Export ICS du calendrier
+router.get('/:id/calendar.ics', authMiddleware, subscriptionMiddleware, groupController.exportGroupCalendar);
+
+// ========== MENTIONS ROUTES ==========
+// Suggestions d'utilisateurs pour les mentions @pseudo
+router.get('/:id/members/suggest', authMiddleware, subscriptionMiddleware, groupController.suggestMembers);
+
+// ========== PINNED MESSAGES ROUTES ==========
+// Liste des messages épinglés d'un groupe
+const messageController = require('../controllers/message.controller');
+router.get('/:groupId/messages/pins', authMiddleware, subscriptionMiddleware, messageController.getPinnedMessages);
+
+// ========== SEARCH MESSAGES ROUTES ==========
+// Recherche avancée de messages dans un groupe
+router.get('/:groupId/messages/search', authMiddleware, subscriptionMiddleware, messageController.searchMessages);
+
+// ========== MODERATION ROUTES ==========
+// Signaler un message
+router.post('/:groupId/messages/:messageId/report', authMiddleware, subscriptionMiddleware, messageController.reportMessage);
+// Muter un utilisateur
+router.post('/:groupId/members/:userId/mute', authMiddleware, subscriptionMiddleware, groupController.muteUser);
+// Démuter un utilisateur
+router.post('/:groupId/members/:userId/unmute', authMiddleware, subscriptionMiddleware, groupController.unmuteUser);
+// Liste des utilisateurs mutés (mods only)
+router.get('/:groupId/mutes', authMiddleware, subscriptionMiddleware, groupController.getMutedUsers);
+
 module.exports = router;
 

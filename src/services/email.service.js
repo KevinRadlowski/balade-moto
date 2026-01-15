@@ -655,7 +655,298 @@ const sendContactEmail = async ({ fromEmail, subject, message }) => {
   }
 };
 
-// Exporter les fonctions ET le transporter
+// Envoyer un email d'annulation de balade
+const sendRideCancellationEmail = async (email, ride, userName, cancellationData) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const rideUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${ride._id}`;
+  
+  // Formater la date et l'heure
+  const rideDate = new Date(ride.date);
+  const [hours, minutes] = ride.heure.split(':');
+  rideDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  
+  const formattedDate = rideDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const formattedTime = ride.heure;
+
+  const reasonLabels = {
+    WEATHER: 'Météo défavorable',
+    MECHANICAL: 'Problème mécanique',
+    ROAD_CLOSED: 'Route fermée',
+    LOW_PARTICIPATION: 'Peu de participants',
+    OTHER: 'Autre raison'
+  };
+
+  const reasonLabel = reasonLabels[cancellationData.reasonCode] || 'Non spécifiée';
+
+  const mailOptions = {
+    from: buildFromHeader(),
+    to: email,
+    subject: `Ride Together - Balade annulée: ${ride.titre}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #d32f2f;">Balade annulée</h2>
+        <p>Bonjour ${userName || 'utilisateur'},</p>
+        <p>Nous vous informons que la balade suivante a été <strong>annulée</strong> :</p>
+        <div style="background-color: #ffebee; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #d32f2f;">
+          <h3 style="color: #d32f2f; margin-top: 0;">${ride.titre}</h3>
+          <p><strong>Date :</strong> ${formattedDate}</p>
+          <p><strong>Heure :</strong> ${formattedTime}</p>
+          <p><strong>Raison :</strong> ${reasonLabel}</p>
+          ${cancellationData.reasonText ? `<p><strong>Détails :</strong> ${cancellationData.reasonText}</p>` : ''}
+        </div>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${rideUrl}" 
+             style="background-color: #d32f2f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Voir les détails
+          </a>
+        </p>
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          Nous sommes désolés pour ce désagrément.
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email d\'annulation:', error);
+    throw error;
+  }
+};
+
+// Envoyer un email de report de balade
+const sendRidePostponementEmail = async (email, ride, userName, postponementData) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const rideUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${ride._id}`;
+  
+  // Formater la date et l'heure
+  const rideDate = new Date(ride.date);
+  const [hours, minutes] = ride.heure.split(':');
+  rideDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  
+  const formattedDate = rideDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const formattedTime = ride.heure;
+
+  const reasonLabels = {
+    WEATHER: 'Météo défavorable',
+    MECHANICAL: 'Problème mécanique',
+    ROAD_CLOSED: 'Route fermée',
+    LOW_PARTICIPATION: 'Peu de participants',
+    OTHER: 'Autre raison'
+  };
+
+  const reasonLabel = reasonLabels[postponementData.reasonCode] || 'Non spécifiée';
+  const newDateTimeText = postponementData.newDateTime 
+    ? new Date(postponementData.newDateTime).toLocaleString('fr-FR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Date à déterminer';
+
+  const mailOptions = {
+    from: buildFromHeader(),
+    to: email,
+    subject: `Ride Together - Balade reportée: ${ride.titre}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #ff9800;">Balade reportée</h2>
+        <p>Bonjour ${userName || 'utilisateur'},</p>
+        <p>Nous vous informons que la balade suivante a été <strong>reportée</strong> :</p>
+        <div style="background-color: #fff3e0; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <h3 style="color: #ff9800; margin-top: 0;">${ride.titre}</h3>
+          <p><strong>Date originale :</strong> ${formattedDate} à ${formattedTime}</p>
+          <p><strong>Nouvelle date proposée :</strong> ${newDateTimeText}</p>
+          <p><strong>Raison :</strong> ${reasonLabel}</p>
+          ${postponementData.reasonText ? `<p><strong>Détails :</strong> ${postponementData.reasonText}</p>` : ''}
+        </div>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${rideUrl}" 
+             style="background-color: #ff9800; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Voir les détails
+          </a>
+        </p>
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          Nous vous tiendrons informé de la nouvelle date.
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de report:', error);
+    throw error;
+  }
+};
+
+// Envoyer un email de reprogrammation de balade
+const sendRideRescheduleEmail = async (email, originalRide, newRide, userName, rescheduleData) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  const originalRideUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${originalRide._id}`;
+  const newRideUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${newRide._id}`;
+  
+  // Formater les dates
+  const originalRideDate = new Date(originalRide.date);
+  const [originalHours, originalMinutes] = originalRide.heure.split(':');
+  originalRideDate.setHours(parseInt(originalHours), parseInt(originalMinutes), 0, 0);
+  
+  const newRideDate = new Date(newRide.date);
+  const [newHours, newMinutes] = newRide.heure.split(':');
+  newRideDate.setHours(parseInt(newHours), parseInt(newMinutes), 0, 0);
+  
+  const formattedOriginalDate = originalRideDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const formattedNewDate = newRideDate.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const mailOptions = {
+    from: buildFromHeader(),
+    to: email,
+    subject: `Ride Together - Balade reprogrammée: ${originalRide.titre}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2196F3;">Balade reprogrammée</h2>
+        <p>Bonjour ${userName || 'utilisateur'},</p>
+        <p>La balade <strong>"${originalRide.titre}"</strong> a été <strong>reprogrammée</strong> :</p>
+        <div style="background-color: #e3f2fd; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2196F3;">
+          <h3 style="color: #2196F3; margin-top: 0;">${originalRide.titre}</h3>
+          <p><strong>Date originale :</strong> ${formattedOriginalDate} à ${originalRide.heure}</p>
+          <p><strong>Nouvelle date :</strong> ${formattedNewDate} à ${newRide.heure}</p>
+        </div>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${newRideUrl}" 
+             style="background-color: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">
+            Voir la nouvelle balade
+          </a>
+          <a href="${originalRideUrl}" 
+             style="background-color: #757575; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Voir l'originale
+          </a>
+        </p>
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          À bientôt ! 🏍️
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de reprogrammation:', error);
+    throw error;
+  }
+};
+
+// Envoyer un email d'alerte météo
+const sendWeatherAlertEmail = async (email, ride, userName, weather) => {
+  if (!transporter) {
+    console.warn('⚠️  Tentative d\'envoi d\'email mais le transporteur n\'est pas configuré');
+    return false;
+  }
+
+  try {
+    const alertMessages = weather.alerts.map(a => a.message).join(', ');
+    const rideDate = new Date(ride.date);
+    const [hours, minutes] = ride.heure.split(':').map(Number);
+    rideDate.setHours(hours, minutes, 0, 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #ff9800; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+          .alert-box { background-color: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; margin: 15px 0; }
+          .button { display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; margin-top: 20px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🌧️ Alerte Météo</h1>
+          </div>
+          <div class="content">
+            <p>Bonjour ${userName},</p>
+            <p>Nous vous informons que des conditions météo défavorables sont prévues pour votre balade :</p>
+            <div class="alert-box">
+              <h3>${ride.titre}</h3>
+              <p><strong>Date :</strong> ${rideDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} à ${ride.heure}</p>
+              <p><strong>Alertes :</strong> ${alertMessages}</p>
+            </div>
+            <p>Nous vous recommandons de vérifier les conditions météo avant de partir et d'adapter votre itinéraire si nécessaire.</p>
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${ride._id}" class="button">Voir la balade</a>
+            <div class="footer">
+              <p>Cette alerte a été générée automatiquement 24h avant votre balade.</p>
+              <p>Vous pouvez désactiver ces alertes dans vos préférences si vous êtes abonné Premium.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: getFromHeader(),
+      to: email,
+      subject: `🌧️ Alerte météo : ${ride.titre}`,
+      html: htmlContent,
+      text: `Alerte météo pour la balade "${ride.titre}" prévue le ${rideDate.toLocaleDateString('fr-FR')} à ${ride.heure}.\n\nAlertes : ${alertMessages}\n\nVoir la balade : ${process.env.FRONTEND_URL || 'http://localhost:3000'}/rides/${ride._id}`
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email d'alerte météo envoyé à ${email} pour la balade ${ride.titre}`);
+    return info;
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'envoi de l'email d'alerte météo à ${email}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendVerificationEmail,
   sendUnlockEmail,
@@ -665,6 +956,10 @@ module.exports = {
   sendEmergencyAlertEmail,
   sendInactivityAlertEmail,
   sendContactEmail,
+  sendRideCancellationEmail,
+  sendRidePostponementEmail,
+  sendRideRescheduleEmail,
+  sendWeatherAlertEmail,
   transporter: transporter || { verify: () => {} }
 };
 

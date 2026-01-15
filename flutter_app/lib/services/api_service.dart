@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/ride.dart';
 import '../models/vehicle.dart';
+import '../models/weather.dart';
 import '../models/plan/user_plan.dart';
 import '../config/api_config.dart';
 import '../exceptions/auth_exception.dart';
@@ -1093,6 +1094,7 @@ class ApiService {
     Map<String, dynamic>? localisation,
     List<Map<String, dynamic>>? waypoints, // Nouveau système de waypoints
     String? vehicleId, // ID du véhicule avec lequel l'organisateur effectue la balade
+    String? groupId, // ID du groupe si la balade est créée depuis un groupe
   }) async {
     final response = await _makeRequest(() async {
       return await http.post(
@@ -1112,6 +1114,7 @@ class ApiService {
           if (localisation != null) 'localisation': localisation,
           if (waypoints != null && waypoints.isNotEmpty) 'waypoints': waypoints,
           if (vehicleId != null) 'vehicleId': vehicleId,
+          if (groupId != null) 'groupId': groupId,
         }),
       );
     });
@@ -1701,6 +1704,257 @@ class ApiService {
     }
   }
 
+  // ========== WAYPOINTS API ==========
+  
+  /// Ajouter ou modifier un waypoint
+  Future<Ride> addOrUpdateWaypoint(String rideId, Map<String, dynamic> waypoint) async {
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/rides/$rideId/waypoints'),
+        headers: _headers,
+        body: jsonEncode({'waypoint': waypoint}),
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la mise à jour du waypoint');
+    }
+  }
+
+  /// Supprimer un waypoint
+  Future<Ride> deleteWaypoint(String rideId, String waypointId) async {
+    final response = await _makeRequest(() async {
+      return await http.delete(
+        Uri.parse('$baseUrl/rides/$rideId/waypoints/$waypointId'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la suppression du waypoint');
+    }
+  }
+
+  /// Obtenir le résumé des waypoints
+  Future<Map<String, dynamic>> getWaypointSummary(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/waypoint-summary'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data']['waypointSummary'];
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération du résumé');
+    }
+  }
+
+  // ========== DANGER REPORTS API ==========
+  
+  /// Signaler un danger
+  Future<Map<String, dynamic>> reportDanger(String rideId, {
+    required double latitude,
+    required double longitude,
+    required String description,
+  }) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/waypoints/danger-report'),
+        headers: _headers,
+        body: jsonEncode({
+          'location': {
+            'type': 'Point',
+            'coordinates': [longitude, latitude]
+          },
+          'description': description,
+        }),
+      );
+    });
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du signalement');
+    }
+  }
+
+  /// Lister les signalements de danger
+  Future<List<dynamic>> getDangerReports(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/danger-reports'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data']['reports'] ?? [];
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des signalements');
+    }
+  }
+
+  /// Approuver un signalement (organisateur)
+  Future<Map<String, dynamic>> approveDangerReport(String reportId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/danger-reports/$reportId/approve'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'approbation');
+    }
+  }
+
+  /// Rejeter un signalement (organisateur)
+  Future<Map<String, dynamic>> rejectDangerReport(String reportId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/danger-reports/$reportId/reject'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du rejet');
+    }
+  }
+
+  /// Promouvoir un signalement en waypoint (organisateur)
+  Future<Ride> promoteDangerReportToWaypoint(String reportId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/danger-reports/$reportId/promote'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la promotion');
+    }
+  }
+
+  // ========== ANNULATION / REPORT / REPROGRAMMATION API ==========
+
+  /// Annuler une balade
+  Future<Ride> cancelRide(String rideId, {
+    required String reasonCode,
+    String? reasonText,
+  }) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/cancel'),
+        headers: _headers,
+        body: jsonEncode({
+          'reasonCode': reasonCode,
+          if (reasonText != null) 'reasonText': reasonText,
+        }),
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'annulation');
+    }
+  }
+
+  /// Reporter une balade
+  Future<Ride> postponeRide(String rideId, {
+    required String reasonCode,
+    String? reasonText,
+    DateTime? newDateTime,
+  }) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/postpone'),
+        headers: _headers,
+        body: jsonEncode({
+          'reasonCode': reasonCode,
+          if (reasonText != null) 'reasonText': reasonText,
+          if (newDateTime != null) 'newDateTime': newDateTime.toIso8601String(),
+        }),
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors du report');
+    }
+  }
+
+  /// Reprogrammer une balade (créer une nouvelle balade)
+  Future<Ride> rescheduleRide(String rideId, {
+    required DateTime newDateTime,
+    bool keepVisibility = true,
+    bool keepParticipants = false,
+  }) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/reschedule'),
+        headers: _headers,
+        body: jsonEncode({
+          'newDateTime': newDateTime.toIso8601String(),
+          'keepVisibility': keepVisibility,
+          'keepParticipants': keepParticipants,
+        }),
+      );
+    });
+    if (response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la reprogrammation');
+    }
+  }
+
+  // ========== MÉTÉO API ==========
+
+  /// Récupérer la météo pour une balade (départ et arrivée)
+  Future<RideWeather?> getRideWeather(String rideId) async {
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/rides/$rideId/weather'),
+        headers: _headers,
+      );
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return RideWeather.fromJson(data['data']);
+    } else if (response.statusCode == 503) {
+      // Service météo indisponible (clé API non configurée)
+      final errorData = jsonDecode(response.body);
+      debugPrint('Service météo indisponible: ${errorData['message']}');
+      return null; // Retourner null au lieu de throw
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération de la météo');
+    }
+  }
+
   /// Mettre à jour une balade (uniquement par l'organisateur)
   /// Permet de modifier le titre et la description
   Future<Ride> updateRide(String rideId, {String? titre, String? description}) async {
@@ -1928,6 +2182,95 @@ class ApiService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors de la récupération du groupe');
+    }
+  }
+
+  /// Récupérer les balades d'un groupe pour le calendrier
+  Future<Map<String, dynamic>> getGroupRides(String groupId, {
+    required DateTime from,
+    required DateTime to,
+    String? view,
+  }) async {
+    final queryParams = <String, String>{
+      'from': from.toIso8601String(),
+      'to': to.toIso8601String(),
+      if (view != null) 'view': view,
+    };
+
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/groups/$groupId/rides').replace(queryParameters: queryParams),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des balades du groupe');
+    }
+  }
+
+  /// Obtenir l'URL d'export ICS du calendrier d'un groupe (avec token pour authentification)
+  Future<String> getGroupCalendarIcsUrl(String groupId, DateTime from, DateTime to) async {
+    final queryParams = <String, String>{
+      'from': from.toIso8601String(),
+      'to': to.toIso8601String(),
+    };
+    
+    // Ajouter le token en query param pour l'authentification
+    if (_token != null) {
+      queryParams['token'] = _token!;
+    }
+    
+    return '${baseUrl}/groups/$groupId/calendar.ics?${Uri(queryParameters: queryParams).query}';
+  }
+
+  /// Obtenir des suggestions d'utilisateurs pour les mentions @pseudo
+  Future<List<Map<String, dynamic>>> suggestGroupMembers(String groupId, String query) async {
+    if (query.trim().length < 2) {
+      return [];
+    }
+
+    final queryParams = <String, String>{
+      'q': query.trim(),
+    };
+
+    final response = await _makeRequest(() async {
+      return await http.get(
+        Uri.parse('$baseUrl/groups/$groupId/members/suggest').replace(queryParameters: queryParams),
+        headers: _headers,
+      );
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final suggestions = data['data']['suggestions'] as List?;
+      return suggestions?.cast<Map<String, dynamic>>() ?? [];
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des suggestions');
+    }
+  }
+
+  /// Associer une balade à un groupe
+  Future<Map<String, dynamic>> associateRideToGroup(String rideId, String groupId) async {
+    final response = await _makeRequest(() async {
+      return await http.post(
+        Uri.parse('$baseUrl/rides/$rideId/associate-group'),
+        headers: _headers,
+        body: jsonEncode({
+          'groupId': groupId,
+        }),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'association de la balade au groupe');
     }
   }
 

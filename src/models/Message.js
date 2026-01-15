@@ -59,11 +59,31 @@ const messageSchema = new mongoose.Schema({
     ref: 'Group',
     default: null
   },
-  // Réponse à un message
+  // Réponse à un message (pour les réponses directes)
   replyToMessageId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message',
     default: null
+  },
+  // Threads : message parent dans un fil de discussion
+  parentMessageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null,
+    index: true
+  },
+  // Threads : ID du message racine du fil (pour performance)
+  threadRootId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null,
+    index: true
+  },
+  // Threads : nombre de réponses dans le fil (dénormalisé pour performance)
+  threadReplyCount: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   replyPreview: {
     senderPseudo: {
@@ -167,6 +187,14 @@ messageSchema.index({ auteur: 1 });
 // Index pour requêtes fréquentes
 messageSchema.index({ auteur: 1, date: -1 }); // Messages d'un utilisateur
 messageSchema.index({ createdAt: -1 }); // Tri par création
+// Index pour les threads
+messageSchema.index({ parentMessageId: 1, date: 1 }); // Réponses d'un thread
+messageSchema.index({ threadRootId: 1, date: 1 }); // Toutes les réponses d'un fil
+messageSchema.index({ idGroupe: 1, parentMessageId: 1 }); // Messages principaux d'un groupe (parentMessageId = null)
+// Index pour la recherche avancée
+messageSchema.index({ contenu: 'text' }); // Index textuel pour recherche dans le contenu
+messageSchema.index({ idGroupe: 1, type: 1, date: -1 }); // Pour filtrer par type (image, video, etc.) dans un groupe
+messageSchema.index({ idGroupe: 1, 'pollData.question': 1, date: -1 }); // Pour filtrer les sondages dans un groupe
 
 // Validation : soit idBalade soit idGroupe doit être défini
 // Et soit contenu soit metadata (fichier) doit être présent

@@ -25,6 +25,10 @@ import '../../widgets/chat/create_poll_dialog.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'thread_screen.dart';
+import 'pinned_messages_screen.dart';
+import 'message_search_screen.dart';
+import 'report_message_screen.dart';
 
 class GroupChatScreenV2 extends StatefulWidget {
   final String groupId;
@@ -134,11 +138,27 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
 
       // Charger les messages initiaux
       await _loadMessages();
+      
+      // Marquer les messages comme lus
+      _markMessagesAsRead();
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  /// Marquer les messages du groupe comme lus
+  Future<void> _markMessagesAsRead() async {
+    try {
+      await _chatService.markAsRead(
+        conversationId: widget.groupId,
+        type: 'group',
+      );
+    } catch (e) {
+      debugPrint('Erreur lors du marquage des messages comme lus: $e');
+      // Ne pas bloquer l'utilisateur si ça échoue
     }
   }
 
@@ -681,10 +701,25 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
             ),
           );
         },
-        onPin: isCreator
+        onPin: isCreator // TODO: Vérifier aussi admin/mod
             ? () {
                 Navigator.pop(context);
                 _togglePin(message);
+              }
+            : null,
+        isPinned: message.pinned,
+        onReport: !isOwnMessage
+            ? () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ReportMessageScreen(
+                      groupId: widget.groupId,
+                      messageId: message.id,
+                    ),
+                  ),
+                );
               }
             : null,
       ),
@@ -697,7 +732,19 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
       final token = await authService.storage.read(key: 'token');
       _chatService.setToken(token);
       
-      await _chatService.togglePin(messageId: message.id);
+      final response = await _chatService.togglePin(messageId: message.id);
+      
+      // Le message sera mis à jour automatiquement via Socket.io (event 'message-pinned')
+      // Mais on peut aussi mettre à jour localement pour une meilleure réactivité
+      if (mounted && response['data'] != null && response['data']['message'] != null) {
+        final updatedMessage = MessageExtended.fromJson(response['data']['message']);
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == message.id);
+          if (index >= 0) {
+            _messages[index] = updatedMessage;
+          }
+        });
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1107,11 +1154,11 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
     );
 
     if (result == 'create') {
-      // Naviguer vers la création de balade
+      // Naviguer vers la création de balade avec le groupId
       final createdRide = await Navigator.push<Ride>(
         context,
         MaterialPageRoute(
-          builder: (context) => const CreateRideWithMapScreen(),
+          builder: (context) => CreateRideWithMapScreen(groupId: widget.groupId),
         ),
       );
 
@@ -1145,6 +1192,26 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
       final token = await authService.storage.read(key: 'token');
       _chatService.setToken(token);
 
+      // Associer la balade au groupe pour qu'elle apparaisse dans le calendrier
+      bool associationReussie = false;
+      try {
+        final apiService = ApiService();
+        apiService.setToken(token);
+        await apiService.associateRideToGroup(ride.id, widget.groupId);
+        associationReussie = true;
+        debugPrint('✅ Balade ${ride.id} associée au groupe ${widget.groupId}');
+      } catch (e) {
+        // Si l'association échoue, on continue quand même pour proposer la balade
+        // mais on log l'erreur pour debug
+        debugPrint('⚠️ Erreur association balade au groupe: $e');
+        // Si l'erreur indique que l'utilisateur n'est pas l'organisateur, on informe l'utilisateur
+        final errorMessage = e.toString().toLowerCase();
+        if (errorMessage.contains('organisateur') || errorMessage.contains('forbidden')) {
+          // L'utilisateur n'est pas l'organisateur, on continue quand même mais sans association
+          debugPrint('ℹ️ Balade non associée: l\'utilisateur n\'est pas l\'organisateur');
+        }
+      }
+
       await _chatService.proposeRide(
         conversationId: widget.groupId,
         type: 'group',
@@ -1154,10 +1221,15 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
 
       // Le message sera automatiquement ajouté via Socket.io
       if (mounted) {
+        String message = 'Balade proposée avec succès !';
+        if (associationReussie) {
+          message += ' Elle apparaîtra dans le calendrier du groupe.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Balade proposée avec succès !'),
+          SnackBar(
+            content: Text(message),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -1165,8 +1237,9 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
+            content: Text('Erreur lors de la proposition de la balade: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -1542,6 +1615,21 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
                               }
                             }
                           },
+                    onThreadTap: _isSelectingMessages
+                        ? null
+                        : () {
+                            // Ouvrir l'écran thread
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ThreadScreen(
+                                  messageId: message.id,
+                                  groupId: widget.groupId,
+                                  currentUserId: _currentUser?.id ?? '',
+                                ),
+                              ),
+                            );
+                          },
                   ),
                 ),
               ],
@@ -1875,6 +1963,40 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
             Navigator.of(context).pop();
           }
         },
+        onPins: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PinnedMessagesScreen(
+                groupId: widget.groupId,
+                currentUserId: _currentUser?.id ?? '',
+              ),
+            ),
+          );
+        },
+        onSearch: () async {
+          final messageId = await Navigator.push<String>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MessageSearchScreen(
+                groupId: widget.groupId,
+                currentUserId: _currentUser?.id ?? '',
+              ),
+            ),
+          );
+          
+          // Si un messageId est retourné, naviguer vers ce message dans le chat
+          if (messageId != null && mounted) {
+            // TODO: Implémenter la navigation vers le message dans la timeline
+            // Pour l'instant, on peut juste afficher un message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Message sélectionné: $messageId'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
         onMenu: () => _showGroupMenu(),
       ),
       body: Container(
@@ -2014,6 +2136,7 @@ class _GroupChatScreenV2State extends State<GroupChatScreenV2> {
             onAudio: () => _handleAudio(),
             onPoll: () => _handlePoll(),
             onRide: () => _handleRide(),
+            groupId: widget.groupId, // Pour l'autocomplete des mentions
           ),
           ],
         ),

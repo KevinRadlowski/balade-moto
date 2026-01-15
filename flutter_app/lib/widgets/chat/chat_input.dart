@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'dart:async';
 import 'reply_preview_bar.dart';
 import '../../models/message_extended.dart';
+import '../../models/user_suggestion.dart';
 import 'attachment_menu.dart';
 import 'emoji_picker.dart';
+import 'mention_autocomplete.dart';
 
 class ChatInput extends StatefulWidget {
   final TextEditingController controller;
@@ -18,6 +21,7 @@ class ChatInput extends StatefulWidget {
   final VoidCallback? onRide;
   final Function(String)? onEmojiSelected;
   final bool isEnabled;
+  final String? groupId; // Pour l'autocomplete des mentions
 
   const ChatInput({
     super.key,
@@ -33,6 +37,7 @@ class ChatInput extends StatefulWidget {
     this.onRide,
     this.onEmojiSelected,
     this.isEnabled = true,
+    this.groupId, // Optionnel : seulement pour les groupes
   });
 
   @override
@@ -43,6 +48,10 @@ class _ChatInputState extends State<ChatInput> {
   bool _isExpanded = false;
   bool _showEmojiPicker = false;
   final FocusNode _focusNode = FocusNode();
+  
+  // Gestion de l'autocomplete des mentions
+  String? _mentionQuery;
+  Timer? _mentionDebounceTimer;
 
   void _showAttachmentMenu() {
     showModalBottomSheet(
@@ -111,9 +120,88 @@ class _ChatInputState extends State<ChatInput> {
     }
   }
 
+  void _checkForMention(String text) {
+    if (widget.groupId == null) {
+      setState(() {
+        _mentionQuery = null;
+      });
+      return;
+    }
+
+    // Trouver la position du curseur
+    final selection = widget.controller.selection;
+    final cursorPosition = selection.isValid ? selection.start : text.length;
+
+    // Chercher le dernier "@" avant le curseur
+    final textBeforeCursor = text.substring(0, cursorPosition);
+    final lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex == -1) {
+      // Pas de "@" trouvé
+      setState(() {
+        _mentionQuery = null;
+      });
+      return;
+    }
+
+    // Vérifier qu'il n'y a pas d'espace entre le "@" et le curseur
+    final textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+    if (textAfterAt.contains(' ') || textAfterAt.contains('\n')) {
+      setState(() {
+        _mentionQuery = null;
+      });
+      return;
+    }
+
+    // Extraire la query (texte après le @)
+    final query = textAfterAt.trim();
+    
+    // Débouncer les requêtes
+    _mentionDebounceTimer?.cancel();
+    _mentionDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        setState(() {
+          _mentionQuery = query.length >= 1 ? query : null;
+        });
+      }
+    });
+  }
+
+  void _insertMention(UserSuggestion suggestion) {
+    final text = widget.controller.text;
+    final selection = widget.controller.selection;
+    final cursorPosition = selection.isValid ? selection.start : text.length;
+
+    // Trouver le dernier "@" avant le curseur
+    final textBeforeCursor = text.substring(0, cursorPosition);
+    final lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex == -1) return;
+
+    // Remplacer "@query" par "@username "
+    final endIndex = cursorPosition;
+    
+    final newText = text.replaceRange(
+      lastAtIndex,
+      endIndex,
+      '@${suggestion.username} ',
+    );
+
+    widget.controller.text = newText;
+    widget.controller.selection = TextSelection.collapsed(
+      offset: lastAtIndex + suggestion.username.length + 2, // +2 pour "@" et " "
+    );
+
+    // Masquer l'autocomplete
+    setState(() {
+      _mentionQuery = null;
+    });
+  }
+
   @override
   void dispose() {
     _focusNode.dispose();
+    _mentionDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -140,6 +228,20 @@ class _ChatInputState extends State<ChatInput> {
               } else {
                 _insertEmoji(emoji);
               }
+            },
+          ),
+        // Autocomplete des mentions
+        if (_mentionQuery != null && widget.groupId != null)
+          MentionAutocomplete(
+            groupId: widget.groupId!,
+            query: _mentionQuery!,
+            onSelect: (suggestion) {
+              _insertMention(suggestion);
+            },
+            onDismiss: () {
+              setState(() {
+                _mentionQuery = null;
+              });
             },
           ),
         Container(
@@ -192,6 +294,8 @@ class _ChatInputState extends State<ChatInput> {
                     setState(() {
                       _isExpanded = text.contains('\n') || text.length > 30;
                     });
+                    // Vérifier les mentions
+                    _checkForMention(text);
                   },
                   onSubmitted: (_) {
                     if (!_isExpanded) {

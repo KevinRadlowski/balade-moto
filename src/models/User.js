@@ -347,7 +347,25 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Group',
     index: true
-  }]
+  }],
+  // Préférences utilisateur
+  preferences: {
+    notifications: {
+      email: {
+        type: Boolean,
+        default: true
+      },
+      push: {
+        type: Boolean,
+        default: true
+      }
+    },
+    // Alertes météo (premium uniquement)
+    weatherAlertsEnabled: {
+      type: Boolean,
+      default: false
+    }
+  }
 }, {
   timestamps: true
 });

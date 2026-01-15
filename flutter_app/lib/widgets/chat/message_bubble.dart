@@ -6,6 +6,7 @@ import '../../config/api_config.dart';
 import 'reply_preview_bar.dart';
 import 'reaction_bar.dart';
 import 'ride_preview_card.dart';
+import 'mention_text.dart';
 
 class MessageBubble extends StatelessWidget {
   final MessageExtended message;
@@ -15,6 +16,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onLongPress;
   final Function(String emoji)? onReactionTap;
   final VoidCallback? onReplyTap;
+  final VoidCallback? onThreadTap; // Pour ouvrir le thread
   final VoidCallback? onRestore;
   final Function(int optionIndex)? onPollVote;
 
@@ -27,6 +29,7 @@ class MessageBubble extends StatelessWidget {
     this.onLongPress,
     this.onReactionTap,
     this.onReplyTap,
+    this.onThreadTap,
     this.onRestore,
     this.onPollVote,
   });
@@ -157,13 +160,21 @@ class MessageBubble extends StatelessWidget {
                              message.pollData!.question.isEmpty || 
                              message.pollData!.options.isEmpty) && 
                             (message.metadata == null || message.metadata!.url == null))
-                          Text(
-                            message.contenu,
+                          MentionText(
+                            text: message.contenu,
                             style: TextStyle(
                               fontSize: 14,
                               color: isOwnMessage ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.w400,
                             ),
+                            mentionColor: isOwnMessage 
+                                ? Colors.white.withOpacity(0.9)
+                                : Colors.blue.shade700,
+                            onMentionTap: (username) {
+                              // TODO: Ouvrir le profil de l'utilisateur mentionné
+                              // Pour l'instant, juste un debug
+                              debugPrint('Mention tapée: @$username');
+                            },
                           ),
                         if (message.contenu.isNotEmpty && message.metadata != null && message.metadata!.url != null)
                           const SizedBox(height: 4),
@@ -206,6 +217,33 @@ class MessageBubble extends StatelessWidget {
                     reactionsSummary: message.reactionsSummary,
                     onReactionTap: onReactionTap,
                   ),
+                  // Afficher le compteur de réponses si > 0
+                  if (message.threadReplyCount > 0 && message.parentMessageId == null)
+                    GestureDetector(
+                      onTap: onThreadTap,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 14,
+                              color: isOwnMessage ? Colors.white70 : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${message.threadReplyCount} ${message.threadReplyCount == 1 ? 'réponse' : 'réponses'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isOwnMessage ? Colors.white70 : Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

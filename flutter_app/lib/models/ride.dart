@@ -1,5 +1,42 @@
 import 'waypoint.dart';
 
+// Résumé des waypoints d'une balade
+class WaypointSummary {
+  final int mandatoryStopsCount;
+  final int dangerCount;
+  final int fuelStopsCount;
+  final int coffeeStopsCount;
+  final int viewpointCount;
+
+  WaypointSummary({
+    required this.mandatoryStopsCount,
+    required this.dangerCount,
+    required this.fuelStopsCount,
+    required this.coffeeStopsCount,
+    required this.viewpointCount,
+  });
+
+  factory WaypointSummary.fromJson(Map<String, dynamic> json) {
+    return WaypointSummary(
+      mandatoryStopsCount: json['mandatoryStopsCount'] ?? 0,
+      dangerCount: json['dangerCount'] ?? 0,
+      fuelStopsCount: json['fuelStopsCount'] ?? 0,
+      coffeeStopsCount: json['coffeeStopsCount'] ?? 0,
+      viewpointCount: json['viewpointCount'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'mandatoryStopsCount': mandatoryStopsCount,
+      'dangerCount': dangerCount,
+      'fuelStopsCount': fuelStopsCount,
+      'coffeeStopsCount': coffeeStopsCount,
+      'viewpointCount': viewpointCount,
+    };
+  }
+}
+
 class Ride {
   final String id;
   final String titre;
@@ -25,6 +62,13 @@ class Ride {
   final bool? isOrganizerPremium; // Indique si l'organisateur est premium
   final String status; // Statut de la balade: scheduled, in_progress, completed, cancelled, postponed
   final String? ridingStyle; // Style de conduite: calme, modere, sportif, mixte
+  final WaypointSummary? waypointSummary; // Résumé des waypoints (compteurs par type)
+
+  // ========== ANNULATION / REPORT / REPROGRAMMATION ==========
+  final RideCancellation? cancellation; // Données d'annulation
+  final RidePostponement? postponement; // Données de report
+  final String? originalRideId; // ID de la balade originale (si reprogrammée)
+  final String? reprogrammedToRideId; // ID de la nouvelle balade (si reprogrammée)
 
   // ========== OUTILS ORGANISATEUR ==========
   final bool requiresApproval; // Validation manuelle des participants
@@ -60,6 +104,11 @@ class Ride {
     this.isOrganizerPremium,
     this.status = 'scheduled',
     this.ridingStyle,
+    this.waypointSummary,
+    this.cancellation,
+    this.postponement,
+    this.originalRideId,
+    this.reprogrammedToRideId,
     this.requiresApproval = false,
     this.pendingRequests,
     this.maxParticipants,
@@ -136,6 +185,18 @@ class Ride {
       isOrganizerPremium: json['isOrganizerPremium'] ?? false,
       status: json['status'] ?? 'scheduled',
       ridingStyle: json['ridingStyle'],
+      waypointSummary: json['waypointSummary'] != null
+          ? WaypointSummary.fromJson(json['waypointSummary'])
+          : null,
+      // Annulation / Report / Reprogrammation
+      cancellation: json['cancellation'] != null
+          ? RideCancellation.fromJson(json['cancellation'])
+          : null,
+      postponement: json['postponement'] != null
+          ? RidePostponement.fromJson(json['postponement'])
+          : null,
+      originalRideId: json['originalRideId']?.toString(),
+      reprogrammedToRideId: json['reprogrammedToRideId']?.toString(),
       // Outils organisateur
       requiresApproval: json['requiresApproval'] ?? false,
       pendingRequests: json['pendingRequests'] != null
@@ -540,6 +601,99 @@ class RideRecurrence {
     if (dayOfWeek == null) return '';
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     return days[dayOfWeek!];
+  }
+}
+
+// ========== CLASSES POUR ANNULATION / REPORT / REPROGRAMMATION ==========
+
+/// Données d'annulation d'une balade
+class RideCancellation {
+  final DateTime? cancelledAt;
+  final String? cancelledById;
+  final String? cancelReasonCode; // WEATHER, MECHANICAL, ROAD_CLOSED, LOW_PARTICIPATION, OTHER
+  final String? cancelReasonText;
+
+  RideCancellation({
+    this.cancelledAt,
+    this.cancelledById,
+    this.cancelReasonCode,
+    this.cancelReasonText,
+  });
+
+  factory RideCancellation.fromJson(Map<String, dynamic> json) {
+    return RideCancellation(
+      cancelledAt: json['cancelledAt'] != null 
+          ? DateTime.parse(json['cancelledAt']) 
+          : null,
+      cancelledById: json['cancelledBy']?.toString(),
+      cancelReasonCode: json['cancelReasonCode'],
+      cancelReasonText: json['cancelReasonText'],
+    );
+  }
+
+  String get reasonLabel {
+    switch (cancelReasonCode) {
+      case 'WEATHER':
+        return 'Météo défavorable';
+      case 'MECHANICAL':
+        return 'Problème mécanique';
+      case 'ROAD_CLOSED':
+        return 'Route fermée';
+      case 'LOW_PARTICIPATION':
+        return 'Peu de participants';
+      case 'OTHER':
+        return 'Autre raison';
+      default:
+        return 'Non spécifiée';
+    }
+  }
+}
+
+/// Données de report d'une balade
+class RidePostponement {
+  final DateTime? postponedAt;
+  final String? postponedById;
+  final String? postponeReasonCode; // WEATHER, MECHANICAL, ROAD_CLOSED, LOW_PARTICIPATION, OTHER
+  final String? postponeReasonText;
+  final DateTime? newDateTime;
+
+  RidePostponement({
+    this.postponedAt,
+    this.postponedById,
+    this.postponeReasonCode,
+    this.postponeReasonText,
+    this.newDateTime,
+  });
+
+  factory RidePostponement.fromJson(Map<String, dynamic> json) {
+    return RidePostponement(
+      postponedAt: json['postponedAt'] != null 
+          ? DateTime.parse(json['postponedAt']) 
+          : null,
+      postponedById: json['postponedBy']?.toString(),
+      postponeReasonCode: json['postponeReasonCode'],
+      postponeReasonText: json['postponeReasonText'],
+      newDateTime: json['newDateTime'] != null 
+          ? DateTime.parse(json['newDateTime']) 
+          : null,
+    );
+  }
+
+  String get reasonLabel {
+    switch (postponeReasonCode) {
+      case 'WEATHER':
+        return 'Météo défavorable';
+      case 'MECHANICAL':
+        return 'Problème mécanique';
+      case 'ROAD_CLOSED':
+        return 'Route fermée';
+      case 'LOW_PARTICIPATION':
+        return 'Peu de participants';
+      case 'OTHER':
+        return 'Autre raison';
+      default:
+        return 'Non spécifiée';
+    }
   }
 }
 

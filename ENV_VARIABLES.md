@@ -121,6 +121,27 @@ UPLOAD_QUOTA_AUDIO_MB_PER_MONTH=300
 # Autres
 UPLOAD_QUOTA_OTHER_PER_USER=50
 UPLOAD_QUOTA_OTHER_MB_PER_MONTH=200
+
+# ============================================
+# Weather Service (OpenWeatherMap)
+# ============================================
+# OpenWeatherMap API Key (obligatoire pour les fonctionnalités météo)
+# Obtenez votre clé gratuite sur https://openweathermap.org/api
+WEATHER_API_KEY=your-openweather-api-key
+WEATHER_API_URL=https://api.openweathermap.org/data/2.5
+
+# Cache météo (TTL en secondes, 30 minutes par défaut)
+WEATHER_CACHE_TTL=1800
+WEATHER_CACHE_ENABLED=true
+
+# Seuils pour les alertes météo
+WEATHER_RAIN_THRESHOLD=60  # % probabilité de pluie
+WEATHER_WIND_THRESHOLD=45  # km/h
+WEATHER_FROST_THRESHOLD=0  # °C (optionnel)
+
+# Scheduler alertes météo
+WEATHER_ALERT_ENABLED=true
+WEATHER_ALERT_HOURS_BEFORE=24  # Nombre d'heures avant la balade pour envoyer l'alerte
 ```
 
 ## Notes importantes

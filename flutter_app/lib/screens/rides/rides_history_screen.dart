@@ -1057,6 +1057,70 @@ class _RideCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                  // Badge "Annulée"
+                  if (ride.status == 'cancelled')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.red.shade300,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.cancel,
+                            size: 14,
+                            color: Colors.red.shade900,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Annulée',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Badge "Reportée"
+                  if (ride.status == 'postponed')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.orange.shade300,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: Colors.orange.shade900,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Reportée',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (showDuplicate && onDuplicate != null)
                     Consumer<PlanProvider>(
                       builder: (context, planProvider, _) {
