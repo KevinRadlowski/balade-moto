@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -1155,23 +1156,49 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
           // Carte
           Expanded(
             flex: 2,
-            child: Stack(
-              children: [
-                GoogleMap(
-                  onMapCreated: _onMapCreated,
-                  initialCameraPosition: CameraPosition(
-                    target: _currentLocation ?? const LatLng(46.6034, 1.8883), // Centre de la France par défaut
-                    zoom: 10.0,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                // Bloquer les notifications de scroll quand on interagit avec la carte
+                return true;
+              },
+              child: RawGestureDetector(
+                gestures: <Type, GestureRecognizerFactory>{
+                  VerticalDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<VerticalDragGestureRecognizer>(
+                    () => VerticalDragGestureRecognizer(),
+                    (VerticalDragGestureRecognizer instance) {
+                      instance.onStart = (_) {};
+                      instance.onUpdate = (_) {};
+                      instance.onEnd = (_) {};
+                      instance.onCancel = () {};
+                    },
                   ),
-                  markers: _markers,
-                  polylines: _polylines,
-                  onTap: (LatLng position) {
-                    _addWaypointFromMap(position);
-                  },
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  mapToolbarEnabled: false,
-                ),
+                  ScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
+                    () => ScaleGestureRecognizer(),
+                    (ScaleGestureRecognizer instance) {
+                      instance.onStart = (_) {};
+                      instance.onUpdate = (_) {};
+                      instance.onEnd = (_) {};
+                    },
+                  ),
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Stack(
+                children: [
+                  GoogleMap(
+                    onMapCreated: _onMapCreated,
+                    initialCameraPosition: CameraPosition(
+                      target: _currentLocation ?? const LatLng(46.6034, 1.8883), // Centre de la France par défaut
+                      zoom: 10.0,
+                    ),
+                    markers: _markers,
+                    polylines: _polylines,
+                    onTap: (LatLng position) {
+                      _addWaypointFromMap(position);
+                    },
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    mapToolbarEnabled: false,
+                  ),
                 // Instructions
                 if (_waypoints.isEmpty)
                   Positioned(
@@ -1196,7 +1223,9 @@ class _CreateRideWithMapScreenState extends State<CreateRideWithMapScreen> {
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
+              ),
             ),
           ),
           // Formulaire

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../services/auth_service.dart';
@@ -842,6 +843,155 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
     }
   }
 
+  Future<void> _showEditRideDialog() async {
+    if (_ride == null) return;
+
+    final titreController = TextEditingController(text: _ride!.titre);
+    final descriptionController = TextEditingController(text: _ride!.description ?? '');
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.edit, color: AppTheme.primaryColor),
+                  SizedBox(width: 8),
+                  Text('Modifier la balade'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Titre',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: titreController,
+                      decoration: InputDecoration(
+                        hintText: 'Titre de la balade',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      maxLength: 200,
+                      enabled: !isSubmitting,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Description',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: InputDecoration(
+                        hintText: 'Description de la balade',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      maxLines: 5,
+                      maxLength: 2000,
+                      enabled: !isSubmitting,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isSubmitting)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else ...[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Annuler'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final titre = titreController.text.trim();
+                      final description = descriptionController.text.trim();
+
+                      if (titre.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Le titre ne peut pas être vide'),
+                            backgroundColor: AppTheme.errorColor,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        isSubmitting = true;
+                      });
+
+                      try {
+                        final updatedRide = await _apiService.updateRide(
+                          _ride!.id,
+                          titre: titre,
+                          description: description.isEmpty ? null : description,
+                        );
+
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _ride = updatedRide;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Balade modifiée avec succès'),
+                              backgroundColor: AppTheme.successColor,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          setState(() {
+                            isSubmitting = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString().replaceAll('Exception: ', '')),
+                              backgroundColor: AppTheme.errorColor,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Enregistrer'),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _deleteRide() async {
     if (_ride == null) return;
 
@@ -1223,23 +1373,38 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Titre
-                Text(
-                  _ride!.titre,
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 28,
-                    height: 1.2,
-                    letterSpacing: -0.5,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withOpacity(0.6),
-                        offset: const Offset(0, 2),
-                        blurRadius: 10,
+                // Titre avec bouton d'édition pour l'organisateur
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _ride!.titre,
+                        style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 28,
+                          height: 1.2,
+                          letterSpacing: -0.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.6),
+                              offset: const Offset(0, 2),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    if (Provider.of<AuthService>(context, listen: false).user?.id == _ride!.organisateur.id)
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.white.withOpacity(0.9), size: 22),
+                        onPressed: _showEditRideDialog,
+                        tooltip: 'Modifier le titre et la description',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 // Date
@@ -1269,6 +1434,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
 
 
   Widget _buildDescriptionCard() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isOrganizer = _ride!.organisateur.id == authService.user?.id;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1276,15 +1444,35 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
         borderRadius: BorderRadius.circular(16),
         boxShadow: AppTheme.cardShadow,
       ),
-      child: Text(
-        _ride!.description!,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          height: 1.7,
-          fontSize: 15,
-          fontWeight: FontWeight.w400,
-          color: Colors.grey.shade800,
-          letterSpacing: 0.1,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  _ride!.description!,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    height: 1.7,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey.shade800,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ),
+              if (isOrganizer)
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.grey.shade600, size: 20),
+                  onPressed: _showEditRideDialog,
+                  tooltip: 'Modifier la description',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1466,32 +1654,58 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                 bottomLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
               ),
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    onMapCreated: (controller) {
-                      if (mounted) {
-                        _mapController = controller;
-                        if (_ride!.waypoints != null && _ride!.waypoints!.isNotEmpty) {
-                          _loadRouteOnMap(_ride!.waypoints!);
-                        }
-                      }
-                    },
-                    initialCameraPosition: CameraPosition(
-                      target: _ride!.waypoints != null && _ride!.waypoints!.isNotEmpty
-                          ? LatLng(
-                              _ride!.waypoints!.first.latitude,
-                              _ride!.waypoints!.first.longitude,
-                            )
-                          : const LatLng(45.7640, 4.8357),
-                      zoom: 12,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  // Bloquer les notifications de scroll quand on interagit avec la carte
+                  return true;
+                },
+                child: RawGestureDetector(
+                  gestures: <Type, GestureRecognizerFactory>{
+                    VerticalDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<VerticalDragGestureRecognizer>(
+                      () => VerticalDragGestureRecognizer(),
+                      (VerticalDragGestureRecognizer instance) {
+                        instance.onStart = (_) {};
+                        instance.onUpdate = (_) {};
+                        instance.onEnd = (_) {};
+                        instance.onCancel = () {};
+                      },
                     ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    mapType: MapType.normal,
-                    zoomControlsEnabled: false,
-                    myLocationButtonEnabled: false,
-                  ),
+                    ScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
+                      () => ScaleGestureRecognizer(),
+                      (ScaleGestureRecognizer instance) {
+                        instance.onStart = (_) {};
+                        instance.onUpdate = (_) {};
+                        instance.onEnd = (_) {};
+                      },
+                    ),
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Stack(
+                  children: [
+                    GoogleMap(
+                      onMapCreated: (controller) {
+                        if (mounted) {
+                          _mapController = controller;
+                          if (_ride!.waypoints != null && _ride!.waypoints!.isNotEmpty) {
+                            _loadRouteOnMap(_ride!.waypoints!);
+                          }
+                        }
+                      },
+                      initialCameraPosition: CameraPosition(
+                        target: _ride!.waypoints != null && _ride!.waypoints!.isNotEmpty
+                            ? LatLng(
+                                _ride!.waypoints!.first.latitude,
+                                _ride!.waypoints!.first.longitude,
+                              )
+                            : const LatLng(45.7640, 4.8357),
+                        zoom: 12,
+                      ),
+                      markers: _markers,
+                      polylines: _polylines,
+                      mapType: MapType.normal,
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                    ),
                   if (_isCalculatingRoute)
                     Container(
                       color: Colors.white.withOpacity(0.8),
@@ -1499,7 +1713,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> with WidgetsBinding
                         child: CircularProgressIndicator(),
                       ),
                     ),
-                ],
+                  ],
+                ),
+                ),
               ),
             ),
           ),

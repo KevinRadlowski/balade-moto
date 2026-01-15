@@ -18,6 +18,7 @@ router.post('/:id/ban/:userId', authMiddleware, subscriptionMiddleware, groupCon
 router.delete('/:id/ban/:userId', authMiddleware, subscriptionMiddleware, groupController.unbanUser);
 router.get('/:id/messages', authMiddleware, subscriptionMiddleware, groupController.getGroupMessages);
 router.post('/:id/claim-admin', authMiddleware, subscriptionMiddleware, groupController.claimAdmin);
+router.post('/:id/favorite', authMiddleware, subscriptionMiddleware, groupController.toggleFavorite);
 
 module.exports = router;
 

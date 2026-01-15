@@ -341,7 +341,13 @@ const userSchema = new mongoose.Schema({
         default: null
       }
     }]
-  }
+  },
+  // Groupes favoris
+  favoriteGroups: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group',
+    index: true
+  }]
 }, {
   timestamps: true
 });

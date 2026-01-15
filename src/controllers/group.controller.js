@@ -46,7 +46,7 @@ exports.createGroup = async (req, res, next) => {
     const userPlan = premiumConfig.getUserPlan(req.user);
     const limits = premiumConfig.getPlanLimits(userPlan);
     
-    const { nom, description, visibilite } = req.body;
+    const { nom, description, visibilite, location } = req.body;
 
     if (!nom) {
       return res.status(400).json({
@@ -77,11 +77,38 @@ exports.createGroup = async (req, res, next) => {
       }
     }
 
+    // Construire l'objet location si fourni
+    let groupLocation = null;
+    if (location) {
+      groupLocation = {};
+      
+      // Champs texte
+      if (location.city) groupLocation.city = location.city;
+      if (location.departmentCode) groupLocation.departmentCode = location.departmentCode;
+      if (location.departmentName) groupLocation.departmentName = location.departmentName;
+      if (location.regionName) groupLocation.regionName = location.regionName;
+      if (location.countryCode) groupLocation.countryCode = location.countryCode;
+      
+      // Geo (Point avec coordinates)
+      if (location.geo && location.geo.coordinates && Array.isArray(location.geo.coordinates) && location.geo.coordinates.length >= 2) {
+        groupLocation.geo = {
+          type: 'Point',
+          coordinates: location.geo.coordinates // [lng, lat]
+        };
+      }
+      
+      // Ne créer location que s'il y a au moins un champ
+      if (Object.keys(groupLocation).length === 0) {
+        groupLocation = null;
+      }
+    }
+
     const group = new Group({
       nom,
       description,
       visibilite: finalVisibilite,
-      createur: req.user._id
+      createur: req.user._id,
+      ...(groupLocation ? { location: groupLocation } : {})
     });
 
     await group.save();
@@ -126,73 +153,451 @@ exports.createGroup = async (req, res, next) => {
   }
 };
 
-// Lister les groupes
-exports.getGroups = async (req, res) => {
+// Toggle favoris d'un groupe
+exports.toggleFavorite = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Vérifier que le groupe existe
+    const group = await Group.findById(id);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+
+    // Charger l'utilisateur avec favoriteGroups
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    // Initialiser favoriteGroups si undefined (compatibilité avec anciens users)
+    if (!user.favoriteGroups) {
+      user.favoriteGroups = [];
+    }
+
+    // Toggle le groupe dans les favoris
+    const groupIdStr = id.toString();
+    const isFavorite = user.favoriteGroups.some(
+      favId => favId.toString() === groupIdStr
+    );
+
+    if (isFavorite) {
+      // Retirer des favoris
+      user.favoriteGroups = user.favoriteGroups.filter(
+        favId => favId.toString() !== groupIdStr
+      );
+    } else {
+      // Ajouter aux favoris
+      user.favoriteGroups.push(id);
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isFavorite: !isFavorite
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de groupe invalide'
+      });
+    }
+    return next(error);
+  }
+};
+
+// Lister les groupes (version refondue avec aggregation)
+exports.getGroups = async (req, res, next) => {
   try {
     const {
-      visibilite,
-      membre,
-      search,
+      scope = 'all', // 'discover' | 'joined' | 'favorites' | 'all'
+      q, // Recherche nom/description
+      owner, // Recherche pseudo du créateur
+      visibilite, // 'publique' | 'privee'
+      region,
+      departmentCode,
+      city,
+      nearLat,
+      nearLng,
+      nearKm,
       page = 1,
-      limit = 10
+      limit = 20
     } = req.query;
 
-    const filter = {};
+    const userId = req.user._id;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50
+
+    // Charger l'utilisateur pour avoir favoriteGroups
+    const user = await User.findById(userId).select('favoriteGroups');
+    const favoriteGroupIds = (user?.favoriteGroups || []).map(id => id.toString());
+
+    // Pipeline d'aggregation
+    const pipeline = [];
+
+    // Étape 1: $match - Filtres de base
+    let matchStage = {};
+
+    // Filtre par scope
+    // NOTE: Si un filtre géospatial (nearLat/nearLng) est actif, on assouplit le scope "discover"
+    // pour permettre de voir tous les groupes dans le rayon, y compris ceux où l'utilisateur est membre
+    const hasGeoSpatialFilter = nearLat && nearLng;
+    
+    if (scope === 'joined') {
+      matchStage['membres.userId'] = userId;
+    } else if (scope === 'favorites') {
+      matchStage._id = { $in: user?.favoriteGroups || [] };
+    } else if (scope === 'discover') {
+      // Découvrir = groupes publics où l'utilisateur n'est pas membre
+      // SAUF si un filtre géospatial est actif : dans ce cas, on montre tous les groupes publics
+      // dans le rayon (y compris ceux où l'utilisateur est membre) pour permettre la découverte géographique
+      matchStage.visibilite = 'publique';
+      if (!hasGeoSpatialFilter) {
+        // Sans filtre géospatial, exclure les groupes où l'utilisateur est membre
+        matchStage['membres.userId'] = { $ne: userId };
+      }
+      // Avec filtre géospatial, on garde tous les groupes publics (le filtre géospatial fera le tri)
+    }
+    // scope === 'all' : pas de filtre supplémentaire
 
     // Filtre par visibilité
     if (visibilite && ['publique', 'privee'].includes(visibilite)) {
-      filter.visibilite = visibilite;
-    } else {
-      // Montrer les groupes publics et les groupes privés où l'utilisateur est membre
-      filter.$or = [
+      matchStage.visibilite = visibilite;
+    } else if (scope !== 'discover') {
+      // Pour 'all', montrer publics + privés où l'utilisateur est membre
+      if (!matchStage.$or) {
+        matchStage.$or = [];
+      }
+      matchStage.$or.push(
         { visibilite: 'publique' },
-        { 'membres.userId': req.user._id }
-      ];
+        { 'membres.userId': userId }
+      );
     }
 
-    // Filtre par membre
-    if (membre) {
-      filter['membres.userId'] = membre;
+    // Recherche par nom/description
+    if (q) {
+      const searchRegex = { $regex: q, $options: 'i' };
+      if (!matchStage.$or) {
+        matchStage.$or = [];
+      }
+      matchStage.$or.push(
+        { nom: searchRegex },
+        { description: searchRegex }
+      );
     }
 
-    // Recherche par nom ou description
-    if (search) {
-      filter.$or = [
-        ...(filter.$or || []),
-        { nom: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
+    // Filtres géographiques textuels (seulement si pas de filtre géospatial)
+    // Si un filtre géospatial est actif, on ignore les filtres textuels car le filtre géospatial est plus précis
+    if (!hasGeoSpatialFilter) {
+      if (region) {
+        matchStage['location.regionName'] = { $regex: region, $options: 'i' };
+      }
+      if (departmentCode) {
+        matchStage['location.departmentCode'] = departmentCode;
+      }
+      if (city) {
+        matchStage['location.city'] = { $regex: city, $options: 'i' };
+      }
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // Filtre géospatial "près de moi" - sera traité séparément avec $geoNear
+    let geoNearStage = null;
+    if (nearLat && nearLng) {
+      const lat = parseFloat(nearLat);
+      const lng = parseFloat(nearLng);
+      const maxDistance = nearKm ? parseFloat(nearKm) * 1000 : 50000; // Par défaut 50km, en mètres
 
-    const groups = await Group.find(filter)
-      .populate('createur', 'pseudo email avatarUrl')
-      .populate('membres.userId', 'pseudo email avatarUrl')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        // Créer un matchStage pour geoNear qui inclut uniquement les groupes avec location.geo valide
+        // $geoNear nécessite que location.geo existe et soit de type Point avec coordinates [lng, lat]
+        const geoMatchStage = {
+          ...matchStage,
+          'location.geo': {
+            $exists: true,
+            $ne: null
+          },
+          'location.geo.type': 'Point',
+          'location.geo.coordinates': {
+            $exists: true,
+            $ne: null,
+            $type: 'array',
+            $size: 2
+          }
+        };
 
-    const total = await Group.countDocuments(filter);
+        geoNearStage = {
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: [lng, lat] // MongoDB utilise [lng, lat]
+            },
+            distanceField: 'distance',
+            maxDistance: maxDistance,
+            spherical: true,
+            query: geoMatchStage // Appliquer les autres filtres dans geoNear + filtre pour avoir location.geo
+          }
+        };
+        // Réinitialiser matchStage car il sera dans geoNear
+        matchStage = {};
+        
+        // Debug: logger les paramètres de recherche (uniquement en développement)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[DEBUG] Recherche géospatiale:', {
+            near: { lat, lng },
+            maxDistance: `${maxDistance}m (${nearKm}km)`,
+            query: JSON.stringify(geoMatchStage, null, 2)
+          });
+        }
+      }
+    }
+
+    // Ajouter $geoNear en premier si nécessaire, sinon $match
+    if (geoNearStage) {
+      pipeline.push(geoNearStage);
+    } else if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage });
+    }
+
+    // Étape 2: $lookup - Joindre avec User pour filtrer par owner (pseudo)
+    if (owner) {
+      pipeline.push({
+        $lookup: {
+          from: 'users',
+          localField: 'createur',
+          foreignField: '_id',
+          as: 'creatorInfo'
+        }
+      });
+      pipeline.push({
+        $match: {
+          'creatorInfo.pseudo': { $regex: owner, $options: 'i' }
+        }
+      });
+    }
+
+    // Étape 3: $addFields - Ajouter isMember et isFavorite
+    pipeline.push({
+      $addFields: {
+        isMember: {
+          $cond: {
+            if: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: '$membres',
+                      as: 'membre',
+                      cond: {
+                        $eq: [
+                          { $toString: '$$membre.userId' },
+                          userId.toString()
+                        ]
+                      }
+                    }
+                  }
+                },
+                0
+              ]
+            },
+            then: true,
+            else: false
+          }
+        },
+        isFavorite: {
+          $in: [{ $toString: '$_id' }, favoriteGroupIds]
+        }
+      }
+    });
+
+    // Étape 4: Filtrer les groupes privés non accessibles
+    // Un groupe privé n'est listé que si l'utilisateur est membre
+    // NOTE: Pour le scope "discover", ce filtre est déjà appliqué dans matchStage/geoMatchStage
+    // mais on le garde ici pour les autres scopes
+    if (scope !== 'discover') {
+      pipeline.push({
+        $match: {
+          $or: [
+            { visibilite: 'publique' },
+            { isMember: true }
+          ]
+        }
+      });
+    }
+
+    // Étape 5: $sort - Tri recommandé
+    pipeline.push({
+      $sort: {
+        isFavorite: -1, // Favoris d'abord
+        isMember: -1, // Puis groupes rejoints
+        updatedAt: -1, // Puis activité récente
+        createdAt: -1 // Puis date de création
+      }
+    });
+
+    // Debug: logger le pipeline complet (uniquement en développement)
+    if (process.env.NODE_ENV === 'development' && nearLat && nearLng) {
+      console.log('[DEBUG] Pipeline complet pour recherche géospatiale:', JSON.stringify(pipeline, null, 2));
+    }
+
+    // Étape 6: $facet - Pagination
+    pipeline.push({
+      $facet: {
+        data: [
+          { $skip: (pageNum - 1) * limitNum },
+          { $limit: limitNum },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'createur',
+              foreignField: '_id',
+              as: 'createurInfo'
+            }
+          },
+          {
+            $unwind: {
+              path: '$createurInfo',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $addFields: {
+              createur: {
+                $cond: {
+                  if: { $or: [{ $not: '$createurInfo' }, '$createurInfo.isDeleted'] },
+                  then: {
+                    _id: '$createur',
+                    pseudo: 'Utilisateur supprimé',
+                    email: null,
+                    avatarUrl: null,
+                    isDeleted: true
+                  },
+                  else: {
+                    _id: '$createurInfo._id',
+                    pseudo: '$createurInfo.pseudo',
+                    email: '$createurInfo.email',
+                    avatarUrl: '$createurInfo.avatarUrl',
+                    isDeleted: false
+                  }
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'membres.userId',
+              foreignField: '_id',
+              as: 'membresInfo'
+            }
+          },
+          {
+            $addFields: {
+              membres: {
+                $map: {
+                  input: '$membres',
+                  as: 'membre',
+                  in: {
+                    $let: {
+                      vars: {
+                        userInfo: {
+                          $arrayElemAt: [
+                            {
+                              $filter: {
+                                input: '$membresInfo',
+                                as: 'info',
+                                cond: { $eq: ['$$info._id', '$$membre.userId'] }
+                              }
+                            },
+                            0
+                          ]
+                        }
+                      },
+                      in: {
+                        userId: {
+                          $cond: {
+                            if: { $or: [{ $not: '$$userInfo' }, '$$userInfo.isDeleted'] },
+                            then: {
+                              _id: '$$membre.userId',
+                              pseudo: 'Utilisateur supprimé',
+                              email: null,
+                              avatarUrl: null,
+                              isDeleted: true
+                            },
+                            else: {
+                              _id: '$$userInfo._id',
+                              pseudo: '$$userInfo.pseudo',
+                              email: '$$userInfo.email',
+                              avatarUrl: '$$userInfo.avatarUrl',
+                              isDeleted: false
+                            }
+                          }
+                        },
+                        role: '$$membre.role',
+                        dateAjout: '$$membre.dateAjout'
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            $project: {
+              createurInfo: 0,
+              membresInfo: 0
+            }
+          }
+        ],
+        total: [{ $count: 'count' }]
+      }
+    });
+
+    // Exécuter l'aggregation
+    const result = await Group.aggregate(pipeline);
+
+    const groups = result[0]?.data || [];
+    const total = result[0]?.total[0]?.count || 0;
+
+    // Construire les URLs complètes des avatars
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+    groups.forEach(group => {
+      if (group.createur && group.createur.avatarUrl && !group.createur.avatarUrl.startsWith('http')) {
+        group.createur.avatarUrl = `${baseUrl}${group.createur.avatarUrl}`;
+      }
+      if (group.membres && Array.isArray(group.membres)) {
+        group.membres.forEach(membre => {
+          if (membre.userId && membre.userId.avatarUrl && !membre.userId.avatarUrl.startsWith('http')) {
+            membre.userId.avatarUrl = `${baseUrl}${membre.userId.avatarUrl}`;
+          }
+        });
+      }
+    });
 
     res.status(200).json({
       success: true,
       data: {
         groups,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: pageNum,
+          limit: limitNum,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limitNum)
         }
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des groupes',
-      error: error.message
-    });
+    return next(error);
   }
 };
 
@@ -299,7 +704,7 @@ exports.getGroupById = async (req, res) => {
   }
 };
 
-// Modifier un groupe (uniquement par les admins)
+// Modifier un groupe (uniquement par le créateur ou les admins)
 exports.updateGroup = async (req, res) => {
   try {
     const { id } = req.params;
@@ -314,11 +719,22 @@ exports.updateGroup = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
+    // Vérifier les permissions
+    const permissions = group.getUserPermissions(req.user._id);
+    
+    // Pour modifier le titre et la description, il faut être créateur ou admin
+    if ((nom !== undefined || description !== undefined) && !permissions.canEditGroupInfo) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être administrateur pour modifier ce groupe'
+        message: 'Vous devez être créateur ou administrateur pour modifier le titre et la description du groupe'
+      });
+    }
+
+    // Pour modifier la visibilité, seul le créateur peut le faire
+    if (visibilite !== undefined && !group.isCreator(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul le créateur peut modifier la visibilité du groupe'
       });
     }
 
@@ -521,11 +937,12 @@ exports.addMember = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
+    // Vérifier les permissions
+    const permissions = group.getUserPermissions(req.user._id);
+    if (!permissions.canAddMembers) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être administrateur pour ajouter des membres'
+        message: 'Vous devez être créateur ou administrateur pour ajouter des membres'
       });
     }
 
@@ -554,10 +971,21 @@ exports.addMember = async (req, res) => {
       });
     }
 
-    // Ajouter le membre
+    // Ajouter le membre (seul le créateur peut ajouter directement en admin/modérateur)
+    let finalRole = 'membre';
+    if (group.isCreator(req.user._id)) {
+      // Le créateur peut définir n'importe quel rôle
+      if (['admin', 'moderateur', 'membre'].includes(role)) {
+        finalRole = role;
+      }
+    } else if (role === 'admin' || role === 'moderateur') {
+      // Les admins ne peuvent ajouter que des membres normaux
+      finalRole = 'membre';
+    }
+    
     group.membres.push({
       userId: user._id,
-      role: role === 'admin' ? 'admin' : 'membre',
+      role: finalRole,
       dateAjout: new Date()
     });
 
@@ -601,14 +1029,6 @@ exports.removeMember = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Vous devez être administrateur pour retirer des membres'
-      });
-    }
-
     // Vérifier si l'utilisateur est membre
     if (!group.isMember(userId)) {
       return res.status(400).json({
@@ -617,7 +1037,19 @@ exports.removeMember = async (req, res) => {
       });
     }
 
-    // Ne pas permettre de retirer le créateur
+    // Permettre à un utilisateur de se retirer lui-même, sinon vérifier les permissions
+    const isSelfRemoval = userId === req.user._id.toString();
+    if (!isSelfRemoval) {
+      const permissions = group.getUserPermissions(req.user._id);
+      if (!permissions.canRemoveMembers) {
+        return res.status(403).json({
+          success: false,
+          message: 'Vous devez être créateur, administrateur ou modérateur pour retirer des membres'
+        });
+      }
+    }
+
+    // Ne pas permettre de retirer le créateur (même si c'est lui-même)
     if (group.createur.toString() === userId) {
       return res.status(400).json({
         success: false,
@@ -656,16 +1088,16 @@ exports.removeMember = async (req, res) => {
   }
 };
 
-// Modifier le rôle d'un membre
+// Modifier le rôle d'un membre (uniquement par le créateur)
 exports.updateMemberRole = async (req, res) => {
   try {
     const { id, userId } = req.params;
     const { role } = req.body;
 
-    if (!role || !['admin', 'membre'].includes(role)) {
+    if (!role || !['admin', 'moderateur', 'membre'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Le rôle doit être "admin" ou "membre"'
+        message: 'Le rôle doit être "admin", "moderateur" ou "membre"'
       });
     }
 
@@ -678,11 +1110,11 @@ exports.updateMemberRole = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
+    // Vérifier que l'utilisateur est le créateur (seul le créateur peut promouvoir)
+    if (!group.isCreator(req.user._id)) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être administrateur pour modifier les rôles'
+        message: 'Seul le créateur peut modifier les rôles des membres'
       });
     }
 
@@ -748,11 +1180,12 @@ exports.banUser = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
+    // Vérifier les permissions
+    const permissions = group.getUserPermissions(req.user._id);
+    if (!permissions.canBanUsers) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être administrateur pour bannir un utilisateur'
+        message: 'Vous devez être créateur, administrateur ou modérateur pour bannir un utilisateur'
       });
     }
 
@@ -851,11 +1284,12 @@ exports.unbanUser = async (req, res) => {
       });
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (!group.isAdmin(req.user._id)) {
+    // Vérifier les permissions
+    const permissions = group.getUserPermissions(req.user._id);
+    if (!permissions.canUnbanUsers) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être administrateur pour débannir un utilisateur'
+        message: 'Vous devez être créateur, administrateur ou modérateur pour débannir un utilisateur'
       });
     }
 

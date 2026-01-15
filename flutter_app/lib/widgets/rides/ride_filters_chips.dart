@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../../config/api_config.dart';
+import '../location_autocomplete_field.dart';
 
 /// Widget de chips de filtre pour les balades
 class RideFiltersChips extends StatefulWidget {
@@ -57,7 +55,6 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   bool _showAdvancedFilters = false;
-  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -534,10 +531,6 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
   }
 
   Future<void> _useCurrentLocation() async {
-    setState(() {
-      _isLoadingLocation = true;
-    });
-
     try {
       // Demander la permission
       LocationPermission permission = await Geolocator.checkPermission();
@@ -584,12 +577,6 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
           ),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-      }
     }
   }
 
@@ -597,36 +584,26 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
     showDialog(
       context: context,
       builder: (context) {
-        final addressController = TextEditingController();
         return AlertDialog(
-          title: const Text('Rechercher une adresse'),
-          content: TextField(
-            controller: addressController,
-            decoration: const InputDecoration(
-              hintText: 'Ex: Lyon, Paris, 69001...',
-              prefixIcon: Icon(Icons.search),
+          title: const Text('Rechercher une ville ou une adresse'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: LocationAutocompleteField(
+              hintText: 'Tapez une ville, région ou département...',
+              labelText: 'Lieu',
+              onLocationSelected: (locationData) async {
+                if (locationData != null && locationData.hasCoordinates) {
+                  Navigator.pop(context);
+                  // Utiliser les coordonnées du lieu sélectionné
+                  _showRadiusSelector(locationData.lat!, locationData.lng!);
+                }
+              },
             ),
-            autofocus: true,
-            onSubmitted: (value) async {
-              if (value.trim().isNotEmpty) {
-                Navigator.pop(context);
-                await _geocodeAddress(value.trim());
-              }
-            },
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (addressController.text.trim().isNotEmpty) {
-                  Navigator.pop(context);
-                  await _geocodeAddress(addressController.text.trim());
-                }
-              },
-              child: const Text('Rechercher'),
             ),
           ],
         );
@@ -634,77 +611,6 @@ class _RideFiltersChipsState extends State<RideFiltersChips> {
     );
   }
 
-  Future<void> _geocodeAddress(String address) async {
-    setState(() {
-      _isLoadingLocation = true;
-    });
-
-    try {
-      // Utiliser l'API Google Maps Geocoding
-      final apiKey = ApiConfig.googleMapsApiKey;
-      final encodedAddress = Uri.encodeComponent(address);
-      final url = 'https://maps.googleapis.com/maps/api/geocode/json?address=$encodedAddress&key=$apiKey&language=fr';
-      
-      final response = await http.get(Uri.parse(url));
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['status'] == 'OK' && data['results'] != null && data['results'].isNotEmpty) {
-          final result = data['results'][0];
-          final location = result['geometry']['location'];
-          final latitude = location['lat'] as double;
-          final longitude = location['lng'] as double;
-          
-          _showRadiusSelector(latitude, longitude);
-        } else {
-          String errorMessage = 'Adresse introuvable';
-          if (data['status'] == 'ZERO_RESULTS') {
-            errorMessage = 'Aucun résultat trouvé pour cette adresse';
-          } else if (data['status'] == 'OVER_QUERY_LIMIT') {
-            errorMessage = 'Limite de requêtes dépassée. Veuillez réessayer plus tard.';
-          } else if (data['status'] == 'REQUEST_DENIED') {
-            errorMessage = 'Erreur d\'authentification avec Google Maps';
-          } else if (data['error_message'] != null) {
-            errorMessage = data['error_message'];
-          }
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(errorMessage),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur HTTP ${response.statusCode}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la recherche: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-      }
-    }
-  }
 
   void _showRadiusSelector(double latitude, double longitude) {
     double selectedRadius = widget.rayon ?? 50.0;

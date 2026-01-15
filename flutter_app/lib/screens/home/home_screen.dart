@@ -200,9 +200,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       // Récupérer les balades où l'utilisateur participe
-      final rides = await _apiService.getRides(
+      final result = await _apiService.getRides(
         participant: userId,
       );
+      final rides = result['rides'] as List<Ride>;
 
       // Filtrer pour ne garder que les balades futures et trouver la plus proche
       final now = DateTime.now();
@@ -253,7 +254,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       
       // Utiliser le paramètre 'membre' pour ne récupérer que les groupes où l'utilisateur est membre
-      final groupsData = await _apiService.getGroups(membre: userId);
+      final result = await _apiService.getGroups(membre: userId);
+      final groupsData = result['groups'] as List;
       final groups = groupsData.map((g) {
         final group = Group.fromJson(g);
         // Si le backend ne fournit pas unreadCount/lastMessageAt, simuler temporairement
@@ -275,6 +277,9 @@ class _HomeScreenState extends State<HomeScreen> {
             lastMessageAt: group.membres.length > 1 
                 ? DateTime.now().subtract(const Duration(minutes: 30))
                 : null,
+            isFavorite: group.isFavorite,
+            isMember: group.isMember,
+            location: group.location,
           );
         }
         return group;
@@ -295,7 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadAllGroups() async {
     try {
       // Charger tous les groupes (sans filtre membre) pour les statistiques
-      final groupsData = await _apiService.getGroups();
+      final result = await _apiService.getGroups();
+      final groupsData = result['groups'] as List;
       final groups = groupsData.map((g) => Group.fromJson(g)).toList();
       
       if (mounted) {
@@ -326,10 +332,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       } else {
         // Sinon, charger les balades publiques récentes normalement
-        allRides = await _apiService.getRides(
+        final result = await _apiService.getRides(
           typeVehicule: user?.vehiclePreference == 'les deux' ? null : user?.vehiclePreference,
           limit: 20, // Charger plus pour filtrer
         );
+        allRides = result['rides'] as List<Ride>;
       }
 
       // Filtrer pour ne garder que les balades où l'utilisateur n'a pas participé
@@ -361,13 +368,56 @@ class _HomeScreenState extends State<HomeScreen> {
       // Compter tous les groupes créés dans l'application (pas seulement ceux dont l'utilisateur est membre)
       final activeGroups = _allGroups.length;
       
-      // Pour les balades de ce mois, on pourrait charger les données séparément si nécessaire
-      // Pour l'instant, on met 0 car on ne charge plus _allRides
-      if (mounted) {
-        setState(() {
-          _ridesThisMonth = 0; // Ne sera plus calculé ici car on ne charge plus toutes les balades
-          _activeGroups = activeGroups;
-        });
+      // Charger les balades publiques à venir pour les statistiques
+      try {
+        final now = DateTime.now();
+        
+        // Charger uniquement les balades publiques et à venir
+        // On passe dateDebut à maintenant pour ne prendre que les balades futures
+        // La limite maximale est de 100, donc on fait plusieurs appels paginés si nécessaire
+        int totalRides = 0;
+        int page = 1;
+        const int limit = 100; // Limite maximale du backend
+        bool hasMore = true;
+        
+        while (hasMore) {
+          final result = await _apiService.getRides(
+            dateDebut: now.toIso8601String(), // Seulement les balades à venir
+            visibilite: 'publique', // Compter uniquement les balades publiques pour les statistiques
+            page: page,
+            limit: limit,
+          );
+          final rides = result['rides'] as List<Ride>;
+          
+          totalRides += rides.length;
+          
+          // Si on a reçu moins de balades que la limite, c'est qu'on a tout chargé
+          if (rides.length < limit) {
+            hasMore = false;
+          } else {
+            page++;
+            // Sécurité : ne pas faire plus de 10 pages (1000 balades max théoriques)
+            if (page > 10) {
+              hasMore = false;
+            }
+          }
+        }
+        
+        if (mounted) {
+          setState(() {
+            _ridesThisMonth = totalRides;
+            _activeGroups = activeGroups;
+          });
+        }
+      } catch (e) {
+        debugPrint('Erreur lors du chargement des balades pour les statistiques: $e');
+        // En cas d'erreur, garder 0 mais ne pas bloquer l'affichage
+        if (mounted) {
+          setState(() {
+            _ridesThisMonth = 0;
+            _activeGroups = activeGroups;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erreur lors du calcul des statistiques: $e');

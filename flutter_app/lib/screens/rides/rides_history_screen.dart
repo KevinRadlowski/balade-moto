@@ -11,6 +11,7 @@ import '../../config/api_config.dart';
 import '../ride/ride_detail_screen.dart';
 import '../ride/create_ride_with_map_screen.dart';
 import 'review_ride_dialog.dart';
+import '../../providers/plan_provider.dart';
 
 class RidesHistoryScreen extends StatefulWidget {
   const RidesHistoryScreen({super.key});
@@ -22,6 +23,7 @@ class RidesHistoryScreen extends StatefulWidget {
 class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   late TabController _tabController;
+  final ScrollController _upcomingScrollController = ScrollController();
   
   List<Ride> _upcomingRides = [];
   List<Ride> _pastRides = [];
@@ -30,10 +32,16 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
   bool _isLoadingUpcoming = true;
   bool _isLoadingPast = true;
   bool _isLoadingMyPast = true;
+  bool _isLoadingMoreUpcoming = false;
   
   String? _errorUpcoming;
   String? _errorPast;
   String? _errorMyPast;
+  
+  // Pagination pour "À venir"
+  int _upcomingPage = 1;
+  bool _hasMoreUpcoming = true;
+  static const int _upcomingLimit = 20;
   
   // Map pour stocker l'état des likes par balade
   final Map<String, bool> _likesState = {};
@@ -77,13 +85,25 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _upcomingScrollController.addListener(_onUpcomingScroll);
     _loadRides();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _upcomingScrollController.dispose();
     super.dispose();
+  }
+
+  void _onUpcomingScroll() {
+    if (_upcomingScrollController.position.pixels >=
+        _upcomingScrollController.position.maxScrollExtent - 200) {
+      // Charger plus de balades quand on est à 200px du bas
+      if (!_isLoadingMoreUpcoming && _hasMoreUpcoming) {
+        _loadMoreUpcomingRides();
+      }
+    }
   }
 
   Future<void> _loadRides() async {
@@ -94,12 +114,17 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
     ]);
   }
 
-  Future<void> _loadUpcomingRides() async {
+  Future<void> _loadUpcomingRides({bool reset = true}) async {
     if (!mounted) return;
-    setState(() {
-      _isLoadingUpcoming = true;
-      _errorUpcoming = null;
-    });
+    if (reset) {
+      setState(() {
+        _isLoadingUpcoming = true;
+        _errorUpcoming = null;
+        _upcomingPage = 1;
+        _hasMoreUpcoming = true;
+        _upcomingRides = [];
+      });
+    }
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -115,7 +140,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
       // Utiliser la date la plus récente entre celle du filtre et aujourd'hui
       final finalDateDebut = effectiveDateDebut.isBefore(today) ? today : effectiveDateDebut;
       
-      final rides = await _apiService.getRides(
+      final result = await _apiService.getRides(
         typeVehicule: _upcomingTypeVehicule,
         dateDebut: finalDateDebut.toIso8601String(),
         dateFin: _upcomingDateFin,
@@ -125,7 +150,12 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         rayon: _upcomingRayon,
         sortBy: _upcomingSortBy,
         sortOrder: _upcomingSortOrder,
+        page: _upcomingPage,
+        limit: _upcomingLimit,
       );
+      
+      final rides = result['rides'] as List<Ride>;
+      final pagination = result['pagination'] as Map<String, dynamic>;
       
       // Filtrer une deuxième fois côté client pour s'assurer qu'aucune balade passée ne remonte
       final filteredRides = rides.where((ride) {
@@ -149,10 +179,15 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
 
       if (mounted) {
         setState(() {
-          _upcomingRides = filteredRides;
+          if (reset) {
+            _upcomingRides = filteredRides;
+          } else {
+            _upcomingRides.addAll(filteredRides);
+          }
           _likesState.addAll(likesState);
           _likesCount.addAll(likesCount);
           _isLoadingUpcoming = false;
+          _hasMoreUpcoming = pagination['page'] < pagination['pages'];
         });
       }
     } catch (e) {
@@ -160,6 +195,82 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         setState(() {
           _errorUpcoming = e.toString();
           _isLoadingUpcoming = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreUpcomingRides() async {
+    if (!mounted || _isLoadingMoreUpcoming || !_hasMoreUpcoming) return;
+    
+    setState(() {
+      _isLoadingMoreUpcoming = true;
+      _upcomingPage++;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final effectiveDateDebut = _upcomingDateDebut != null
+          ? DateTime.parse(_upcomingDateDebut!)
+          : today;
+      final finalDateDebut = effectiveDateDebut.isBefore(today) ? today : effectiveDateDebut;
+      
+      final result = await _apiService.getRides(
+        typeVehicule: _upcomingTypeVehicule,
+        dateDebut: finalDateDebut.toIso8601String(),
+        dateFin: _upcomingDateFin,
+        search: _upcomingSearch,
+        latitude: _upcomingLatitude,
+        longitude: _upcomingLongitude,
+        rayon: _upcomingRayon,
+        sortBy: _upcomingSortBy,
+        sortOrder: _upcomingSortOrder,
+        page: _upcomingPage,
+        limit: _upcomingLimit,
+      );
+      
+      final rides = result['rides'] as List<Ride>;
+      final pagination = result['pagination'] as Map<String, dynamic>;
+      
+      // Filtrer les balades passées
+      final filteredRides = rides.where((ride) {
+        final rideDate = DateTime(
+          ride.date.year,
+          ride.date.month,
+          ride.date.day,
+          int.parse(ride.heure.split(':')[0]),
+          int.parse(ride.heure.split(':')[1]),
+        );
+        return rideDate.isAfter(now) || rideDate.isAtSameMomentAs(now);
+      }).toList();
+
+      // Initialiser l'état des likes
+      final likesState = <String, bool>{};
+      final likesCount = <String, int>{};
+      for (final ride in filteredRides) {
+        likesState[ride.id] = ride.hasUserLiked ?? false;
+        likesCount[ride.id] = ride.totalLikes ?? ride.likes.length;
+      }
+
+      if (mounted) {
+        setState(() {
+          _upcomingRides.addAll(filteredRides);
+          _likesState.addAll(likesState);
+          _likesCount.addAll(likesCount);
+          _isLoadingMoreUpcoming = false;
+          _hasMoreUpcoming = pagination['page'] < pagination['pages'];
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreUpcoming = false;
+          _upcomingPage--; // Revenir à la page précédente en cas d'erreur
         });
       }
     }
@@ -179,7 +290,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
 
       final now = DateTime.now();
       // Utiliser getRides avec dateFin pour les balades passées
-      final rides = await _apiService.getRides(
+      final result = await _apiService.getRides(
         typeVehicule: _pastTypeVehicule,
         dateFin: _pastDateFin ?? now.toIso8601String(),
         dateDebut: _pastDateDebut,
@@ -190,6 +301,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         sortBy: _pastSortBy,
         sortOrder: _pastSortOrder,
       );
+      final rides = result['rides'] as List<Ride>;
 
       // Initialiser l'état des likes
       final likesState = <String, bool>{};
@@ -233,7 +345,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
       // Utiliser getRides avec participant pour mes balades passées
       final userId = authService.user?.id;
       
-      final rides = await _apiService.getRides(
+      final result = await _apiService.getRides(
         typeVehicule: _myPastTypeVehicule,
         dateFin: _myPastDateFin ?? now.toIso8601String(),
         dateDebut: _myPastDateDebut,
@@ -245,6 +357,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
         sortBy: _myPastSortBy,
         sortOrder: _myPastSortOrder,
       );
+      final rides = result['rides'] as List<Ride>;
 
       // Initialiser l'état des likes
       final likesState = <String, bool>{};
@@ -424,7 +537,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
             setState(() {
               _upcomingTypeVehicule = value;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onVisibiliteChanged: (value) {
             // Non utilisé pour "À venir"
@@ -433,19 +546,19 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
             setState(() {
               _upcomingDateDebut = value;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onDateFinChanged: (value) {
             setState(() {
               _upcomingDateFin = value;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onSearchChanged: (value) {
             setState(() {
               _upcomingSearch = value;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onLocationChanged: (lat, lng, rayon) {
             setState(() {
@@ -453,14 +566,14 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
               _upcomingLongitude = lng;
               _upcomingRayon = rayon;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onSortChanged: (sortBy, sortOrder) {
             setState(() {
               _upcomingSortBy = sortBy;
               _upcomingSortOrder = sortOrder;
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
           onClearFilters: () {
             setState(() {
@@ -474,7 +587,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
               _upcomingSortBy = 'date';
               _upcomingSortOrder = 'asc';
             });
-            _loadUpcomingRides();
+            _loadUpcomingRides(reset: true);
           },
         ),
         Expanded(
@@ -499,11 +612,19 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                           child: Text('Aucune balade à venir'),
                         )
                       : RefreshIndicator(
-                          onRefresh: _loadUpcomingRides,
+                          onRefresh: () => _loadUpcomingRides(reset: true),
                           child: ListView.builder(
+                            controller: _upcomingScrollController,
                             padding: const EdgeInsets.all(16),
-                            itemCount: _upcomingRides.length,
+                            itemCount: _upcomingRides.length + (_isLoadingMoreUpcoming ? 1 : 0),
                             itemBuilder: (context, index) {
+                              if (index == _upcomingRides.length) {
+                                // Afficher l'indicateur de chargement en bas
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
                               final ride = _upcomingRides[index];
                               return _RideCard(
                                 ride: ride,
@@ -516,7 +637,7 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                                     ),
                                   ).then((_) {
                                     if (mounted) {
-                                      _loadUpcomingRides();
+                                      _loadUpcomingRides(reset: true);
                                     }
                                   });
                                 },
@@ -631,11 +752,13 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                             itemCount: _pastRides.length,
                             itemBuilder: (context, index) {
                               final ride = _pastRides[index];
+                              final planProvider = Provider.of<PlanProvider>(context, listen: false);
+                              final isPremium = planProvider.isPremium;
                               return _RideCard(
                                 ride: ride,
                                 isLiked: _likesState[ride.id] ?? false,
                                 totalLikes: _likesCount[ride.id] ?? 0,
-                                showDuplicate: true,
+                                showDuplicate: isPremium,
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -757,11 +880,13 @@ class _RidesHistoryScreenState extends State<RidesHistoryScreen> with SingleTick
                             itemCount: _myPastRides.length,
                             itemBuilder: (context, index) {
                               final ride = _myPastRides[index];
+                              final planProvider = Provider.of<PlanProvider>(context, listen: false);
+                              final isPremium = planProvider.isPremium;
                               return _RideCard(
                                 ride: ride,
                                 isLiked: _likesState[ride.id] ?? false,
                                 totalLikes: _likesCount[ride.id] ?? 0,
-                                showDuplicate: true,
+                                showDuplicate: isPremium,
                                 showReview: true,
                                 onTap: () {
                                   Navigator.of(context).push(
@@ -848,17 +973,20 @@ class _RideCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              // Titre de la balade
+              Text(
+                ride.titre,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Chips (type véhicule, visibilité, premium, actions)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: Text(
-                      ride.titre,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -878,7 +1006,6 @@ class _RideCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -899,8 +1026,7 @@ class _RideCard extends StatelessWidget {
                     ),
                   ),
                   // Badge "Organisateur Premium"
-                  if (ride.isOrganizerPremium == true) ...[
-                    const SizedBox(width: 8),
+                  if (ride.isOrganizerPremium == true)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -931,16 +1057,49 @@ class _RideCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ],
-                  if (showDuplicate && onDuplicate != null) ...[
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.copy),
-                      onPressed: onDuplicate,
-                      tooltip: 'Dupliquer cette balade',
-                      iconSize: 20,
+                  if (showDuplicate && onDuplicate != null)
+                    Consumer<PlanProvider>(
+                      builder: (context, planProvider, _) {
+                        // Double vérification : s'assurer que l'utilisateur est vraiment premium
+                        if (!planProvider.isPremium) {
+                          return const SizedBox.shrink();
+                        }
+                        return InkWell(
+                          onTap: onDuplicate,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.green.shade300,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.copy,
+                                  size: 14,
+                                  color: Colors.green.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Dupliquer',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ],
                 ],
               ),
               if (ride.description != null && ride.description!.isNotEmpty) ...[

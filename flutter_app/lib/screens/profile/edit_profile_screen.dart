@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
@@ -28,6 +30,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _avatarUrl;
   dynamic _selectedImage; // Peut être File (mobile) ou bytes (web)
   bool _isLoading = false;
+  bool _isUploadingAvatar = false;
   String? _errorMessage;
   
   // Backgrounds personnalisés
@@ -46,6 +49,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return ApiConfig.getFileUrl(avatarUrl);
   }
 
+  // Obtenir le provider d'image pour l'avatar
+  ImageProvider? _getAvatarImageProvider() {
+    // Si on a une image sélectionnée localement (pas encore uploadée), l'afficher
+    if (_selectedImage != null) {
+      if (kIsWeb && _selectedImage is List<int>) {
+        // Sur web, convertir les bytes en MemoryImage
+        return MemoryImage(Uint8List.fromList(_selectedImage as List<int>));
+      } else if (!kIsWeb && _selectedImage is String) {
+        // Sur mobile, utiliser le chemin du fichier
+        return FileImage(io.File(_selectedImage as String));
+      }
+    }
+    
+    // Sinon, utiliser l'URL du serveur si disponible
+    if (_avatarUrl != null && 
+        _avatarUrl!.isNotEmpty && 
+        (_avatarUrl!.startsWith('http') || _avatarUrl!.startsWith('/uploads'))) {
+      return NetworkImage(_buildAvatarUrl(_avatarUrl!)) as ImageProvider;
+    }
+    
+    return null;
+  }
+
+  // Obtenir le widget enfant pour l'avatar (icône par défaut)
+  Widget? _getAvatarChild() {
+    // Si on a une image (locale ou serveur), ne pas afficher l'icône
+    if (_selectedImage != null || 
+        (_avatarUrl != null && 
+         _avatarUrl!.isNotEmpty && 
+         (_avatarUrl!.startsWith('http') || _avatarUrl!.startsWith('/uploads')))) {
+      return null;
+    }
+    
+    return const Icon(
+      Icons.person,
+      size: 60,
+      color: Colors.white,
+    );
+  }
+
   Future<void> _loadUserData() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     
@@ -56,33 +99,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       apiService.setToken(token);
       final user = await apiService.getMe();
       
-      _firstNameController.text = user.firstName ?? '';
-      _lastNameController.text = user.lastName ?? '';
-      _pseudoController.text = user.pseudo ?? '';
-      _emailController.text = user.email;
-      _selectedVehiclePreference = user.vehiclePreference ?? 'moto';
-      _avatarUrl = user.avatarUrl;
-      _customBackgrounds = user.customBackgrounds;
+      if (mounted) {
+        setState(() {
+          _firstNameController.text = user.firstName ?? '';
+          _lastNameController.text = user.lastName ?? '';
+          _pseudoController.text = user.pseudo ?? '';
+          _emailController.text = user.email;
+          _selectedVehiclePreference = user.vehiclePreference ?? 'moto';
+          _avatarUrl = user.avatarUrl;
+          _customBackgrounds = user.customBackgrounds;
+          // Ne pas réinitialiser _selectedImage ici pour garder l'image locale affichée
+        });
+      }
       
       // Mettre à jour l'utilisateur dans AuthService
       authService.updateUser(user);
     } catch (e) {
       // En cas d'erreur, utiliser les données locales
       final user = authService.user;
-      if (user != null) {
-        _firstNameController.text = user.firstName ?? '';
-        _lastNameController.text = user.lastName ?? '';
-        _pseudoController.text = user.pseudo ?? '';
-        _emailController.text = user.email;
-        _selectedVehiclePreference = user.vehiclePreference ?? 'moto';
-        _avatarUrl = user.avatarUrl;
-        _customBackgrounds = user.customBackgrounds;
+      if (user != null && mounted) {
+        setState(() {
+          _firstNameController.text = user.firstName ?? '';
+          _lastNameController.text = user.lastName ?? '';
+          _pseudoController.text = user.pseudo ?? '';
+          _emailController.text = user.email;
+          _selectedVehiclePreference = user.vehiclePreference ?? 'moto';
+          _avatarUrl = user.avatarUrl;
+          _customBackgrounds = user.customBackgrounds;
+        });
       }
     }
   }
 
   Future<void> _pickImage() async {
-    if (_isLoading) return;
+    if (_isLoading || _isUploadingAvatar) return;
     
     try {
       if (kIsWeb) {
@@ -92,14 +142,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           allowMultiple: false,
         );
 
-        if (result != null) {
+        if (result != null && result.files.isNotEmpty) {
           final file = result.files.single;
           
-          if (file.bytes != null) {
+          if (file.bytes != null && file.bytes!.isNotEmpty) {
             // Uploader l'image depuis les bytes (web)
             await _uploadImageFromBytes(file.bytes!, file.name);
           } else {
-            throw Exception('Impossible de lire le fichier sélectionné');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Impossible de lire le fichier sélectionné'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         }
       } else {
@@ -137,14 +194,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             imageQuality: 85,
           );
 
-          if (image != null) {
-            // Sur mobile uniquement, créer un File depuis le chemin
-            if (!kIsWeb) {
-              // Utiliser le chemin directement pour éviter les problèmes avec io.File
-              await _uploadImage(image.path);
-            } else {
-              throw Exception('Cette méthode ne devrait pas être appelée sur le web');
-            }
+          if (image != null && image.path.isNotEmpty) {
+            // Sur mobile uniquement, utiliser le chemin directement
+            await _uploadImage(image.path);
           }
         }
       }
@@ -152,7 +204,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sélection de l\'image: ${e.toString()}'),
+            content: Text('Erreur lors de la sélection de l\'image: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -161,29 +213,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _uploadImage(String imagePath) async {
+    if (imagePath.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chemin d\'image invalide'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
+      _isUploadingAvatar = true;
       _errorMessage = null;
+      // Afficher l'image sélectionnée immédiatement pour un feedback visuel
+      _selectedImage = imagePath;
     });
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final apiService = ApiService();
       final token = await authService.storage.read(key: 'token');
+      if (token == null || token.isEmpty) {
+        throw Exception('Token d\'authentification manquant');
+      }
       apiService.setToken(token);
 
       // Uploader l'image (sur mobile uniquement)
       final avatarUrl = await apiService.uploadAvatar(imagePath);
+      
+      if (avatarUrl.isEmpty) {
+        throw Exception('L\'URL de l\'avatar retournée est vide');
+      }
 
+      // Mettre à jour l'état avec la nouvelle URL
       setState(() {
         _avatarUrl = avatarUrl;
-        // Sur mobile, stocker le chemin pour l'affichage local
-        // On ne stocke pas le File directement car il sera créé dynamiquement si nécessaire
-        if (!kIsWeb) {
-          _selectedImage = imagePath; // Stocker le chemin au lieu du File
-        }
-        _isLoading = false;
+        _isUploadingAvatar = false;
+        // Conserver _selectedImage pour l'affichage jusqu'à ce que l'image serveur soit chargée
       });
+
+      // Attendre un peu pour que le serveur traite l'upload avant de recharger
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Recharger les données utilisateur pour s'assurer que tout est synchronisé
+      await _loadUserData();
+      
+      // Après le rechargement, nettoyer _selectedImage pour utiliser l'URL serveur
+      if (mounted) {
+        setState(() {
+          // Ne pas réinitialiser _selectedImage si l'avatarUrl est maintenant disponible
+          // Cela permet de garder l'image locale si le serveur n'a pas encore mis à jour
+          if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+            _selectedImage = null;
+          }
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,20 +283,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
+        _isUploadingAvatar = false;
+        // En cas d'erreur, garder l'image sélectionnée pour permettre de réessayer
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _uploadImageFromBytes(List<int> bytes, String fileName) async {
+    if (bytes.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fichier image vide'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
+      _isUploadingAvatar = true;
       _errorMessage = null;
+      // Afficher l'image sélectionnée immédiatement pour un feedback visuel
+      _selectedImage = bytes;
     });
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final token = await authService.storage.read(key: 'token');
+      
+      if (token == null || token.isEmpty) {
+        throw Exception('Token d\'authentification manquant');
+      }
 
       // Uploader via une requête multipart
       final uri = Uri.parse('${ApiService.baseUrl}/user/upload-avatar');
@@ -230,17 +346,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final avatarUrl = data['data']?['avatarUrl'];
+        
+        if (avatarUrl == null || avatarUrl.isEmpty) {
+          throw Exception('L\'URL de l\'avatar retournée est vide');
+        }
+        
+        // Mettre à jour l'état avec la nouvelle URL
         setState(() {
-          _avatarUrl = data['data']['avatarUrl'];
-          _isLoading = false;
+          _avatarUrl = avatarUrl;
+          _isUploadingAvatar = false;
+          // Conserver _selectedImage pour l'affichage jusqu'à ce que l'image serveur soit chargée
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image uploadée avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        // Attendre un peu pour que le serveur traite l'upload avant de recharger
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Recharger les données utilisateur pour s'assurer que tout est synchronisé
+        await _loadUserData();
+        
+        // Après le rechargement, nettoyer _selectedImage pour utiliser l'URL serveur
+        if (mounted) {
+          setState(() {
+            // Ne pas réinitialiser _selectedImage si l'avatarUrl est maintenant disponible
+            // Cela permet de garder l'image locale si le serveur n'a pas encore mis à jour
+            if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+              _selectedImage = null;
+            }
+          });
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image uploadée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         final errorData = jsonDecode(response.body);
         throw Exception(errorData['message'] ?? 'Erreur lors de l\'upload');
@@ -248,8 +391,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
+        _isUploadingAvatar = false;
+        // En cas d'erreur, garder l'image sélectionnée pour permettre de réessayer
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -590,24 +744,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: Stack(
                   children: [
                     GestureDetector(
-                      onTap: _pickImage,
-                      child: CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Theme.of(context).primaryColor,
-                        backgroundImage: _avatarUrl != null && 
-                                       _avatarUrl!.isNotEmpty && 
-                                       (_avatarUrl!.startsWith('http') || _avatarUrl!.startsWith('/uploads'))
-                            ? NetworkImage(_buildAvatarUrl(_avatarUrl!)) as ImageProvider
-                            : null, // Utiliser uniquement l'URL du serveur pour l'affichage
-                        child: (_avatarUrl == null || _avatarUrl!.isEmpty || 
-                               (!_avatarUrl!.startsWith('http') && !_avatarUrl!.startsWith('/uploads'))) &&
-                               (kIsWeb || _selectedImage == null || _selectedImage is! String)
-                            ? const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Colors.white,
-                              )
-                            : null,
+                      onTap: _isUploadingAvatar ? null : _pickImage,
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Theme.of(context).primaryColor,
+                            backgroundImage: _getAvatarImageProvider(),
+                            child: _getAvatarChild(),
+                          ),
+                          // Overlay de chargement pendant l'upload
+                          if (_isUploadingAvatar)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Positioned(
@@ -617,8 +778,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         radius: 18,
                         backgroundColor: Theme.of(context).primaryColor,
                         child: IconButton(
-                          icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
-                          onPressed: _isLoading ? null : _pickImage,
+                          icon: _isUploadingAvatar
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                          onPressed: _isUploadingAvatar ? null : _pickImage,
                           padding: EdgeInsets.zero,
                           tooltip: kIsWeb ? 'Sélectionner une image' : 'Prendre une photo',
                         ),

@@ -31,7 +31,9 @@ router.get('/calendar', authMiddleware, subscriptionMiddleware, rideController.g
 const {
   validateCalculateRoute,
   validateGeocodeAddress,
-  validateReverseGeocode
+  validateReverseGeocode,
+  validatePlacesAutocomplete,
+  validatePlaceDetails
 } = require('../validators/google-maps.validator');
 
 router.get('/directions/route', 
@@ -54,6 +56,20 @@ router.get('/reverse-geocode',
   rateLimitMiddleware(20, 60000), // 20 req/min
   validateReverseGeocode, 
   rideController.reverseGeocode
+);
+router.get('/places/autocomplete', 
+  authMiddleware, 
+  subscriptionMiddleware,
+  rateLimitMiddleware(20, 60000), // 20 req/min
+  validatePlacesAutocomplete, 
+  rideController.placesAutocomplete
+);
+router.get('/places/details', 
+  authMiddleware, 
+  subscriptionMiddleware,
+  rateLimitMiddleware(20, 60000), // 20 req/min
+  validatePlaceDetails, 
+  rideController.placeDetails
 );
 // Route pour accéder à une balade via son lien secret (AVANT /:id pour éviter les conflits)
 router.get('/secret/:secretLink', authMiddleware, subscriptionMiddleware, rideController.getRideBySecretLink);

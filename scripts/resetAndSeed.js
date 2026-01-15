@@ -133,6 +133,69 @@ function rideWaypoints({
   return wps;
 }
 
+/**
+ * Helper pour créer une location de groupe à partir d'une ville
+ * Retourne un objet location avec city, departmentCode, departmentName, regionName, countryCode, geo
+ */
+function groupLocationFromCity(cityKey, cities) {
+  const city = cities[cityKey];
+  if (!city) return null;
+
+  // Mapping ville -> département et région
+  const locationMap = {
+    paris: {
+      city: "Paris",
+      departmentCode: "75",
+      departmentName: "Paris",
+      regionName: "Île-de-France",
+      countryCode: "FR",
+    },
+    lyon: {
+      city: "Lyon",
+      departmentCode: "69",
+      departmentName: "Rhône",
+      regionName: "Auvergne-Rhône-Alpes",
+      countryCode: "FR",
+    },
+    marseille: {
+      city: "Marseille",
+      departmentCode: "13",
+      departmentName: "Bouches-du-Rhône",
+      regionName: "Provence-Alpes-Côte d'Azur",
+      countryCode: "FR",
+    },
+    bordeaux: {
+      city: "Bordeaux",
+      departmentCode: "33",
+      departmentName: "Gironde",
+      regionName: "Nouvelle-Aquitaine",
+      countryCode: "FR",
+    },
+    nice: {
+      city: "Nice",
+      departmentCode: "06",
+      departmentName: "Alpes-Maritimes",
+      regionName: "Provence-Alpes-Côte d'Azur",
+      countryCode: "FR",
+    },
+  };
+
+  const locationData = locationMap[cityKey];
+  if (!locationData) return null;
+
+  return {
+    city: locationData.city,
+    departmentCode: locationData.departmentCode,
+    departmentName: locationData.departmentName,
+    regionName: locationData.regionName,
+    countryCode: locationData.countryCode,
+    geo: {
+      type: "Point",
+      coordinates: [city.lng, city.lat], // [lng, lat] pour MongoDB
+    },
+  };
+}
+
 async function resetAndSeed() {
   console.log("🔌 Connexion MongoDB...");
   await mongoose.connect(MONGO_URI);
@@ -1516,6 +1579,7 @@ async function resetAndSeed() {
 
   // ---------- GROUPS ----------
   console.log("\n💬 Création des groupes mock...");
+  
   const groupsPayload = [
     {
       nom: "RideTogether - Accueil",
@@ -1527,6 +1591,7 @@ async function resetAndSeed() {
         { userId: U.lyon_moto._id, role: "membre" },
         { userId: U.paris_car._id, role: "membre" },
       ],
+      location: groupLocationFromCity("paris", cities),
     },
     {
       nom: "Lyon Riders",
@@ -1537,6 +1602,7 @@ async function resetAndSeed() {
         { userId: U.lyon_moto._id, role: "admin" },
         { userId: U.admin_ride._id, role: "membre" },
       ],
+      location: groupLocationFromCity("lyon", cities),
     },
     {
       nom: "Privé - Sorties Sud",
@@ -1547,6 +1613,7 @@ async function resetAndSeed() {
         { userId: U.marseille_mix._id, role: "admin" },
         { userId: U.nice_moto._id, role: "membre" },
       ],
+      location: groupLocationFromCity("marseille", cities),
     },
     {
       nom: "Roadtrip Ouest",
@@ -1557,6 +1624,7 @@ async function resetAndSeed() {
         { userId: U.bordeaux_moto._id, role: "admin" },
         { userId: U.admin_ride._id, role: "membre" },
       ],
+      location: groupLocationFromCity("bordeaux", cities),
     },
     {
       nom: "Privé - Organisation (staff)",
@@ -1567,6 +1635,7 @@ async function resetAndSeed() {
         { userId: U.admin_ride._id, role: "admin" },
         { userId: U.paris_car._id, role: "membre" },
       ],
+      location: groupLocationFromCity("paris", cities),
     },
     {
       nom: "Paris & IDF Riders",
@@ -1578,6 +1647,7 @@ async function resetAndSeed() {
         { userId: U.admin_ride._id, role: "membre" },
         { userId: U.lyon_moto._id, role: "membre" },
       ],
+      location: groupLocationFromCity("paris", cities),
     },
     {
       nom: "PACA Riders",
@@ -1588,6 +1658,7 @@ async function resetAndSeed() {
         { userId: U.marseille_mix._id, role: "admin" },
         { userId: U.nice_moto._id, role: "membre" },
       ],
+      location: groupLocationFromCity("nice", cities),
     },
     {
       nom: "Moto Only",
@@ -1600,6 +1671,7 @@ async function resetAndSeed() {
         { userId: U.nice_moto._id, role: "membre" },
         { userId: U.admin_ride._id, role: "membre" },
       ],
+      location: groupLocationFromCity("lyon", cities),
     },
     {
       nom: "Privé - Spots & Secrets",
@@ -1611,15 +1683,120 @@ async function resetAndSeed() {
         { userId: U.nice_moto._id, role: "membre" },
         { userId: U.marseille_mix._id, role: "membre" },
       ],
+      location: groupLocationFromCity("nice", cities),
     },
   ];
+
+  // Filtrer les locations null (au cas où)
+  groupsPayload.forEach((group) => {
+    if (!group.location) {
+      delete group.location;
+    }
+  });
 
   const createdGroups = await Group.insertMany(groupsPayload);
   console.log(`✅ ${createdGroups.length} groupes créés`);
 
+  // Construire groupByName immédiatement après création (utilisé plus bas pour messages et favoris)
+  const groupByName = Object.fromEntries(createdGroups.map((g) => [g.nom, g]));
+
+  // ---------- ASSIGNER FAVORIS AUX USERS ----------
+  console.log("\n⭐ Attribution des groupes favoris aux utilisateurs...");
+  
+  const favoriteGroupsMapping = {
+    admin_ride: [
+      "RideTogether - Accueil",
+      "Paris & IDF Riders",
+      "Moto Only",
+    ],
+    paris_car: [
+      "Paris & IDF Riders",
+      "RideTogether - Accueil",
+    ],
+    lyon_moto: [
+      "Lyon Riders",
+      "Moto Only",
+    ],
+    marseille_mix: [
+      "PACA Riders",
+      "Privé - Sorties Sud",
+    ],
+    nice_moto: [
+      "PACA Riders",
+      "Moto Only",
+      "Privé - Spots & Secrets",
+    ],
+    bordeaux_moto: [
+      "Roadtrip Ouest",
+      "Moto Only",
+    ],
+    lille_car: [
+      "RideTogether - Accueil",
+    ],
+    toulouse_car: [
+      "RideTogether - Accueil",
+    ],
+  };
+
+  const favoriteUpdates = [];
+  for (const [pseudo, groupNames] of Object.entries(favoriteGroupsMapping)) {
+    const user = U[pseudo];
+    if (!user) continue;
+
+    const groupIds = groupNames
+      .map((name) => groupByName[name]?._id)
+      .filter(Boolean); // Filtrer les groupes non trouvés
+
+    if (groupIds.length > 0) {
+      favoriteUpdates.push({
+        updateOne: {
+          filter: { _id: user._id },
+          update: { $set: { favoriteGroups: groupIds } },
+        },
+      });
+    }
+  }
+
+  if (favoriteUpdates.length > 0) {
+    await User.bulkWrite(favoriteUpdates);
+    console.log(`✅ Favoris assignés à ${favoriteUpdates.length} utilisateurs`);
+  }
+
+  // ---------- METTRE À JOUR updatedAt POUR SIMULER ACTIVITÉ RÉCENTE ----------
+  console.log("\n🕐 Mise à jour des timestamps updatedAt pour simuler l'activité récente...");
+  
+  const nowForActivity = new Date();
+  const recentActivity = addHours(nowForActivity, -2); // Il y a 2 heures
+  const veryRecentActivity = addMinutes(nowForActivity, -30); // Il y a 30 minutes
+
+  const updatedAtMapping = {
+    "Paris & IDF Riders": recentActivity,
+    "Privé - Organisation (staff)": veryRecentActivity,
+    "Moto Only": addHours(nowForActivity, -6), // Il y a 6 heures
+    "PACA Riders": addHours(nowForActivity, -12), // Il y a 12 heures
+  };
+
+  const updatedAtOperations = [];
+  for (const [groupName, updatedAt] of Object.entries(updatedAtMapping)) {
+    const group = groupByName[groupName];
+    if (group) {
+      updatedAtOperations.push({
+        updateOne: {
+          filter: { _id: group._id },
+          update: { $set: { updatedAt } },
+        },
+      });
+    }
+  }
+
+  if (updatedAtOperations.length > 0) {
+    await Group.bulkWrite(updatedAtOperations);
+    console.log(`✅ ${updatedAtOperations.length} groupes avec updatedAt mis à jour`);
+  }
+
   // ---------- MESSAGES ----------
   console.log("\n✉️  Création de messages mock...");
-  const groupByName = Object.fromEntries(createdGroups.map((g) => [g.nom, g]));
+  // groupByName est déjà défini plus haut après la création des groupes
 
   // Base: il y a 2 jours à 18:00 (heure locale serveur)
   const baseMsgTime = addDays(new Date(), -2, 18, 0);

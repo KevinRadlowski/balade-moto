@@ -92,6 +92,40 @@ exports.validateReverseGeocode = [
   handleValidationErrors
 ];
 
+// Validation pour placesAutocomplete
+exports.validatePlacesAutocomplete = [
+  query('input')
+    .trim()
+    .notEmpty()
+    .withMessage('Le paramètre input est requis')
+    .isLength({ min: 2, max: 500 })
+    .withMessage('L\'input doit faire entre 2 et 500 caractères')
+    .custom((value) => {
+      if (/[<>\"'&]/.test(value)) {
+        throw new Error('L\'input contient des caractères non autorisés');
+      }
+      return true;
+    }),
+  handleValidationErrors
+];
+
+// Validation pour placeDetails
+exports.validatePlaceDetails = [
+  query('placeId')
+    .trim()
+    .notEmpty()
+    .withMessage('Le paramètre placeId est requis')
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Le placeId doit faire entre 1 et 200 caractères')
+    .custom((value) => {
+      if (/[<>\"'&]/.test(value)) {
+        throw new Error('Le placeId contient des caractères non autorisés');
+      }
+      return true;
+    }),
+  handleValidationErrors
+];
+
 
 
 

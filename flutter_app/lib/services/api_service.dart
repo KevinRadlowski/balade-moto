@@ -868,22 +868,10 @@ class ApiService {
   }
 
   Future<String> uploadAvatar(dynamic imageFile) async {
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/user/upload-avatar'),
-    );
-
-    // Ajouter le token d'authentification
-    if (_token != null) {
-      request.headers['Authorization'] = 'Bearer $_token';
-    }
-
-    // Ajouter le fichier selon le type
-    // Note: Cette méthode est uniquement utilisée sur mobile
-    // Sur le web, on utilise _uploadImageFromBytes dans edit_profile_screen.dart
+    // Préparer le fichier selon le type
+    String filePath;
+    
     try {
-      String filePath;
-      
       if (imageFile is String) {
         // Si c'est un chemin de fichier
         filePath = imageFile;
@@ -898,20 +886,75 @@ class ApiService {
       } else {
         throw Exception('Cette méthode ne peut pas être utilisée sur le web. Utilisez _uploadImageFromBytes.');
       }
-      
-      request.files.add(
-        await http.MultipartFile.fromPath('avatar', filePath),
-      );
     } catch (e) {
       throw Exception('Erreur lors de la préparation du fichier: $e');
     }
 
+    // Vérifier que le token est disponible
+    if (_token == null || _token!.isEmpty) {
+      throw Exception('Token d\'authentification manquant');
+    }
+
+    // Créer la requête multipart
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/user/upload-avatar'),
+    );
+
+    // Ajouter le token d'authentification
+    request.headers['Authorization'] = 'Bearer $_token';
+
+    // Ajouter le fichier
+    request.files.add(
+      await http.MultipartFile.fromPath('avatar', filePath),
+    );
+
+    // Envoyer la requête
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
+    // Gérer les erreurs d'authentification
+    if (response.statusCode == 401) {
+      // Essayer de rafraîchir le token si possible
+      if (_onTokenRefresh != null) {
+        try {
+          await _onTokenRefresh!();
+          // Réessayer avec le nouveau token
+          var retryRequest = http.MultipartRequest(
+            'POST',
+            Uri.parse('$baseUrl/user/upload-avatar'),
+          );
+          retryRequest.headers['Authorization'] = 'Bearer $_token';
+          retryRequest.files.add(
+            await http.MultipartFile.fromPath('avatar', filePath),
+          );
+          final retryStreamedResponse = await retryRequest.send();
+          final retryResponse = await http.Response.fromStream(retryStreamedResponse);
+          
+          if (retryResponse.statusCode == 200) {
+            final data = jsonDecode(retryResponse.body);
+            final avatarUrl = data['data']?['avatarUrl'];
+            if (avatarUrl == null || avatarUrl.isEmpty) {
+              throw Exception('L\'URL de l\'avatar retournée est vide');
+            }
+            return avatarUrl;
+          }
+        } catch (e) {
+          if (_onTokenExpired != null) {
+            _onTokenExpired!();
+          }
+        }
+      }
+      throw Exception('Token d\'authentification expiré ou invalide');
+    }
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['data']['avatarUrl'];
+      final avatarUrl = data['data']?['avatarUrl'];
+      if (avatarUrl == null || avatarUrl.isEmpty) {
+        throw Exception('L\'URL de l\'avatar retournée est vide');
+      }
+      return avatarUrl;
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors de l\'upload de l\'avatar');
@@ -919,7 +962,7 @@ class ApiService {
   }
 
   // Balades
-  Future<List<Ride>> getRides({
+  Future<Map<String, dynamic>> getRides({
     String? typeVehicule,
     String? dateDebut,
     String? dateFin,
@@ -931,6 +974,7 @@ class ApiService {
     String? sortOrder,
     String? participant,
     String? organisateur,
+    String? visibilite,
     int page = 1,
     int limit = 10,
   }) async {
@@ -945,6 +989,7 @@ class ApiService {
       if (sortOrder != null) 'sortOrder': sortOrder,
       if (participant != null) 'participant': participant,
       if (organisateur != null) 'organisateur': organisateur,
+      if (visibilite != null) 'visibilite': visibilite,
     };
     
     // Ajouter les paramètres géographiques si rayon > 0
@@ -961,9 +1006,12 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return (data['data']['rides'] as List)
-          .map((r) => Ride.fromJson(r))
-          .toList();
+      return {
+        'rides': (data['data']['rides'] as List)
+            .map((r) => Ride.fromJson(r))
+            .toList(),
+        'pagination': data['data']['pagination'],
+      };
     } else {
       throw Exception('Erreur lors de la récupération des balades');
     }
@@ -1115,6 +1163,44 @@ class ApiService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors du géocodage inverse');
+    }
+  }
+
+  // Places Autocomplete
+  Future<Map<String, dynamic>> placesAutocomplete(String input) async {
+    final queryParams = <String, String>{
+      'input': input,
+    };
+
+    final uri = Uri.parse('$baseUrl/rides/places/autocomplete').replace(queryParameters: queryParams);
+    final response = await _makeRequest(() async {
+      return await http.get(uri, headers: _headers);
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de l\'autocomplete Places');
+    }
+  }
+
+  // Place Details
+  Future<Map<String, dynamic>> placeDetails(String placeId) async {
+    final queryParams = <String, String>{
+      'placeId': placeId,
+    };
+
+    final uri = Uri.parse('$baseUrl/rides/places/details').replace(queryParameters: queryParams);
+    final response = await _makeRequest(() async {
+      return await http.get(uri, headers: _headers);
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des détails du lieu');
     }
   }
 
@@ -1615,6 +1701,30 @@ class ApiService {
     }
   }
 
+  /// Mettre à jour une balade (uniquement par l'organisateur)
+  /// Permet de modifier le titre et la description
+  Future<Ride> updateRide(String rideId, {String? titre, String? description}) async {
+    final Map<String, dynamic> body = {};
+    if (titre != null) body['titre'] = titre;
+    if (description != null) body['description'] = description;
+
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/rides/$rideId'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Ride.fromJson(data['data']['ride']);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la mise à jour de la balade');
+    }
+  }
+
   // Supprimer une balade (uniquement par l'organisateur)
   Future<void> deleteRide(String id) async {
     final response = await _makeRequest(() async {
@@ -1693,22 +1803,78 @@ class ApiService {
   }
 
   // Groupes
-  Future<List<dynamic>> getGroups({String? membre}) async {
-    final uri = membre != null
-        ? Uri.parse('$baseUrl/groups').replace(queryParameters: {'membre': membre})
-        : Uri.parse('$baseUrl/groups');
+  Future<Map<String, dynamic>> getGroups({
+    String? scope,
+    String? q,
+    String? owner,
+    String? visibilite,
+    String? region,
+    String? departmentCode,
+    String? city,
+    double? nearLat,
+    double? nearLng,
+    double? nearKm,
+    int page = 1,
+    int limit = 20,
+    // Paramètre legacy pour compatibilité
+    String? membre,
+  }) async {
+    // Construire les query parameters (ignorer ceux qui sont null)
+    final queryParams = <String, String>{};
     
-    final response = await http.get(
-      uri,
-      headers: _headers,
-    );
+    if (scope != null) queryParams['scope'] = scope;
+    if (q != null && q.isNotEmpty) queryParams['q'] = q;
+    if (owner != null && owner.isNotEmpty) queryParams['owner'] = owner;
+    if (visibilite != null) queryParams['visibilite'] = visibilite;
+    if (region != null && region.isNotEmpty) queryParams['region'] = region;
+    if (departmentCode != null && departmentCode.isNotEmpty) {
+      queryParams['departmentCode'] = departmentCode;
+    }
+    if (city != null && city.isNotEmpty) queryParams['city'] = city;
+    if (nearLat != null) queryParams['nearLat'] = nearLat.toString();
+    if (nearLng != null) queryParams['nearLng'] = nearLng.toString();
+    if (nearKm != null) queryParams['nearKm'] = nearKm.toString();
+    queryParams['page'] = page.toString();
+    queryParams['limit'] = limit.toString();
+    
+    // Compatibilité legacy : si membre est fourni, utiliser scope='joined' avec un filtre
+    // Note: Le backend ne supporte plus directement 'membre', donc on utilise scope='joined'
+    // mais cela ne filtre que les groupes où l'utilisateur actuel est membre
+    // Pour un filtre par membre spécifique, il faudrait une autre approche
+    if (membre != null) {
+      // Pour la compatibilité, on peut utiliser scope='joined' mais cela filtre par l'utilisateur actuel
+      // On garde le paramètre membre pour ne pas casser le code existant, mais il sera ignoré
+      // car le backend utilise maintenant scope='joined' qui filtre par req.user._id
+      queryParams['scope'] = 'joined';
+    }
+
+    final uri = Uri.parse('$baseUrl/groups').replace(queryParameters: queryParams);
+    
+    final response = await _makeRequest(() => http.get(uri, headers: _headers));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['data']['groups'] as List;
+      return data['data'] as Map<String, dynamic>;
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors de la récupération des groupes');
+    }
+  }
+
+  Future<bool> toggleFavoriteGroup(String groupId) async {
+    final uri = Uri.parse('$baseUrl/groups/$groupId/favorite');
+    
+    final response = await _makeRequest(() => http.post(
+      uri,
+      headers: _headers,
+    ));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data']['isFavorite'] as bool;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la modification du favori');
     }
   }
 
@@ -1716,16 +1882,20 @@ class ApiService {
     required String nom,
     String? description,
     String visibilite = 'publique',
+    Map<String, dynamic>? location,
   }) async {
     final response = await _makeRequest(() async {
+      final body = <String, dynamic>{
+        'nom': nom,
+        if (description != null && description.isNotEmpty) 'description': description,
+        'visibilite': visibilite,
+        if (location != null) 'location': location,
+      };
+      
       return await http.post(
         Uri.parse('$baseUrl/groups'),
         headers: _headers,
-        body: jsonEncode({
-          'nom': nom,
-          if (description != null && description.isNotEmpty) 'description': description,
-          'visibilite': visibilite,
-        }),
+        body: jsonEncode(body),
       );
     });
 
@@ -1774,6 +1944,33 @@ class ApiService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors de la jonction au groupe');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateGroup(
+    String groupId, {
+    String? nom,
+    String? description,
+    String? visibilite,
+  }) async {
+    final body = <String, dynamic>{};
+    if (nom != null) body['nom'] = nom;
+    if (description != null) body['description'] = description;
+    if (visibilite != null) body['visibilite'] = visibilite;
+
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/groups/$groupId'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la modification du groupe');
     }
   }
 
@@ -1855,6 +2052,27 @@ class ApiService {
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['message'] ?? 'Erreur lors du retrait du membre');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateMemberRole(
+    String groupId,
+    String userId, {
+    required String role,
+  }) async {
+    final response = await _makeRequest(() async {
+      return await http.put(
+        Uri.parse('$baseUrl/groups/$groupId/members/$userId/role'),
+        headers: _headers,
+        body: jsonEncode({'role': role}),
+      );
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Erreur lors de la modification du rôle');
     }
   }
 

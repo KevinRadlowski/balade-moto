@@ -1227,7 +1227,8 @@ exports.updateRide = async (req, res, next) => {
       lieuDepart,
       lieuArrivee,
       rayon,
-      visibilite
+      visibilite,
+      localisation
     } = req.body;
 
     const ride = await Ride.findById(id);
@@ -2156,6 +2157,142 @@ exports.calculateRoute = async (req, res, next) => {
 
 // Géocoder une adresse via Google Maps Geocoding API (pour éviter CORS)
 // Géocodage inverse (coordonnées -> adresse)
+// Autocomplete Places
+exports.placesAutocomplete = async (req, res, next) => {
+  try {
+    const { input } = req.query;
+
+    if (!input || input.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le paramètre "input" est requis et doit contenir au moins 2 caractères'
+      });
+    }
+
+    // Construire l'URL de l'API Places Autocomplete
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return next(new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante'));
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input.trim())}&key=${apiKey}&language=fr&components=country:fr`;
+
+    // Faire la requête à l'API Places Autocomplete
+    const urlObj = new URL(url);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET'
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = https.request(options, (response) => {
+        let data = '';
+
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        response.on('end', () => {
+          try {
+            const jsonData = JSON.parse(data);
+            
+            if (jsonData.status === 'OK' || jsonData.status === 'ZERO_RESULTS') {
+              const responseData = {
+                success: true,
+                data: {
+                  predictions: jsonData.predictions || []
+                }
+              };
+              res.status(200).json(responseData);
+            } else {
+              return next(new BadRequestError(`Erreur Places Autocomplete API: ${jsonData.status} - ${jsonData.error_message || 'Aucun résultat'}`));
+            }
+          } catch (error) {
+            return next(new InternalServerError(`Erreur lors du parsing de la réponse: ${error.message}`));
+          }
+        });
+      });
+
+      request.on('error', (error) => {
+        return next(new InternalServerError(`Erreur lors de la requête à l'API Places: ${error.message}`));
+      });
+
+      request.end();
+    });
+  } catch (error) {
+    return next(new InternalServerError(`Erreur lors de l'autocomplete Places: ${error.message}`));
+  }
+};
+
+// Place Details
+exports.placeDetails = async (req, res, next) => {
+  try {
+    const { placeId } = req.query;
+
+    if (!placeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le paramètre "placeId" est requis'
+      });
+    }
+
+    // Construire l'URL de l'API Place Details
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return next(new InternalServerError('Configuration serveur incomplète : clé API Google Maps manquante'));
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&key=${apiKey}&language=fr&fields=address_components,geometry,formatted_address,name`;
+
+    // Faire la requête à l'API Place Details
+    const urlObj = new URL(url);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET'
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = https.request(options, (response) => {
+        let data = '';
+
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        response.on('end', () => {
+          try {
+            const jsonData = JSON.parse(data);
+            
+            if (jsonData.status === 'OK' && jsonData.result) {
+              const responseData = {
+                success: true,
+                data: jsonData.result
+              };
+              res.status(200).json(responseData);
+            } else {
+              return next(new BadRequestError(`Erreur Place Details API: ${jsonData.status} - ${jsonData.error_message || 'Lieu non trouvé'}`));
+            }
+          } catch (error) {
+            return next(new InternalServerError(`Erreur lors du parsing de la réponse: ${error.message}`));
+          }
+        });
+      });
+
+      request.on('error', (error) => {
+        return next(new InternalServerError(`Erreur lors de la requête à l'API Place Details: ${error.message}`));
+      });
+
+      request.end();
+    });
+  } catch (error) {
+    return next(new InternalServerError(`Erreur lors de la récupération des détails du lieu: ${error.message}`));
+  }
+};
+
 exports.reverseGeocode = async (req, res, next) => {
   try {
     const { lat, lng } = req.query;

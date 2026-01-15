@@ -34,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _biometricEnabled = false;
   bool _biometricAvailable = false;
   String _biometricTypeName = 'Biométrie';
+  bool _isResendingVerification = false;
 
   @override
   void initState() {
@@ -89,6 +90,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _errorMessage = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    if (_user?.email == null) return;
+
+    setState(() {
+      _isResendingVerification = true;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+
+      await _apiService.resendVerificationEmail(_user!.email);
+      
+      // Recharger le profil pour mettre à jour l'état
+      await _loadProfile();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email de vérification envoyé ! Vérifiez votre boîte de réception.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = e.toString().replaceAll('Exception: ', '');
+        // Gérer le cas du cooldown
+        if (errorMessage.contains('attendre')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResendingVerification = false;
+        });
+      }
     }
   }
 
@@ -870,14 +928,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           if (!_user!.emailVerified)
                             Padding(
-                              padding: const EdgeInsets.only(top: 8, left: 16),
-                              child: Text(
-                                'Email non vérifié',
-                                style: TextStyle(
-                                  color: Colors.orange[700],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Email non vérifié',
+                                    style: TextStyle(
+                                      color: Colors.orange[700],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton.icon(
+                                    onPressed: _isResendingVerification ? null : _resendVerificationEmail,
+                                    icon: _isResendingVerification
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.email_outlined, size: 16),
+                                    label: Text(_isResendingVerification
+                                        ? 'Envoi en cours...'
+                                        : 'Renvoyer l\'email de vérification'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.blue[700],
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           const SizedBox(height: 12),

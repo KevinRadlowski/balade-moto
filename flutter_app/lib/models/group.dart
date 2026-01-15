@@ -9,6 +9,10 @@ class Group {
   // Champs pour l'indicateur d'activité
   final int? unreadCount;
   final DateTime? lastMessageAt;
+  // Nouveaux champs du backend
+  final bool? isFavorite;
+  final bool? isMember;
+  final GroupLocation? location;
 
   Group({
     required this.id,
@@ -20,6 +24,9 @@ class Group {
     this.bannedUsers,
     this.unreadCount,
     this.lastMessageAt,
+    this.isFavorite,
+    this.isMember,
+    this.location,
   });
 
   factory Group.fromJson(Map<String, dynamic> json) {
@@ -77,6 +84,56 @@ class Group {
           : [],
       unreadCount: unreadCount,
       lastMessageAt: lastMessageAt,
+      isFavorite: json['isFavorite'] as bool?,
+      isMember: json['isMember'] as bool?,
+      location: json['location'] != null
+          ? GroupLocation.fromJson(json['location'])
+          : null,
+    );
+  }
+}
+
+class GroupLocation {
+  final String? city;
+  final String? departmentCode;
+  final String? departmentName;
+  final String? regionName;
+  final String? countryCode;
+  final double? lat;
+  final double? lng;
+
+  GroupLocation({
+    this.city,
+    this.departmentCode,
+    this.departmentName,
+    this.regionName,
+    this.countryCode,
+    this.lat,
+    this.lng,
+  });
+
+  factory GroupLocation.fromJson(Map<String, dynamic> json) {
+    // Extraire lat/lng depuis location.geo.coordinates si présent
+    // MongoDB stocke [lng, lat] dans coordinates
+    double? lat;
+    double? lng;
+    
+    if (json['geo'] != null && json['geo']['coordinates'] != null) {
+      final coordinates = json['geo']['coordinates'] as List;
+      if (coordinates.length >= 2) {
+        lng = coordinates[0] is num ? coordinates[0].toDouble() : null;
+        lat = coordinates[1] is num ? coordinates[1].toDouble() : null;
+      }
+    }
+
+    return GroupLocation(
+      city: json['city'] as String?,
+      departmentCode: json['departmentCode'] as String?,
+      departmentName: json['departmentName'] as String?,
+      regionName: json['regionName'] as String?,
+      countryCode: json['countryCode'] as String?,
+      lat: lat,
+      lng: lng,
     );
   }
 }

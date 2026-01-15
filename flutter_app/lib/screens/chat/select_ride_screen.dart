@@ -40,9 +40,10 @@ class _SelectRideScreenState extends State<SelectRideScreen> {
       final token = await authService.storage.read(key: 'token');
       _apiService.setToken(token);
 
-      final rides = await _apiService.getRides(
+      final result = await _apiService.getRides(
         limit: 100, // Charger toutes les balades disponibles
       );
+      final rides = result['rides'] as List<Ride>;
 
       setState(() {
         _rides = rides;

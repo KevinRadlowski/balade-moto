@@ -22,6 +22,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   bool _isLoading = true;
   bool _isMember = false;
   bool _isAdmin = false;
+  bool _isCreator = false;
   String? _errorMessage;
 
   @override
@@ -57,6 +58,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           
           // Vérifier si l'utilisateur est le créateur
           final isCreator = _group!.createur.userId.toString() == currentUserId.toString();
+          _isCreator = isCreator;
           
           // Vérifier si l'utilisateur est dans la liste des membres
           final isMemberInList = _group!.membres.any((membre) => membre.userId.toString() == currentUserId.toString());
@@ -110,6 +112,78 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vous avez rejoint le groupe avec succès !'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _leaveGroup() async {
+    if (_group == null) return;
+
+    // Confirmation avant de quitter
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Quitter le groupe'),
+        content: Text(
+          'Êtes-vous sûr de vouloir quitter "${_group!.nom}" ? Vous ne recevrez plus les notifications de ce groupe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Quitter'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+
+      // Récupérer l'ID de l'utilisateur actuel
+      final currentUser = await _apiService.getMe();
+      final currentUserId = currentUser.id;
+
+      // Utiliser removeMemberFromGroup pour retirer l'utilisateur actuel
+      await _apiService.removeMemberFromGroup(widget.groupId, currentUserId);
+      
+      // Recharger les informations du groupe
+      await _loadGroup();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous avez quitté le groupe avec succès'),
           backgroundColor: Colors.green,
         ),
       );
@@ -296,26 +370,49 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 color: Colors.white.withOpacity(0.85),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => GroupChatScreenV2(
-                                          groupId: _group!.id,
-                                          groupName: _group!.nom,
-                                          memberCount: _group!.membres.length,
+                              child: Column(
+                                children: [
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => GroupChatScreenV2(
+                                              groupId: _group!.id,
+                                              groupName: _group!.nom,
+                                              memberCount: _group!.membres.length,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.chat),
+                                      label: const Text('Ouvrir le chat'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                      ),
+                                    ),
+                                  ),
+                                  // Bouton pour quitter le groupe (uniquement si l'utilisateur n'est pas le créateur)
+                                  if (!_isCreator) ...[
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _leaveGroup,
+                                        icon: const Icon(Icons.exit_to_app, color: Colors.red),
+                                        label: const Text(
+                                          'Quitter le groupe',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          side: const BorderSide(color: Colors.red),
                                         ),
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.chat),
-                                  label: const Text('Ouvrir le chat'),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                  ),
-                                ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -340,6 +437,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+                                  // Option pour modifier le groupe (créateur et admin)
+                                  if (_isCreator || _isAdmin) ...[
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(Icons.edit, color: Colors.blue),
+                                      title: const Text('Modifier le groupe'),
+                                      trailing: const Icon(Icons.chevron_right),
+                                      onTap: () => _showEditGroupDialog(),
+                                    ),
+                                  ],
                                   ListTile(
                                     contentPadding: EdgeInsets.zero,
                                     leading: const Icon(Icons.person_add, color: Colors.blue),
@@ -361,13 +468,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     trailing: const Icon(Icons.chevron_right),
                                     onTap: () => _showBannedUsersDialog(),
                                   ),
-                                  ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: const Icon(Icons.delete, color: Colors.red),
-                                    title: const Text('Supprimer le groupe'),
-                                    trailing: const Icon(Icons.chevron_right),
-                                    onTap: () => _showDeleteGroupDialog(),
-                                  ),
+                                  // Supprimer le groupe (créateur uniquement)
+                                  if (_isCreator) ...[
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(Icons.delete, color: Colors.red),
+                                      title: const Text('Supprimer le groupe'),
+                                      trailing: const Icon(Icons.chevron_right),
+                                      onTap: () => _showDeleteGroupDialog(),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -648,6 +758,123 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
   }
 
+  // Dialog pour modifier le groupe
+  Future<void> _showEditGroupDialog() async {
+    if (_group == null) return;
+
+    final nomController = TextEditingController(text: _group!.nom);
+    final descriptionController = TextEditingController(text: _group!.description ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Modifier le groupe'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nomController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du groupe',
+                    hintText: 'Entrez le nom du groupe',
+                  ),
+                  maxLength: 100,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Entrez la description du groupe',
+                  ),
+                  maxLines: 3,
+                  maxLength: 500,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newNom = nomController.text.trim();
+              final newDescription = descriptionController.text.trim();
+
+              if (newNom.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le nom du groupe est requis'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(context);
+              await _updateGroup(nom: newNom, description: newDescription.isEmpty ? null : newDescription);
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Mettre à jour le groupe
+  Future<void> _updateGroup({String? nom, String? description}) async {
+    if (_group == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+
+      await _apiService.updateGroup(
+        widget.groupId,
+        nom: nom,
+        description: description,
+      );
+
+      // Recharger les informations du groupe
+      await _loadGroup();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Groupe modifié avec succès !'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // Dialog pour gérer les membres
   Future<void> _showManageMembersDialog() async {
     if (_group == null) return;
@@ -673,12 +900,34 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               return ListTile(
                 leading: _buildMemberAvatar(membre),
                 title: Text(membre.pseudo ?? 'Utilisateur'),
-                subtitle: Text(membre.role),
+                subtitle: Text(_getRoleDisplayName(membre.role, isCreator)),
                 trailing: isCreator
                     ? const Text('Créateur', style: TextStyle(color: Colors.orange))
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Option pour modifier le rôle (créateur uniquement)
+                          if (_isCreator) ...[
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, color: Colors.blue),
+                              tooltip: 'Modifier le rôle',
+                              onSelected: (role) => _updateMemberRole(membre.userId, role),
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'admin',
+                                  child: Text('Promouvoir en Admin'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'moderateur',
+                                  child: Text('Promouvoir en Modérateur'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'membre',
+                                  child: Text('Rétrograder en Membre'),
+                                ),
+                              ],
+                            ),
+                          ],
                           IconButton(
                             icon: const Icon(Icons.block, color: Colors.red),
                             tooltip: 'Bannir',
@@ -703,6 +952,71 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         ],
       ),
     );
+  }
+
+  // Helper pour obtenir le nom d'affichage du rôle
+  String _getRoleDisplayName(String role, bool isCreator) {
+    if (isCreator) return 'Créateur';
+    switch (role) {
+      case 'admin':
+        return 'Administrateur';
+      case 'moderateur':
+        return 'Modérateur';
+      case 'membre':
+        return 'Membre';
+      default:
+        return role;
+    }
+  }
+
+  // Mettre à jour le rôle d'un membre
+  Future<void> _updateMemberRole(String userId, String role) async {
+    if (_group == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = await authService.storage.read(key: 'token');
+      _apiService.setToken(token);
+
+      await _apiService.updateMemberRole(
+        widget.groupId,
+        userId,
+        role: role,
+      );
+
+      // Recharger les informations du groupe
+      await _loadGroup();
+
+      if (!mounted) return;
+
+      final roleName = _getRoleDisplayName(role, false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Rôle modifié avec succès : $roleName'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context); // Fermer le dialog de gestion
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Retirer un membre
@@ -1081,11 +1395,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           ),
         ),
         trailing: Text(
-          membre.role,
+          _getRoleDisplayName(
+            membre.role,
+            membre.userId.toString() == _group!.createur.userId.toString(),
+          ),
           style: TextStyle(
-            color: membre.role == 'admin'
+            color: membre.userId.toString() == _group!.createur.userId.toString()
                 ? Colors.orange
-                : Colors.grey,
+                : membre.role == 'admin'
+                    ? Colors.orange
+                    : membre.role == 'moderateur'
+                        ? Colors.blue
+                        : Colors.grey,
             fontWeight: FontWeight.bold,
           ),
         ),

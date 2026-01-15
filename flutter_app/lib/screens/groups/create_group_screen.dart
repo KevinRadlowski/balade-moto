@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../providers/plan_provider.dart';
 import '../../exceptions/plan_limit_exception.dart';
 import '../../widgets/premium/premium_upsell_modal.dart';
+import '../../widgets/location_autocomplete_field.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -19,6 +20,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _nomController = TextEditingController();
   final _descriptionController = TextEditingController();
   String _visibilite = 'publique';
+  LocationFilterData? _selectedLocation;
   bool _isLoading = false;
 
   @override
@@ -67,6 +69,24 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             ? null
             : _descriptionController.text.trim(),
         visibilite: _visibilite,
+        location: _selectedLocation != null
+            ? {
+                'city': _selectedLocation!.city,
+                'departmentCode': _selectedLocation!.departmentCode,
+                'departmentName': _selectedLocation!.departmentName,
+                'regionName': _selectedLocation!.regionName,
+                'countryCode': _selectedLocation!.countryCode,
+                'geo': _selectedLocation!.hasCoordinates
+                    ? {
+                        'type': 'Point',
+                        'coordinates': [
+                          _selectedLocation!.lng!,
+                          _selectedLocation!.lat!,
+                        ],
+                      }
+                    : null,
+              }
+            : null,
       );
 
       if (mounted) {
@@ -209,6 +229,72 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   );
                 },
               ),
+              const SizedBox(height: 16),
+              LocationAutocompleteField(
+                labelText: 'Localisation (optionnel)',
+                hintText: 'Tapez une ville, région ou département...',
+                onLocationSelected: (locationData) {
+                  setState(() {
+                    _selectedLocation = locationData;
+                  });
+                },
+              ),
+              if (_selectedLocation != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on, size: 20, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedLocation!.displayName ?? 'Lieu sélectionné',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue.shade900,
+                              ),
+                            ),
+                            if (_selectedLocation!.city != null ||
+                                _selectedLocation!.departmentName != null ||
+                                _selectedLocation!.regionName != null)
+                              Text(
+                                [
+                                  if (_selectedLocation!.city != null) _selectedLocation!.city,
+                                  if (_selectedLocation!.departmentName != null)
+                                    _selectedLocation!.departmentName,
+                                  if (_selectedLocation!.regionName != null)
+                                    _selectedLocation!.regionName,
+                                ].join(', '),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 18, color: Colors.blue.shade700),
+                        onPressed: () {
+                          setState(() {
+                            _selectedLocation = null;
+                          });
+                        },
+                        tooltip: 'Supprimer la localisation',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

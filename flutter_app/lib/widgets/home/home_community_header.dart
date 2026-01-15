@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/user.dart';
 import '../../config/api_config.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/ride/create_ride_with_map_screen.dart';
 import '../../screens/groups/groups_screen.dart';
+import '../../services/navigation_state.dart';
 
 /// Header communautaire immersif pour la page d'accueil
 /// 
@@ -290,11 +292,21 @@ class HomeCommunityHeader extends StatelessWidget {
         'label': 'balades',
         'value': ridesThisMonth ?? 0,
         'icon': Icons.directions_bike,
+        'onTap': () {
+          // Rediriger vers l'onglet "Balades" (index 1) dans la navigation principale
+          final navigationState = Provider.of<NavigationState>(context, listen: false);
+          navigationState.setIndex(1);
+        },
       },
       {
         'label': 'groupes',
         'value': activeGroups ?? 0,
         'icon': Icons.group,
+        'onTap': () {
+          // Rediriger vers l'onglet "Groupes" (index 3) dans la navigation principale
+          final navigationState = Provider.of<NavigationState>(context, listen: false);
+          navigationState.setIndex(3);
+        },
       },
     ];
 
@@ -309,59 +321,66 @@ class HomeCommunityHeader extends StatelessWidget {
               right: index == 0 ? (isVerySmall ? 8 : 12) : 0, // Marge à droite pour la première carte
               left: index == stats.length - 1 ? (isVerySmall ? 8 : 12) : 0, // Marge à gauche pour la dernière carte
             ),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isVerySmall ? 8 : 12,
-                vertical: isVerySmall ? 10 : 14,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: stat['onTap'] as VoidCallback,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                  width: 1,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isVerySmall ? 8 : 12,
+                    vertical: isVerySmall ? 10 : 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        stat['icon'] as IconData,
+                        size: isVerySmall ? 20 : 24,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                      SizedBox(height: isVerySmall ? 4 : 6),
+                      Text(
+                        '${stat['value']}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isVerySmall ? 18 : 22,
+                          fontWeight: FontWeight.bold,
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: isVerySmall ? 2 : 4),
+                      Text(
+                        stat['label'] as String,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: isVerySmall ? 12 : 14,
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    stat['icon'] as IconData,
-                    size: isVerySmall ? 20 : 24,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                  SizedBox(height: isVerySmall ? 4 : 6),
-                  Text(
-                    '${stat['value']}',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isVerySmall ? 18 : 22,
-                      fontWeight: FontWeight.bold,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black54,
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: isVerySmall ? 2 : 4),
-                  Text(
-                    stat['label'] as String,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      fontSize: isVerySmall ? 12 : 14,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black54,
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ),
             ),
           ),

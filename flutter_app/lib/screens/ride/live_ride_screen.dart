@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1099,29 +1100,55 @@ class _LiveRideScreenState extends State<LiveRideScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Carte
-            GoogleMap(
-            onMapCreated: (controller) {
-              _mapController = controller;
-              // Ne pas recharger la route ici, elle est déjà chargée dans _initializeLiveRide
-              // _loadRouteOnMap();
-            },
-            initialCameraPosition: CameraPosition(
-              target: widget.ride.waypoints != null && widget.ride.waypoints!.isNotEmpty
-                  ? LatLng(
-                      widget.ride.waypoints!.first.latitude,
-                      widget.ride.waypoints!.first.longitude,
-                    )
-                  : const LatLng(46.6034, 1.8883),
-              zoom: 12.0,
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // Bloquer les notifications de scroll quand on interagit avec la carte
+          return true;
+        },
+        child: RawGestureDetector(
+          gestures: <Type, GestureRecognizerFactory>{
+            VerticalDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<VerticalDragGestureRecognizer>(
+              () => VerticalDragGestureRecognizer(),
+              (VerticalDragGestureRecognizer instance) {
+                instance.onStart = (_) {};
+                instance.onUpdate = (_) {};
+                instance.onEnd = (_) {};
+                instance.onCancel = () {};
+              },
             ),
-            markers: _markers,
-            polylines: _polylines,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-          ),
+            ScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
+              () => ScaleGestureRecognizer(),
+              (ScaleGestureRecognizer instance) {
+                instance.onStart = (_) {};
+                instance.onUpdate = (_) {};
+                instance.onEnd = (_) {};
+              },
+            ),
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+          children: [
+            // Carte
+            GoogleMap(
+              onMapCreated: (controller) {
+                _mapController = controller;
+                // Ne pas recharger la route ici, elle est déjà chargée dans _initializeLiveRide
+                // _loadRouteOnMap();
+              },
+              initialCameraPosition: CameraPosition(
+                target: widget.ride.waypoints != null && widget.ride.waypoints!.isNotEmpty
+                    ? LatLng(
+                        widget.ride.waypoints!.first.latitude,
+                        widget.ride.waypoints!.first.longitude,
+                      )
+                    : const LatLng(46.6034, 1.8883),
+                zoom: 12.0,
+              ),
+              markers: _markers,
+              polylines: _polylines,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+            ),
           
           // Panneau d'informations
           Positioned(
@@ -1264,7 +1291,9 @@ class _LiveRideScreenState extends State<LiveRideScreen> {
               ],
             ),
           ),
-        ],
+          ],
+        ),
+        ),
       ),
     );
   }
